@@ -40,5 +40,5 @@ jobs:
           chmod +x rattler-build
 
           # Build and push
-          magic run build --target-platform=$TARGET_PLATFORM
-          magic run publish
+          magic run build -m nightly --target-platform=$TARGET_PLATFORM
+          magic run publish -c mojo-community-nightly
