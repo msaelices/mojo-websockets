@@ -20,7 +20,14 @@ This software is in a early stage of development, using the Mojo nightly version
 
 2. **Add the WebSockets Package** (at the top level of your project):
 
+    ```bash
+    magic add websockets
+    ```
+## Example of usage
 
+```mojo
+# TODO
+```
 ## TODO
 
 - [ ] Implement WebSocket ping/pong mechanism
