@@ -24,7 +24,6 @@ This software is in a early stage of development, using the Mojo nightly version
 ## TODO
 
 - [ ] Implement WebSocket ping/pong mechanism
-- [ ] Add support for WebSocket extensions
 - [ ] Optimize performance for high-concurrency scenarios
 - [ ] Implement automatic reconnection for clients
 
