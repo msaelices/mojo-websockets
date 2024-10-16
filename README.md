@@ -33,6 +33,7 @@ This software is in a early stage of development, using the Mojo nightly version
 - [ ] Implement WebSocket ping/pong mechanism
 - [ ] Optimize performance for high-concurrency scenarios
 - [ ] Implement automatic reconnection for clients
+- [ ] Make sure it passes all the tests in [Autobahn|Testsuite](https://github.com/crossbario/autobahn-testsuite/)
 
 ## Contributing
 
