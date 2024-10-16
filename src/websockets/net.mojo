@@ -78,7 +78,7 @@ trait Listener(Movable):
     fn __init__(inout self, addr: TCPAddr) raises:
         ...
 
-    fn accept(borrowed self) raises -> SysConnection:
+    fn accept(borrowed self) raises -> TCPConnection:
         ...
 
     fn close(self) raises:
@@ -170,7 +170,7 @@ struct TCPAddr(Addr):
 
 
 @value
-struct SysConnection(Connection):
+struct TCPConnection(Connection):
     var fd: c_int
     var raddr: TCPAddr
     var laddr: TCPAddr
@@ -575,7 +575,7 @@ struct addrinfo_unix(AddrInfo):
 
 fn create_connection(
     sock: c_int, host: String, port: UInt16
-) raises -> SysConnection:
+) raises -> TCPConnection:
     """
     Connect to a server using a socket.
 
@@ -610,6 +610,7 @@ fn create_connection(
 
     var laddr = TCPAddr()
     var raddr = TCPAddr(host, int(port))
-    var conn = SysConnection(sock, laddr, raddr)
+    var conn = TCPConnection(sock, laddr, raddr)
 
     return conn
+
