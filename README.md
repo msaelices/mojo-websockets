@@ -39,6 +39,13 @@ This software is in a early stage of development, using the Mojo nightly version
 
 Contributions are welcome! If you'd like to contribute, please follow the contribution guidelines in the [CONTRIBUTING.md](CONTRIBUTING.md) file in the repository.
 
+## Acknowledgments
+
+We have taken a lot of code from the following great Mojo projects:
+
+* [lightbug_http](https://github.com/saviorand/lightbug_http)
+* [mojo-libc](https://github.com/crisadamo/mojo-libc)
+
 ## License
 
 mojo-websockets is licensed under the [MIT license](LICENSE).
