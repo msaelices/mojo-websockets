@@ -1,7 +1,7 @@
-from utils import StaticTuple
+from memory import memcpy, Reference, UnsafePointer
 from sys.ffi import external_call
 from sys.info import sizeof
-from memory import memcpy, Reference, UnsafePointer
+from utils import StaticTuple
 
 from .aliases import Bytes
 

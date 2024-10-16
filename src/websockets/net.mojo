@@ -11,6 +11,7 @@ from .libc import (
     SOCK_STREAM,
     SOL_SOCKET,
     SO_ERROR,
+    accept,
     addrinfo,
     c_char,
     c_int,
@@ -574,13 +575,12 @@ struct addrinfo_unix(AddrInfo):
 
 
 fn create_connection(
-    sock: c_int, host: String, port: UInt16
+    host: String, port: UInt16
 ) raises -> TCPConnection:
     """
     Connect to a server using a socket.
 
     Args:
-        sock: Int32 - The socket file descriptor.
         host: String - The host to connect to.
         port: UInt16 - The port to connect to.
 
@@ -600,6 +600,7 @@ fn create_connection(
         AF_INET, htons(port), ip, StaticTuple[c_char, 8](0, 0, 0, 0, 0, 0, 0, 0)
     )
     var addr_ptr = Pointer[sockaddr_in].address_of(addr)
+    var sock = socket(AF_INET, SOCK_STREAM, 0)
 
     if (
         external_call["connect", c_int](sock, addr_ptr, sizeof[sockaddr_in]())
@@ -613,4 +614,3 @@ fn create_connection(
     var conn = TCPConnection(sock, laddr, raddr)
 
     return conn
-
