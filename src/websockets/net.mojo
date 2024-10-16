@@ -11,10 +11,12 @@ from .libc import (
     SOCK_STREAM,
     SOL_SOCKET,
     SO_ERROR,
+    SO_REUSEADDR,
     accept,
     addrinfo,
     c_char,
     c_int,
+    c_uint,
     c_void,
     close,
     fcntl,
@@ -24,9 +26,12 @@ from .libc import (
     htons,
     in_addr,
     inet_ntop,
+    inet_pton,
+    listen,
     ntohs,
     recv,
     send,
+    setsockopt,
     shutdown,
     sockaddr,
     sockaddr_in,
@@ -112,7 +117,7 @@ trait Connection(CollectionElement):
         ...
 
 
-trait Addr(CollectionElement):
+trait Addr(StringableCollectionElement):
     fn __init__(inout self):
         ...
 
@@ -122,8 +127,6 @@ trait Addr(CollectionElement):
     fn network(self) -> String:
         ...
 
-    fn string(self) -> String:
-        ...
 
 
 @value
@@ -162,7 +165,7 @@ struct TCPAddr(Addr):
     fn network(self) -> String:
         return NetworkType.tcp.value
 
-    fn string(self) -> String:
+    fn __str__(self) -> String:
         if self.zone != "":
             return join_host_port(
                 self.ip + "%" + self.zone, self.port.__str__()
@@ -574,6 +577,109 @@ struct addrinfo_unix(AddrInfo):
         return addr_in.sin_addr
 
 
+@value
+struct TCPListener(Listener):
+    """
+    A TCP listener that listens for incoming connections and can accept them.
+    """
+
+    var fd: c_int
+    var _addr: TCPAddr
+
+    fn __init__(inout self) raises:
+        self._addr = TCPAddr("localhost", 8080)
+        self.fd = socket(AF_INET, SOCK_STREAM, 0)
+
+    fn __init__(inout self, addr: TCPAddr) raises:
+        self._addr = addr
+        self.fd = socket(AF_INET, SOCK_STREAM, 0)
+
+    fn __init__(inout self, addr: TCPAddr, fd: c_int) raises:
+        self._addr = addr
+        self.fd = fd
+
+    fn listen(inout self) raises: 
+        var address_family = AF_INET
+        var ip_buf_size = 4
+        var addr = self._addr
+
+        var sockfd = self.fd
+        if sockfd == -1:
+            print("Socket creation error")
+
+        var yes: Int = 1
+        var setsockopt_result = setsockopt(
+            sockfd,
+            SOL_SOCKET,
+            SO_REUSEADDR,
+            UnsafePointer[Int].address_of(yes).bitcast[c_void](),
+            sizeof[Int](),
+        )
+
+        var ip_buf = UnsafePointer[c_void].alloc(ip_buf_size)
+        _ = inet_pton(
+            address_family, to_char_ptr(addr.ip), ip_buf
+        )
+        var raw_ip = ip_buf.bitcast[c_uint]()[]
+        var bin_port = htons(UInt16(addr.port))
+
+        var ai = sockaddr_in(
+            address_family, bin_port, raw_ip, StaticTuple[c_char, 8]()
+        )
+        var ai_ptr = Pointer.address_of(ai)
+
+        # var bind = bind(sockfd, ai_ptr, sizeof[sockaddr_in]())
+        var bind = external_call["bind", c_int](
+            sockfd, ai_ptr, sizeof[sockaddr_in]()
+        )
+        if bind != 0:
+            print(
+                "Bind attempt failed. The address might be in use or"
+                " the socket might not be available."
+            )
+            _ = shutdown(sockfd, SHUT_RDWR)
+
+        if listen(sockfd, c_int(128)) == -1:
+            print("Listen failed.\n on sockfd " + sockfd.__str__())
+
+        print(
+            "\nServer is listening on "
+            + addr.ip
+            + ":"
+            + addr.port.__str__()
+        )
+        print("Ready to accept connections...")
+
+    fn accept(self) raises -> TCPConnection:
+        var their_addr = sockaddr(0, StaticTuple[c_char, 14]())
+        var their_addr_ptr = UnsafePointer.address_of(their_addr)
+        var sin_size = socklen_t(sizeof[socklen_t]())
+
+        var new_sockfd = accept(
+            self.fd, their_addr_ptr, UnsafePointer[socklen_t].address_of(sin_size)
+        )
+        if new_sockfd == -1:
+            print(
+                "Failed to accept connection, system accept() returned an"
+                " error."
+            )
+        var peer = get_peer_name(new_sockfd)
+        print("Got connection from " + peer.host + ":" + peer.port)
+
+        return TCPConnection(
+            new_sockfd, self._addr, TCPAddr(peer.host, atol(peer.port)), 
+        )
+
+    fn close(self) raises:
+        _ = shutdown(self.fd, SHUT_RDWR)
+        var close_status = close(self.fd)
+        if close_status == -1:
+            print("Failed to close new_sockfd")
+
+    fn addr(self) -> TCPAddr:
+        return self._addr
+
+
 fn create_connection(
     host: String, port: UInt16
 ) raises -> TCPConnection:
@@ -614,3 +720,18 @@ fn create_connection(
     var conn = TCPConnection(sock, laddr, raddr)
 
     return conn
+
+
+fn create_listener(host: String, port: UInt16) raises -> TCPListener:
+    """
+    Create a listener that listens for incoming connections.
+
+    Args:
+        host: String - The host to listen on.
+        port: UInt16 - The port to listen on.
+
+    Returns:
+        TCPListener - The listener.
+    """
+    var addr = TCPAddr(host, int(port))
+    return TCPListener(addr)
