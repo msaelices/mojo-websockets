@@ -28,6 +28,7 @@ fn websocket[
     3. Close server
     4. return the websocket.
     """
+    # TODO: Use the code from the net module instead of `Python.import_module("socket")`
 
     var client = PythonObject(None)
     try:
