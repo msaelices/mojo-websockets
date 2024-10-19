@@ -554,7 +554,7 @@ struct addrinfo_unix(AddrInfo):
 
         var error = getaddrinfo(
             host_ptr,
-            UnsafePointer[UInt8](),
+            UnsafePointer[Byte](),
             UnsafePointer.address_of(hints),
             UnsafePointer.address_of(servinfo),
         )
