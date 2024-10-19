@@ -1,6 +1,6 @@
 [project]
 authors = ["Manuel Saelices <msaelices@gmail.com>"]
-channels = ["conda-forge", "https://conda.modular.com/max-nightly"]
+channels = ["conda-forge", "https://conda.modular.com/max-nightly", "https://repo.prefix.dev/mojo-community"]
 description = "Library for building WebSocket servers and clients in Mojo"
 name = "mojo-websockets"
 platforms = ["linux-64", "osx-arm64"]
