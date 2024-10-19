@@ -1,10 +1,9 @@
 from utils import Span
 
 
-fn to_string[T: Formattable](value: T) -> String:
+fn to_string[T: Writer](inout writer: T) -> String:
     var s = String()
-    var formatter = s._unsafe_to_formatter()
-    value.format_to(formatter)
+    s.write_to(writer)
     return s
 
 
