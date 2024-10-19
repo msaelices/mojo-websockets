@@ -84,6 +84,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libbrotlicommon-1.1.0-hb9d3cd8_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libbrotlidec-1.1.0-hb9d3cd8_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libbrotlienc-1.1.0-hb9d3cd8_2.conda
+      - conda: https://repo.prefix.dev/mojo-community/linux-64/libc-0.1.1-hb0f4dca_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libcblas-3.9.0-24_linux64_openblas.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libcrc32c-1.1.2-h9c3ff4c_0.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libcurl-8.10.1-hbbe4b11_0.conda
@@ -282,6 +283,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libbrotlicommon-1.1.0-hd74edd7_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libbrotlidec-1.1.0-hd74edd7_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libbrotlienc-1.1.0-hd74edd7_2.conda
+      - conda: https://repo.prefix.dev/mojo-community/osx-arm64/libc-0.1.1-h60d57d3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libcblas-3.9.0-24_osxarm64_openblas.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libcrc32c-1.1.2-hbdafb3b_0.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libcurl-8.10.1-h13a7ad3_0.conda
@@ -2521,6 +2523,34 @@ packages:
   license_family: MIT
   size: 279644
   timestamp: 1725268003553
+- kind: conda
+  name: libc
+  version: 0.1.1
+  build: h60d57d3_0
+  subdir: osx-arm64
+  url: https://repo.prefix.dev/mojo-community/osx-arm64/libc-0.1.1-h60d57d3_0.conda
+  sha256: 004dfb339010a5669fae103e556b33325b429fb18adf0e3d7fa0d5ba5d6531a8
+  depends:
+  - max >=24.5.0
+  arch: arm64
+  platform: osx
+  license: MIT
+  size: 325226
+  timestamp: 1729381368577
+- kind: conda
+  name: libc
+  version: 0.1.1
+  build: hb0f4dca_0
+  subdir: linux-64
+  url: https://repo.prefix.dev/mojo-community/linux-64/libc-0.1.1-hb0f4dca_0.conda
+  sha256: 6939f854f5be62211812165c7065b56b219cf6475dcc067217ca0502e03d57f0
+  depends:
+  - max >=24.5.0
+  arch: x86_64
+  platform: linux
+  license: MIT
+  size: 325146
+  timestamp: 1729381358857
 - kind: conda
   name: libcblas
   version: 3.9.0

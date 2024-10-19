@@ -3,8 +3,7 @@ from sys import external_call, os_is_macos
 from memory import UnsafePointer, Pointer
 from utils import StaticTuple, StringRef
 
-from .aliases import Bytes, Duration
-from .libc import (
+from libc import (
     AF_INET,
     AI_PASSIVE,
     SHUT_RDWR,
@@ -39,6 +38,8 @@ from .libc import (
     socklen_t,
     to_char_ptr,
 )
+
+from .aliases import Bytes, Duration
 from .utils.string import to_string
 
 alias default_buffer_size = 4096

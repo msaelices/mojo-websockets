@@ -1,6 +1,7 @@
+from libc import socket, AF_INET, SOCK_STREAM
+
 from websockets.aliases import DEFAULT_BUFFER_SIZE, Bytes
 from websockets.net import create_connection
-from websockets.libc import socket, AF_INET, SOCK_STREAM
 
 
 fn main() raises:
