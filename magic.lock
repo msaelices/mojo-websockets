@@ -84,7 +84,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libbrotlicommon-1.1.0-hb9d3cd8_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libbrotlidec-1.1.0-hb9d3cd8_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libbrotlienc-1.1.0-hb9d3cd8_2.conda
-      - conda: https://repo.prefix.dev/mojo-community/linux-64/libc-0.1.1-hb0f4dca_0.conda
+      - conda: https://repo.prefix.dev/mojo-community/linux-64/libc-0.1.2-hb0f4dca_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libcblas-3.9.0-24_linux64_openblas.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libcrc32c-1.1.2-h9c3ff4c_0.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libcurl-8.10.1-hbbe4b11_0.conda
@@ -283,7 +283,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libbrotlicommon-1.1.0-hd74edd7_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libbrotlidec-1.1.0-hd74edd7_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libbrotlienc-1.1.0-hd74edd7_2.conda
-      - conda: https://repo.prefix.dev/mojo-community/osx-arm64/libc-0.1.1-h60d57d3_0.conda
+      - conda: https://repo.prefix.dev/mojo-community/osx-arm64/libc-0.1.2-h60d57d3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libcblas-3.9.0-24_osxarm64_openblas.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libcrc32c-1.1.2-hbdafb3b_0.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libcurl-8.10.1-h13a7ad3_0.conda
@@ -2525,32 +2525,32 @@ packages:
   timestamp: 1725268003553
 - kind: conda
   name: libc
-  version: 0.1.1
+  version: 0.1.2
   build: h60d57d3_0
   subdir: osx-arm64
-  url: https://repo.prefix.dev/mojo-community/osx-arm64/libc-0.1.1-h60d57d3_0.conda
-  sha256: 004dfb339010a5669fae103e556b33325b429fb18adf0e3d7fa0d5ba5d6531a8
+  url: https://repo.prefix.dev/mojo-community/osx-arm64/libc-0.1.2-h60d57d3_0.conda
+  sha256: 0cad5fbd7d45651a697c8599fe1e8f6eb011f1dfce38ceda76e4815558a911ba
   depends:
   - max >=24.5.0
   arch: arm64
   platform: osx
   license: MIT
-  size: 325226
-  timestamp: 1729381368577
+  size: 325188
+  timestamp: 1729382351801
 - kind: conda
   name: libc
-  version: 0.1.1
+  version: 0.1.2
   build: hb0f4dca_0
   subdir: linux-64
-  url: https://repo.prefix.dev/mojo-community/linux-64/libc-0.1.1-hb0f4dca_0.conda
-  sha256: 6939f854f5be62211812165c7065b56b219cf6475dcc067217ca0502e03d57f0
+  url: https://repo.prefix.dev/mojo-community/linux-64/libc-0.1.2-hb0f4dca_0.conda
+  sha256: 9e1aa173fe828c9091b8e3e79ee1aa3ac111a3067c29cba9659ad6d6b6ee52df
   depends:
   - max >=24.5.0
   arch: x86_64
   platform: linux
   license: MIT
-  size: 325146
-  timestamp: 1729381358857
+  size: 325095
+  timestamp: 1729382339374
 - kind: conda
   name: libcblas
   version: 3.9.0
