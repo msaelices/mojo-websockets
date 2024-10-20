@@ -36,7 +36,6 @@ from libc import (
     sockaddr_in,
     socket,
     socklen_t,
-    to_char_ptr,
 )
 
 from .aliases import Bytes, Duration
@@ -380,8 +379,8 @@ fn convert_binary_ip_to_string(
     """
     # It seems like the len of the buffer depends on the length of the string IP.
     # Allocating 10 works for localhost (127.0.0.1) which I suspect is 9 bytes + 1 null terminator byte. So max should be 16 (15 + 1).
-    var ip_buffer = UnsafePointer[c_void].alloc(16)
-    var ip_address_ptr = UnsafePointer.address_of(ip_address).bitcast[c_void]()
+    var ip_buffer = UnsafePointer[c_char].alloc(16)
+    var ip_address_ptr = UnsafePointer.address_of(ip_address).bitcast[Byte]()
     _ = inet_ntop(address_family, ip_address_ptr, ip_buffer, 16)
 
     var string_buf = ip_buffer.bitcast[Int8]()
@@ -473,7 +472,7 @@ struct addrinfo_macos(AddrInfo):
         Returns:
             in_addr - The IP address.
         """
-        var host_ptr = to_char_ptr(host)
+        var host_ptr = host.unsafe_cstr_ptr()
         var servinfo = Pointer.address_of(Self())
         var servname = UnsafePointer[Int8]()
 
@@ -543,7 +542,7 @@ struct addrinfo_unix(AddrInfo):
         Returns:
             UInt32 - The IP address.
         """
-        var host_ptr = to_char_ptr(host)
+        var host_ptr = host.unsafe_cstr_ptr()
         var self_addrinfo = rebind[addrinfo](Self())
         var servinfo = UnsafePointer[addrinfo]().alloc(1)
         servinfo.init_pointee_move(self_addrinfo)
@@ -555,7 +554,7 @@ struct addrinfo_unix(AddrInfo):
 
         var error = getaddrinfo(
             host_ptr,
-            UnsafePointer[Byte](),
+            UnsafePointer[c_char](),
             UnsafePointer.address_of(hints),
             UnsafePointer.address_of(servinfo),
         )
@@ -619,7 +618,7 @@ struct TCPListener(Listener):
 
         var ip_buf = UnsafePointer[c_void].alloc(ip_buf_size)
         _ = inet_pton(
-            address_family, to_char_ptr(addr.ip), ip_buf
+            address_family, addr.ip.unsafe_cstr_ptr(), ip_buf
         )
         var raw_ip = ip_buf.bitcast[c_uint]()[]
         var bin_port = htons(UInt16(addr.port))
