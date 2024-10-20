@@ -11,3 +11,9 @@ magic update && magic install
 ```bash
 mojo package src/websockets -o websockets.mojopkg
 ``
+
+## How to run tests
+
+```bash
+./scripts/run-tests.sh
+```
