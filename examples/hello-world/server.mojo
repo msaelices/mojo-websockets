@@ -30,7 +30,7 @@ fn main() raises:
             while res != -1:
                 _ = send_message(conn, "server waiting")
                 # first argument is the number of file descriptors (TODO: make it dynamic)
-                res = select(1, fds_ptr, null_ptr, null_ptr, null_timeval_ptr)
+                res = select(socket + 1, fds_ptr, null_ptr, null_ptr, null_timeval_ptr)
                 print("\nwait\n")
                 sleep(1)
             m = receive_message(ws.value())
