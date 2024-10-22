@@ -60,7 +60,9 @@ fn websocket[
         var buf = Bytes(capacity=1024)
         var bytes_read = conn.read(buf)
         var request = String(buf[:bytes_read])
-        var end_header = int(request.find("\r\n\r\n"))
+        # TODO: why find("\r\n\r\n") does not work?
+        # var end_header = request.find("\r\n\r\n")
+        var end_header = request.find("\r\n\r")
         if end_header == -1:
             raise "end_header == -1, no \\r\\n\\r\\n"
         var request_split = str(request)[:end_header].split("\r\n")
@@ -101,7 +103,7 @@ fn websocket[
 
         var accept = request_header["Sec-WebSocket-Key"]
         accept += MAGIC_CONSTANT
-        accept = b64encode(str(py_sha1(accept).digest()))
+        accept = b64encode(str(py_sha1(PythonObject(accept).encode()).digest()))
 
         var response = String("HTTP/1.1 101 Switching Protocols\r\n")
         response += "Upgrade: websocket\r\n"
