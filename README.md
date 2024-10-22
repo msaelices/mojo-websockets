@@ -41,10 +41,7 @@ Contributions are welcome! If you'd like to contribute, please follow the contri
 
 ## Acknowledgments
 
-We have taken a lot of code from the following great Mojo projects:
-
-* [lightbug_http](https://github.com/saviorand/lightbug_http)
-* [mojo-libc](https://github.com/crisadamo/mojo-libc)
+We have taken a lot of code from the amazing [lightbug_http](https://github.com/saviorand/lightbug_http) project.
 
 ## License
 
