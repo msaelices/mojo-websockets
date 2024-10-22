@@ -1,9 +1,13 @@
 # Code adapted from https://github.com/saviorand/lightbug_http/tree/feature/websocket/
 # Thanks to @rd4com for the original code
 
+from base64 import b64encode
 from collections import Dict, Optional
 from python import Python, PythonObject
 from time import sleep
+
+from ..aliases import Bytes
+from ..net import create_listener, TCPConnection
 
 # It is a "magic" constant, see:
 # https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_servers#server_handshake_response
@@ -21,7 +25,7 @@ alias BYTE_1_SIZE_EIGHT_BYTES: UInt8 = 127
 
 fn websocket[
     host: StringLiteral = "127.0.0.1", port: Int = 8000
-]() -> Optional[PythonObject]:
+]() -> Optional[TCPConnection]:
     """
     1. Open server
     2. Upgrade first HTTP client to websocket
@@ -30,33 +34,30 @@ fn websocket[
     """
     # TODO: Use the code from the net module instead of `Python.import_module("socket")`
 
-    var client = PythonObject(None)
     try:
-        var py_socket = Python.import_module("socket")
-        var py_base64 = Python.import_module("base64")
         var py_sha1 = Python.import_module("hashlib").sha1
-        var server = py_socket.socket(py_socket.AF_INET, py_socket.SOCK_STREAM)
-        server.setsockopt(py_socket.SOL_SOCKET, py_socket.SO_REUSEADDR, 1)
-        server.bind((host, port))
-        server.listen(1)
+
+        var listener = create_listener(host, port)
+        print('Listening on ', host, ':', port)
+        listener.listen()
+
+        var conn = listener.accept()
+        print('Accepted connection from ', str(conn.raddr))
         print("ws://" + str(host) + ":" + str(port))
 
-        client = server.accept()
-        # Only localhost !
-        if client[1][0] != "127.0.0.1":
-            print("Exit, request from: " + str(client[1][0]))
-            client.close()
-            server.close()
+        if conn.raddr.ip != "127.0.0.1":
+            print("Exit, request from: " + str(conn.raddr.ip))
+            conn.close()
+            listener.close()
             return None
 
         # Close server
-        server.close()
+        listener.close()
 
         # Get request
-        var request = client[0].recv(1024).decode()
-        var request_header = Dict[String, String]()
-        print(request.__repr__())
-
+        var buf = Bytes(capacity=1024)
+        var bytes_read = conn.read(buf)
+        var request = String(buf[:bytes_read])
         var end_header = int(request.find("\r\n\r\n"))
         if end_header == -1:
             raise "end_header == -1, no \\r\\n\\r\\n"
@@ -70,6 +71,7 @@ fn websocket[
         if len(request_split) == 0:
             raise "error: no headers"
 
+        var request_header = Dict[String, String]()
         for e in request_split:
             var header_pos = e[].find(":")
             if header_pos == -1:
@@ -79,6 +81,8 @@ fn websocket[
             var k = e[][:header_pos]
             var v = e[][header_pos + 2 :]
             request_header[k^] = v^
+
+        print('Request headers:')
 
         for h in request_header:
             print(h[], request_header[h[]])
@@ -93,22 +97,21 @@ fn websocket[
         if "Sec-WebSocket-Key" not in request_header:
             raise "No Sec-WebSocket-Key for upgrading to websocket"
 
-        var accept = PythonObject(request_header["Sec-WebSocket-Key"])
-        accept += PythonObject(MAGIC_CONSTANT)
-        accept = accept.encode()
-        accept = py_base64.b64encode(py_sha1(accept).digest())
+        var accept = request_header["Sec-WebSocket-Key"]
+        accept += MAGIC_CONSTANT
+        accept = b64encode(str(py_sha1(accept).digest()))
 
         var response = String("HTTP/1.1 101 Switching Protocols\r\n")
         response += "Upgrade: websocket\r\n"
         response += "Connection: Upgrade\r\n"
         response += "Sec-WebSocket-Accept: "
-        response += str(accept.decode("utf-8"))
+        response += accept
         response += String("\r\n\r\n")
 
         print(response)
 
-        client[0].send(PythonObject(response).encode())
-        return client^
+        _ = conn.write(response)
+        return conn^
 
     except e:
         print(e)
