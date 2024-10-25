@@ -6,10 +6,11 @@ from collections import Dict, Optional
 from python import Python, PythonObject
 from time import sleep
 
-from libc import FD
+from libc import FD, fd_set, timeval, select
 
 from ..aliases import Bytes
-from ..net import create_listener, TCPConnection
+from ..http import HTTPRequest, HTTPResponse, encode
+from ..net import create_listener, TCPConnection, TCPListener
 
 # It is a "magic" constant, see:
 # https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_servers#server_handshake_response
@@ -24,8 +25,10 @@ alias BYTE_1_SIZE_ONE_BYTE: UInt8 = 125
 alias BYTE_1_SIZE_TWO_BYTES: UInt8 = 126
 alias BYTE_1_SIZE_EIGHT_BYTES: UInt8 = 127
 
+alias ConnHandler = fn (HTTPRequest) -> HTTPResponse
 
-fn websocket[
+
+fn serve[
     host: StringLiteral = "127.0.0.1", port: Int = 8000
 ]() -> Optional[TCPConnection]:
     """
@@ -341,3 +344,164 @@ fn send_message(inout conn: TCPConnection, message: String) -> Bool:
     except e:
         print(e)
         return False
+
+
+
+@value
+struct Server:
+    """
+    A Mojo-based web server that accept incoming requests and delivers HTTP services.
+    """
+    # TODO: add an error_handler to the constructor
+
+    var _address: String
+
+    var _max_request_body_size: Int
+    var tcp_keep_alive: Bool
+
+    var ln: TCPListener
+
+    var connections: List[TCPConnection]
+    var read_fds: fd_set
+    var write_fds: fd_set
+
+    fn __init__(
+        inout self, max_request_body_size: Int = 1024, tcp_keep_alive: Bool = False
+    ) raises:
+        self._address = "127.0.0.1"
+        self._max_request_body_size = max_request_body_size
+        self.tcp_keep_alive = tcp_keep_alive
+        self.ln = TCPListener()
+        self.connections = List[TCPConnection]()
+        self.read_fds = fd_set()
+        self.write_fds = fd_set()
+    
+    fn address(self) -> String:
+        return self._address
+
+    fn set_address(inout self, own_address: String) -> Self:
+        self._address = own_address
+        return self
+
+    fn max_request_body_size(self) -> Int:
+        return self._max_request_body_size
+
+    fn set_max_request_body_size(inout self, size: Int) -> Self:
+        self._max_request_body_size = size
+        return self
+
+    fn serve_forever(inout self, address: String, handler: ConnHandler) raises -> None: # TODO: conditional conformance on main struct , then a default for handler e.g. WebsocketHandshake
+        """
+        Listen for incoming connections and serve HTTP requests.
+
+        Args:
+            address : String - The address (host:port) to listen on.
+            handler : HTTPService - An object that handles incoming HTTP requests.
+        """
+        var listener = create_listener(address, port)
+        print('Listening on ', host, ':', port)
+        listener.listen()
+        self.serve(listener, handler)
+
+    fn serve(inout self, ln: TCPListener, handler: ConnHandler) raises -> None:
+        """
+        Serve HTTP requests.
+
+        Args:
+            ln : TCPListener - TCP server that listens for incoming connections.
+            handler : HTTPService - An object that handles incoming HTTP requests.
+
+        Raises:
+        If there is an error while serving requests.
+        """
+        self.ln = ln
+        self.connections = List[TCPConnection]()
+
+        while True:
+            _ = self.read_fds.clear_all()
+            _ = self.write_fds.clear_all()
+
+            self.read_fds.set(int(self.ln.fd))
+
+            var max_fd = self.ln.fd
+            for i in range(len(self.connections)):
+                var conn = self.connections[i]
+                self.read_fds.set(int(conn.fd))
+                self.write_fds.set(int(conn.fd))
+                
+                if conn.fd > max_fd:
+                    max_fd = conn.fd
+                
+            var timeout = timeval(0, 10000)
+
+            var select_result = select(
+                max_fd + 1,
+                UnsafePointer.address_of(self.read_fds),
+                UnsafePointer.address_of(self.write_fds),
+                UnsafePointer[fd_set](),
+                UnsafePointer.address_of(timeout)
+            )
+            if select_result == -1:
+                print("Select error")
+                return
+            
+            if self.read_fds.is_set(int(self.ln.fd)):
+                var conn = self.ln.accept()
+                try: 
+                    _ = conn.set_non_blocking(True)
+                except e:
+                    print("Error setting connnection to non-blocking mode: ", e)
+                    conn.close()
+                    continue
+                self.connections.append(conn)
+                if conn.fd > max_fd:
+                    max_fd = conn.fd
+                    self.read_fds.set(int(conn.fd))
+            
+            var i = 0
+            while i < len(self.connections):
+                var conn = self.connections[i]
+                if self.read_fds.is_set(int(conn.fd)):
+                    _ = self.handle_read(conn, handler)
+                if self.write_fds.is_set(int(conn.fd)):
+                    _ = self.handle_write(conn)
+                
+                if conn.is_closed():
+                    _ = self.connections.pop(i)
+                else:
+                    i += 1
+
+    fn handle_read(inout self, inout conn: TCPConnection, handler: ConnHandler) raises -> None:
+        var max_request_body_size = self.max_request_body_size()
+        if max_request_body_size <= 0:
+            max_request_body_size = default_max_request_body_size
+
+        var b = Bytes(capacity=default_buffer_size)
+        var bytes_recv = conn.read(b)
+        
+        if bytes_recv == 0:
+            conn.close()
+            return
+
+        var request = HTTPRequest.from_bytes(self.address(), max_request_body_size, b^)
+        var res = handler.func(request)
+
+        if not self.tcp_keep_alive:
+            _ = res.set_connection_close()
+
+        conn.set_write_buffer(encode(res^))
+
+        # TODO: does this make sense?
+        self.write_fds.set(int(conn.fd))
+        
+        # if not self.tcp_keep_alive:
+        #     conn.close()
+
+    fn handle_write(inout self, inout conn: TCPConnection) raises -> None:
+        var write_buffer = conn.write_buffer()
+        if write_buffer:
+            var bytes_sent = conn.write(write_buffer)
+            if bytes_sent < len(write_buffer):
+                conn.set_write_buffer(write_buffer[bytes_sent:])
+            else:
+                conn.set_write_buffer(Bytes())

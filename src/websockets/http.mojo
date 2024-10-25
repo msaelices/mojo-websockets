@@ -363,7 +363,7 @@ struct HTTPResponse(Writable, Stringable):
             whitespace,
             self.status_text,
             lineBreak,
-            "server: lightbug_http",
+            "server: websockets",
             lineBreak,
         )
 
@@ -390,7 +390,7 @@ struct HTTPResponse(Writable, Stringable):
         writer.write(whitespace)
         writer.write(self.status_text)
         writer.write(lineBreak)
-        writer.write("server: lightbug_http")
+        writer.write("server: websockets")
         writer.write(lineBreak)
 
         if HeaderKey.DATE not in self.headers:
