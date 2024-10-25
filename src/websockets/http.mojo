@@ -368,12 +368,9 @@ struct HTTPResponse(Writable, Stringable):
         )
 
         if HeaderKey.DATE not in self.headers:
-            try:
-                # TODO: Use UTC time
-                var current_time = now().__str__()
-                write_header(writer, HeaderKey.DATE, current_time)
-            except:
-                pass
+            # TODO: Use UTC time
+            var current_time = now().__str__()
+            write_header(writer, HeaderKey.DATE, current_time)
 
         self.headers.write_to(writer)
 
