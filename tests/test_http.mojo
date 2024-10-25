@@ -1,13 +1,24 @@
+from collections import Dict, List
 from testing import assert_equal, assert_true
 
+from websockets.http import (
+    HTTPRequest,
+    HTTPResponse,
+    Header,
+    HeaderKey,
+    Headers,
+    encode,
+)
+from websockets.utils.uri import URI
 from websockets.utils.string import (
     ByteReader,
     Bytes,
     bytes,
     empty_string,
+    to_string,
 )
-from websockets.http import Headers, Header
 
+alias DEFAULT_SERVER_CONN_STRING = "http://localhost:8080"
 
 def test_header():
     test_parse_request_header()
@@ -64,3 +75,39 @@ def test_parse_response_header():
     assert_equal(header["Content-Length"], "1234")
     assert_equal(header["Connection"], "close")
     assert_equal(header["Trailer"], "end-of-message")
+
+
+def test_http():
+    test_encode_http_request()
+    test_encode_http_response()
+
+
+def test_encode_http_request():
+    var uri = URI(DEFAULT_SERVER_CONN_STRING + "/foobar?baz")
+    var req = HTTPRequest(
+        uri,
+        body=String("Hello world!").as_bytes(),
+        headers=Headers(Header("Connection", "keep-alive")),
+    )
+
+    var as_str = str(req)
+    var req_encoded = to_string(encode(req^))
+    assert_equal(
+        req_encoded,
+        (
+            "GET / HTTP/1.1\r\nconnection: keep-alive\r\ncontent-length:"
+            " 12\r\n\r\nHello world!"
+        ),
+    )
+    assert_equal(req_encoded, as_str)
+
+
+def test_encode_http_response():
+    var res = HTTPResponse(bytes("Hello, World!"))
+    res.headers[HeaderKey.DATE] = "2024-06-02T13:41:50.766880+00:00"
+    var as_str = str(res)
+    var res_encoded = to_string(encode(res^))
+    var expected_full = "HTTP/1.1 200 OK\r\nserver: lightbug_http\r\ncontent-type: application/octet-stream\r\nconnection: keep-alive\r\ncontent-length: 13\r\ndate: 2024-06-02T13:41:50.766880+00:00\r\n\r\nHello, World!"
+
+    assert_equal(res_encoded, expected_full)
+    assert_equal(res_encoded, as_str)
