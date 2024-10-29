@@ -10,7 +10,7 @@ from time import sleep
 from libc import FD, fd_set, timeval, select
 
 from ..aliases import Bytes, DEFAULT_BUFFER_SIZE, DEFAULT_MAX_REQUEST_BODY_SIZE
-from ..http import HTTPRequest, HTTPResponse, encode
+from ..http import Header, Headers, HTTPRequest, HTTPResponse, encode
 from ..net import create_listener, TCPConnection, TCPListener
 
 # It is a "magic" constant, see:
@@ -26,7 +26,7 @@ alias BYTE_1_SIZE_ONE_BYTE: UInt8 = 125
 alias BYTE_1_SIZE_TWO_BYTES: UInt8 = 126
 alias BYTE_1_SIZE_EIGHT_BYTES: UInt8 = 127
 
-alias ConnHandler = fn (HTTPRequest) raises -> HTTPResponse
+alias ConnHandler = fn (conn: TCPConnection, data: Bytes) raises -> None
 
 
 fn serve_old[
@@ -478,27 +478,29 @@ struct Server:
         if max_request_body_size <= 0:
             max_request_body_size = DEFAULT_MAX_REQUEST_BODY_SIZE
 
-        var b = Bytes(capacity=DEFAULT_BUFFER_SIZE)
-        var bytes_recv = conn.read(b)
+        var buf = Bytes(capacity=DEFAULT_BUFFER_SIZE)
+        var bytes_recv = conn.read(buf)
         print("Bytes received: ", bytes_recv)
         
         if bytes_recv == 0:
-            # conn.close()
             return
 
-        var request = HTTPRequest.from_bytes(self.address(), max_request_body_size, b^)
-        var res = handler(request)
+        var request = HTTPRequest.from_bytes(self.address(), max_request_body_size, buf^)
+        print("REQUEST:\n\n", request, "\nEND REQUEST\n")
 
-        if not self.tcp_keep_alive:
-            _ = res.set_connection_close()
+        res = handshake(request)
+        var bytes_written = conn.write(encode(res^))
+        print("Bytes written: ", bytes_written)
 
-        conn.set_write_buffer(encode(res^))
+        # var res = handler(request)
+        # var message = receive_message(conn, data)
+        # self.handler(conn, buf)
 
         # TODO: does this make sense?
         self.write_fds.set(int(conn.fd))
         
-        # if not self.tcp_keep_alive:
-        #     conn.close()
+        if not self.tcp_keep_alive:
+            conn.close()
 
     fn handle_write(inout self, inout conn: TCPConnection) raises -> None:
         var write_buffer = conn.write_buffer()
@@ -534,4 +536,23 @@ fn serve(handler: ConnHandler, host: String, port: Int) raises -> Server:
         Server - A server object that can be used to serve requests.
     """
     return Server(host, port, handler)
+
+
+fn handshake(req: HTTPRequest) raises -> HTTPResponse:
+    if 'Upgrade' not in req.headers:
+        raise Error("Request headers do not contain an upgrade header")
+
+    if req.headers['upgrade'] != "websocket":
+        raise Error("Request upgrade do not contain an upgrade to websocket")
+
+    if not req.headers["Sec-WebSocket-Key"]:
+        raise Error("No Sec-WebSocket-Key for upgrading to websocket")
+
+    var accept = req.headers["Sec-WebSocket-Key"] + MAGIC_CONSTANT
+    var py_sha1 = Python.import_module("hashlib").sha1
+
+    var accept_encoded = b64encode(str(py_sha1(PythonObject(accept).encode()).digest()))
+    var headers = Headers(Header("Upgrade", "websocket"), Header("Connection", "Upgrade"), Header("Sec-WebSocket-Accept", accept_encoded))
+
+    return HTTPResponse(Bytes(), headers, 101, "Switching Protocols")
 
