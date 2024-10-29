@@ -26,7 +26,7 @@ alias BYTE_1_SIZE_ONE_BYTE: UInt8 = 125
 alias BYTE_1_SIZE_TWO_BYTES: UInt8 = 126
 alias BYTE_1_SIZE_EIGHT_BYTES: UInt8 = 127
 
-alias ConnHandler = fn (HTTPRequest) -> HTTPResponse
+alias ConnHandler = fn (HTTPRequest) raises -> HTTPResponse
 
 
 fn serve_old[
@@ -355,9 +355,10 @@ struct Server:
     """
     # TODO: add an error_handler to the constructor
 
-    var _address: String
-
-    var _max_request_body_size: Int
+    var host: String
+    var port: Int
+    var handler: ConnHandler
+    var max_request_body_size: Int
     var tcp_keep_alive: Bool
 
     var ln: TCPListener
@@ -366,44 +367,38 @@ struct Server:
     var read_fds: fd_set
     var write_fds: fd_set
 
-    fn __init__(
-        inout self, max_request_body_size: Int = 1024, tcp_keep_alive: Bool = False
-    ) raises:
-        self._address = "127.0.0.1"
-        self._max_request_body_size = max_request_body_size
+    fn __init__(inout self, host: String, port: Int, handler: ConnHandler, max_request_body_size: Int = 1024, tcp_keep_alive: Bool = False) raises:
+        """
+        Initialize a new server.
+
+        Args:
+            host: String - The address to listen on.
+            port: Int - The port to listen on.
+            handler : ConnHandler - An object that handles incoming HTTP requests.
+            max_request_body_size: Int - The maximum size of the request body.
+            tcp_keep_alive: Bool - Whether to keep the connection alive after the request is handled.
+
+        Raises:
+            If there is an error while initializing the server.
+        """
+        self.host = host
+        self.port = port
+        self.handler = handler
+        self.max_request_body_size = max_request_body_size
         self.tcp_keep_alive = tcp_keep_alive
         self.ln = TCPListener()
         self.connections = List[TCPConnection]()
         self.read_fds = fd_set()
         self.write_fds = fd_set()
-    
-    fn address(self) -> String:
-        return self._address
 
-    fn set_address(inout self, own_address: String) -> Self:
-        self._address = own_address
-        return self
-
-    fn max_request_body_size(self) -> Int:
-        return self._max_request_body_size
-
-    fn set_max_request_body_size(inout self, size: Int) -> Self:
-        self._max_request_body_size = size
-        return self
-
-    fn serve_forever(inout self, host: String, port: Int, handler: ConnHandler) raises -> None: # TODO: conditional conformance on main struct , then a default for handler e.g. WebsocketHandshake
+    fn serve_forever(inout self) raises -> None: # TODO: conditional conformance on main struct , then a default for handler e.g. WebsocketHandshake
         """
         Listen for incoming connections and serve HTTP requests.
-
-        Args:
-            host: String - The address (host:port) to listen on.
-            port: Int - The port to listen on.
-            handler : HTTPService - An object that handles incoming HTTP requests.
         """
-        var listener = create_listener(host, port)
-        print('Listening on ', host, ':', port)
+        var listener = create_listener(self.host, self.port)
+        print('Listening on ', self.host, ':', self.port)
         listener.listen()
-        self.serve(listener, handler)
+        self.serve(listener, self.handler)
 
     fn serve(inout self, ln: TCPListener, handler: ConnHandler) raises -> None:
         """
@@ -473,8 +468,11 @@ struct Server:
                 else:
                     i += 1
 
+    fn address(inout self) -> String:
+        return self.host + ":" + str(self.port)
+
     fn handle_read(inout self, inout conn: TCPConnection, handler: ConnHandler) raises -> None:
-        var max_request_body_size = self.max_request_body_size()
+        var max_request_body_size = self.max_request_body_size
         if max_request_body_size <= 0:
             max_request_body_size = DEFAULT_MAX_REQUEST_BODY_SIZE
 
@@ -508,9 +506,19 @@ struct Server:
             else:
                 conn.set_write_buffer(Bytes())
 
+    def shutdown(self) -> None:
+        self.ln.close()
 
-@value
-struct serve:
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        inout self,
+    ) -> None:
+        self.shutdown()
+
+
+fn serve(handler: ConnHandler, host: String, port: Int) raises -> Server:
     """
     Serve HTTP requests.
 
@@ -522,20 +530,5 @@ struct serve:
     Returns:
         Server - A server object that can be used to serve requests.
     """
-    var server: Server
-    var handler: ConnHandler
-    var host: String
-    var port: Int
+    return Server(host, port, handler)
 
-    fn __init__(inout self, handler: ConnHandler, host: String, port: Int) raises:
-        self.server = Server()
-        self.handler = handler
-        self.host = host
-        self.port = port
-
-    fn __enter__(inout self) raises -> Server:
-        self.server.serve_forever(self.host, self.port, self.handler)
-        return self.server
-
-    fn __exit__(inout self) raises:
-        self.server.ln.close()
