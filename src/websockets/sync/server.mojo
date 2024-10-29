@@ -444,6 +444,7 @@ struct Server:
             
             if self.read_fds.is_set(int(self.ln.fd)):
                 var conn = self.ln.accept()
+                print('Accepted connection from ', str(conn.raddr))
                 try: 
                     _ = conn.set_non_blocking(True)
                 except e:
@@ -457,6 +458,7 @@ struct Server:
             
             var i = 0
             while i < len(self.connections):
+                print("Connection ", i)
                 var conn = self.connections[i]
                 if self.read_fds.is_set(int(conn.fd)):
                     _ = self.handle_read(conn, handler)
@@ -478,9 +480,10 @@ struct Server:
 
         var b = Bytes(capacity=DEFAULT_BUFFER_SIZE)
         var bytes_recv = conn.read(b)
+        print("Bytes received: ", bytes_recv)
         
         if bytes_recv == 0:
-            conn.close()
+            # conn.close()
             return
 
         var request = HTTPRequest.from_bytes(self.address(), max_request_body_size, b^)
