@@ -599,11 +599,16 @@ struct TCPListener(Listener):
         self.fd = fd
 
     fn listen(inout self) raises: 
+        var address_family = AF_INET
+        var ip_buf_size = 4
+        var addr = self._addr
+
         var sockfd = self.fd
         if sockfd == -1:
             print("Socket creation error")
 
-        var _ = setsockopt(
+        var yes = 1
+        _ = setsockopt(
             sockfd,
             SOL_SOCKET,
             SO_REUSEADDR,
