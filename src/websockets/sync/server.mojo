@@ -3,12 +3,13 @@
 
 from base64 import b64encode
 from collections import Dict, Optional
+from memory import UnsafePointer
 from python import Python, PythonObject
 from time import sleep
 
 from libc import FD, fd_set, timeval, select
 
-from ..aliases import Bytes
+from ..aliases import Bytes, DEFAULT_BUFFER_SIZE, DEFAULT_MAX_REQUEST_BODY_SIZE
 from ..http import HTTPRequest, HTTPResponse, encode
 from ..net import create_listener, TCPConnection, TCPListener
 
@@ -28,7 +29,7 @@ alias BYTE_1_SIZE_EIGHT_BYTES: UInt8 = 127
 alias ConnHandler = fn (HTTPRequest) -> HTTPResponse
 
 
-fn serve[
+fn serve_old[
     host: StringLiteral = "127.0.0.1", port: Int = 8000
 ]() -> Optional[TCPConnection]:
     """
@@ -390,15 +391,16 @@ struct Server:
         self._max_request_body_size = size
         return self
 
-    fn serve_forever(inout self, address: String, handler: ConnHandler) raises -> None: # TODO: conditional conformance on main struct , then a default for handler e.g. WebsocketHandshake
+    fn serve_forever(inout self, host: String, port: Int, handler: ConnHandler) raises -> None: # TODO: conditional conformance on main struct , then a default for handler e.g. WebsocketHandshake
         """
         Listen for incoming connections and serve HTTP requests.
 
         Args:
-            address : String - The address (host:port) to listen on.
+            host: String - The address (host:port) to listen on.
+            port: Int - The port to listen on.
             handler : HTTPService - An object that handles incoming HTTP requests.
         """
-        var listener = create_listener(address, port)
+        var listener = create_listener(host, port)
         print('Listening on ', host, ':', port)
         listener.listen()
         self.serve(listener, handler)
@@ -474,9 +476,9 @@ struct Server:
     fn handle_read(inout self, inout conn: TCPConnection, handler: ConnHandler) raises -> None:
         var max_request_body_size = self.max_request_body_size()
         if max_request_body_size <= 0:
-            max_request_body_size = default_max_request_body_size
+            max_request_body_size = DEFAULT_MAX_REQUEST_BODY_SIZE
 
-        var b = Bytes(capacity=default_buffer_size)
+        var b = Bytes(capacity=DEFAULT_BUFFER_SIZE)
         var bytes_recv = conn.read(b)
         
         if bytes_recv == 0:
@@ -484,7 +486,7 @@ struct Server:
             return
 
         var request = HTTPRequest.from_bytes(self.address(), max_request_body_size, b^)
-        var res = handler.func(request)
+        var res = handler(request)
 
         if not self.tcp_keep_alive:
             _ = res.set_connection_close()
@@ -505,3 +507,35 @@ struct Server:
                 conn.set_write_buffer(write_buffer[bytes_sent:])
             else:
                 conn.set_write_buffer(Bytes())
+
+
+@value
+struct serve:
+    """
+    Serve HTTP requests.
+
+    Args:
+        handler : ConnHandler - An object that handles incoming HTTP requests.
+        host : String - The address to listen on.
+        port : Int - The port to listen on.
+
+    Returns:
+        Server - A server object that can be used to serve requests.
+    """
+    var server: Server
+    var handler: ConnHandler
+    var host: String
+    var port: Int
+
+    fn __init__(inout self, handler: ConnHandler, host: String, port: Int) raises:
+        self.server = Server()
+        self.handler = handler
+        self.host = host
+        self.port = port
+
+    fn __enter__(inout self) raises -> Server:
+        self.server.serve_forever(self.host, self.port, self.handler)
+        return self.server
+
+    fn __exit__(inout self) raises:
+        self.server.ln.close()
