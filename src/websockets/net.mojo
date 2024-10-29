@@ -178,31 +178,31 @@ struct TCPConnection(Connection):
     var fd: c_int
     var raddr: TCPAddr
     var laddr: TCPAddr
-    var __write_buffer: Bytes
+    var _write_buffer: Bytes
 
     fn __init__(inout self, laddr: String, raddr: String) raises:
         self.raddr = resolve_internet_addr(NetworkType.tcp4.value, raddr)
         self.laddr = resolve_internet_addr(NetworkType.tcp4.value, laddr)
         self.fd = socket(AF_INET, SOCK_STREAM, 0)
-        self.__write_buffer = Bytes()
+        self._write_buffer = Bytes()
 
     fn __init__(inout self, laddr: TCPAddr, raddr: TCPAddr) raises:
         self.raddr = raddr
         self.laddr = laddr
         self.fd = socket(AF_INET, SOCK_STREAM, 0)
-        self.__write_buffer = Bytes()
+        self._write_buffer = Bytes()
 
     fn __init__(inout self, fd: c_int, laddr: TCPAddr, raddr: TCPAddr) raises:
         self.raddr = raddr
         self.laddr = laddr
         self.fd = fd
-        self.__write_buffer = Bytes()
+        self._write_buffer = Bytes()
     
     fn write_buffer(self) -> Bytes:
-        return self.__write_buffer
+        return self._write_buffer
     
     fn set_write_buffer(inout self, buf: Bytes):
-        self.__write_buffer = buf
+        self._write_buffer = buf
 
     fn read(self, inout buf: Bytes) raises -> Int:
         var bytes_recv = recv(
