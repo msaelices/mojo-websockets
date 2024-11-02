@@ -189,20 +189,17 @@ struct Frame(Writable, Stringable):
         self.rsv2 = False
         self.rsv3 = False
 
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_repr_to[W: Writer](self, inout writer: W) raises:
         """
         Return a human-readable representation of a frame.
         """
         var coding: String = ""
         var data: String
 
-        try:
-            length = "{} byte{}".format(
-               len(self.data),
-               "" if len(self.data) == 1 else "s",
-            )
-        except:
-            length = "Error"
+        length = "{} byte{}".format(
+           len(self.data),
+           "" if len(self.data) == 1 else "s",
+        )
         non_final = "" if self.fin else "continued"
 
         if self.opcode == OP_TEXT:
@@ -213,16 +210,10 @@ struct Frame(Writable, Stringable):
         elif self.opcode == OP_BINARY:
             # We'll show at most the first 16 bytes and the last 8 bytes.
             # Encode just what we need, plus two dummy bytes to elide later.
-            try:
-                data = self._data_as_binary()
-                coding = "binary"
-            except:
-                data = "Error"
+            data = self._data_as_binary()
+            coding = "binary"
         elif self.opcode == OP_CLOSE:
-            try:
-                data = str(Close.parse(self.data))
-            except:
-                data = "Error"
+            data = str(Close.parse(self.data))
         elif self.data:
             # We don't know if a Continuation frame contains text or binary.
             # Ping and Pong frames could contain UTF-8.
@@ -239,14 +230,23 @@ struct Frame(Writable, Stringable):
 
         metadata = ", ".join(List(coding, length, non_final))
 
-        try:
-            repr_data = "'{}'".format(data) if coding == "text" else data
-            writer.write(get_op_code_name(self.opcode), " ", repr_data, " [", metadata, "]")
-        except:
-            writer.write("Error")
+        repr_data = "'{}'".format(data) if coding == "text" else data
+        writer.write(get_op_code_name(self.opcode), " ", repr_data, " [", metadata, "]")
 
     fn __str__(self) -> String:
-        return String.write(self)
+        var s = String()
+        try:
+            self.write_repr_to(s)
+        except:
+            s = "ERROR representing frame"
+        return s
+
+    fn write_to[W: Writer](self, inout writer: W) -> None:
+        """
+        Serialize the frame to a writer.
+        """
+        # TODO: Implement based on serialize() method below
+        writer.write("foo")
 
     @always_inline
     fn _data_as_text(self) -> String:
