@@ -44,9 +44,9 @@ def test_parse_request_header():
     var reader = ByteReader(b^)
     var method: String
     var protocol: String
-    var uri: String
-    method, uri, protocol = header.parse_raw(reader)
-    assert_equal(uri, "/index.html")
+    var path: String
+    method, path, protocol = header.parse_raw(reader)
+    assert_equal(path, "/index.html")
     assert_equal(protocol, "HTTP/1.1")
     assert_equal(method, "GET")
     assert_equal(header["Host"], "example.com")
@@ -85,7 +85,7 @@ def test_http():
 def test_encode_http_request():
     var uri = URI(DEFAULT_SERVER_CONN_STRING + "/foobar?baz")
     var req = HTTPRequest(
-        uri,
+        uri.path,
         body=String("Hello world!").as_bytes(),
         headers=Headers(Header("Connection", "keep-alive")),
     )
