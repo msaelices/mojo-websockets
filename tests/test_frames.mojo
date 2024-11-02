@@ -6,10 +6,10 @@ from websockets.utils.string import bytes
 
 
 fn test_str() raises:
-    assert_equal(str(Frame(OP_TEXT, bytes("Spam"))), "TEXT 'Spam' [, 4 bytes, ]")
-    assert_equal(str(Frame(OP_TEXT, bytes("Spam"), fin=False)), "TEXT 'Spam' [, 4 bytes, continued]")
-    assert_equal(str(Frame(OP_BINARY, bytes("Eggs"))), "BINARY 0x30 0x30 0x30 0x30 [, 4 bytes, ]")
-    assert_equal(str(Frame(OP_BINARY, bytes("Eggs"), fin=False)), "BINARY 0x30 0x30 0x30 0x30 [, 4 bytes, continued]")
+    assert_equal(str(Frame(OP_TEXT, bytes("Spam"))), "TEXT 'Spam' [text, 4 bytes, ]")
+    assert_equal(str(Frame(OP_TEXT, bytes("Spam"), fin=False)), "TEXT 'Spam' [text, 4 bytes, continued]")
+    assert_equal(str(Frame(OP_BINARY, bytes("Eggs"))), "BINARY 0x30 0x30 0x30 0x30 [binary, 4 bytes, ]")
+    assert_equal(str(Frame(OP_BINARY, bytes("Eggs"), fin=False)), "BINARY 0x30 0x30 0x30 0x30 [binary, 4 bytes, continued]")
     assert_equal(str(Frame(OP_CLOSE, bytes(""))), "CLOSE NO_STATUS_RCVD (no status received [internal]) [, 0 bytes, ]")
     assert_equal(str(Frame(OP_CLOSE, bytes("\x03\xe9OK"))), "CLOSE GOING_AWAY (going away) OK [, 4 bytes, ]")
     assert_equal(str(Frame(OP_PING, bytes(""))), "PING '' [, 0 bytes, ]")

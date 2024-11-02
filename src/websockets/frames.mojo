@@ -1,6 +1,7 @@
 from bit import byte_swap
 from collections import Dict, Optional
 from memory import bitcast, UnsafePointer
+from utils import StringRef
 
 from websockets.utils.string import Bytes
 
@@ -57,6 +58,7 @@ alias OK_CLOSE_CODES = (
     CLOSE_CODE_GOING_AWAY,
     CLOSE_CODE_NO_STATUS_RCVD,
 )
+
 
 @always_inline
 fn get_op_code_name(code: Int) raises -> String:
@@ -155,7 +157,7 @@ fn get_close_code_explanation(code: Int) raises -> String:
 
 
 @value
-struct Frame:
+struct Frame(Writable, Stringable):
     """
     WebSocket frame.
 
@@ -187,53 +189,81 @@ struct Frame:
         self.rsv2 = False
         self.rsv3 = False
 
-    fn __str__(self) raises -> String:
-         """
-         Return a human-readable representation of a frame.
-         """
-         var coding: String = ""
-         var data: String
+    fn write_to[W: Writer](self, inout writer: W):
+        """
+        Return a human-readable representation of a frame.
+        """
+        var coding: String = ""
+        var data: String
 
-         length = "{} byte{}".format(
-            len(self.data),
-            '' if len(self.data) == 1 else 's',
-         )
-         non_final = "" if self.fin else "continued"
+        try:
+            length = "{} byte{}".format(
+               len(self.data),
+               "" if len(self.data) == 1 else "s",
+            )
+        except:
+            length = "Error"
+        non_final = "" if self.fin else "continued"
 
-         @always_inline
-         fn _repr_binary(binary: Bytes) raises -> String:
-             var data: String = ""
-             for byte in binary:
-                 data += '{} '.format(hex(ord(str(byte))))
-             return data.strip()
+        if self.opcode == OP_TEXT:
+            # Decoding only the beginning and the end is needlessly hard.
+            # Decode the entire payload then elide later if necessary.
+            data = self._data_as_text()
+            coding = "text"
+        elif self.opcode == OP_BINARY:
+            # We'll show at most the first 16 bytes and the last 8 bytes.
+            # Encode just what we need, plus two dummy bytes to elide later.
+            try:
+                data = self._data_as_binary()
+                coding = "binary"
+            except:
+                data = "Error"
+        elif self.opcode == OP_CLOSE:
+            try:
+                data = str(Close.parse(self.data))
+            except:
+                data = "Error"
+        elif self.data:
+            # We don't know if a Continuation frame contains text or binary.
+            # Ping and Pong frames could contain UTF-8.
+            # Attempt to decode as UTF-8 and display it as text; fallback to
+            # binary. If self.data is a memoryview, it has no decode() method,
+            # which raises AttributeError.
+            data = self._data_as_text()
+            coding = "text"
+            # except:
+            #     data += _repr_binary(self.data)
+            #     coding = "binary"
+        else:
+            data = "''"
 
-         if self.opcode == OP_TEXT:
-             # Decoding only the beginning and the end is needlessly hard.
-             # Decode the entire payload then elide later if necessary.
-             data = repr(String(self.data + Bytes(0)))
-         elif self.opcode == OP_BINARY:
-             # We'll show at most the first 16 bytes and the last 8 bytes.
-             # Encode just what we need, plus two dummy bytes to elide later.
-             data = _repr_binary(self.data)
-         elif self.opcode == OP_CLOSE:
-             data = str(Close.parse(self.data))
-         elif self.data:
-             # We don't know if a Continuation frame contains text or binary.
-             # Ping and Pong frames could contain UTF-8.
-             # Attempt to decode as UTF-8 and display it as text; fallback to
-             # binary. If self.data is a memoryview, it has no decode() method,
-             # which raises AttributeError.
-             data = repr(String(self.data + Bytes(0)))
-             coding = "text"
-             # except:
-             #     data += _repr_binary(self.data)
-             #     coding = "binary"
-         else:
-             data = "''"
+        metadata = ", ".join(List(coding, length, non_final))
 
-         metadata = ", ".join(List(coding, length, non_final))
+        try:
+            repr_data = "'{}'".format(data) if coding == "text" else data
+            writer.write(get_op_code_name(self.opcode), " ", repr_data, " [", metadata, "]")
+        except:
+            writer.write("Error")
 
-         return "{} {} [{}]".format(get_op_code_name(self.opcode), data, metadata)
+    fn __str__(self) -> String:
+        return String.write(self)
+
+    @always_inline
+    fn _data_as_text(self) -> String:
+        """
+        Return the data as a string.
+        """
+        return StringRef(self.data.unsafe_ptr(), len(self.data))
+
+    @always_inline
+    fn _data_as_binary(self) raises -> String:
+        """
+        Return the data as a string.
+        """
+        var s: String = ""
+        for byte in self.data:
+            s += "{} ".format(hex(ord(str(byte))))
+        return s.strip()
 
 
 @value
