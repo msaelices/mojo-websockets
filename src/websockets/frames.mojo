@@ -325,7 +325,7 @@ struct Close:
         else:
             raise Error("ProtocolError: close frame too short")
 
-    def serialize(self) -> Bytes:
+    fn serialize(self) raises -> Bytes:
         """
         Serialize the payload of a close frame.
 
@@ -334,12 +334,12 @@ struct Close:
         # TODO: Check if this is equivalent to struct.pack("!H", self.code) + self.reason.encode()
         return Bytes(self.code) + self.reason.as_bytes()
 
-    def check(self) -> None:
+    fn check(self) raises -> None:
         """
         Check that the close code has a valid value for a close frame.
 
         Raises:
-            ProtocolError: If the close code is invalid.
+            Error: If the close code is invalid.
 
         """
         if not (self.code in EXTERNAL_CLOSE_CODES or 3000 <= self.code < 5000):
