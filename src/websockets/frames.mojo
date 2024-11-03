@@ -2,6 +2,7 @@ from bit import byte_swap
 from collections import Dict, Optional
 from memory import bitcast, UnsafePointer
 from utils import StringRef
+from sys.info import is_big_endian
 
 from websockets.utils.string import Bytes
 
@@ -312,10 +313,15 @@ struct Close:
 
         """
         if len(data) >= 2:
-            # TODO: Check if this is equivalent to struct.unpack("!H", data[:2])
-            # code = byte_swap(rebind[UInt16](data[:2]))
+            # This is equivalent to struct.unpack("!H", data[:2])
+            data_ui16 = data.unsafe_ptr().bitcast[UInt16]()[]
             code = int(byte_swap(data.unsafe_ptr().bitcast[UInt16]()[]))
-            # code = int(byte_swap(data[:2]))
+
+            @parameter
+            if not is_big_endian():
+                code = int(byte_swap(data_ui16))
+            else:
+                code = int(data_ui16)
             reason = String(data[2:] + Bytes(0))
             close = Close(code, reason)
             close.check()
