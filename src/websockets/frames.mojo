@@ -322,7 +322,7 @@ struct Close:
                 code = int(byte_swap(data_ui16))
             else:
                 code = int(data_ui16)
-            reason = String(data[2:] + Bytes(0))
+            reason = StringRef(data.unsafe_ptr().offset(2), len(data) - 2)
             close = Close(code, reason)
             close.check()
             return close
