@@ -82,7 +82,7 @@ fn get_op_code_name(code: Int) raises -> String:
 
 
 @always_inline
-fn get_close_code_name(code: Int) raises -> String:
+fn get_close_code_name(code: UInt16) raises -> String:
     var name: String
     if code == CLOSE_CODE_NORMAL_CLOSURE:
         name = "NORMAL_CLOSURE"
@@ -120,7 +120,7 @@ fn get_close_code_name(code: Int) raises -> String:
 
 
 @always_inline
-fn get_close_code_explanation(code: Int) raises -> String:
+fn get_close_code_explanation(code: UInt16) raises -> String:
     var explanation: String
     if code == CLOSE_CODE_NORMAL_CLOSURE:
         explanation = "OK"
@@ -198,7 +198,7 @@ struct Frame(Writable, Stringable):
         var data: String
 
         length = "{} byte{}".format(
-           len(self.data),
+           int(len(self.data)),
            "" if len(self.data) == 1 else "s",
         )
         non_final = "" if self.fin else "continued"
@@ -247,7 +247,7 @@ struct Frame(Writable, Stringable):
         Serialize the frame to a writer.
         """
         # TODO: Implement based on serialize() method below
-        writer.write("foo")
+        pass
 
     @always_inline
     fn _data_as_text(self) -> String:
@@ -277,7 +277,7 @@ struct Close:
         reason: Close reason.
     """
 
-    var code: Int
+    var code: UInt16
     var reason: String
 
     fn __str__(self) raises -> String:
@@ -286,9 +286,9 @@ struct Close:
 
         """
         var explanation: String
-        if 3000 <= self.code < 4000:
+        if UInt16(3000) <= self.code < UInt16(4000):
             explanation = "registered"
-        elif 4000 <= self.code < 5000:
+        elif UInt16(4000) <= self.code < UInt16(5000):
             explanation = "private use"
         else:
             explanation = get_close_code_explanation(self.code)
@@ -309,19 +309,16 @@ struct Close:
 
         Raises:
             ProtocolError: If data is ill-formed.
-            UnicodeDecodeError: If the reason isn't valid UTF-8.
-
         """
         if len(data) >= 2:
             # This is equivalent to struct.unpack("!H", data[:2])
-            data_ui16 = data.unsafe_ptr().bitcast[UInt16]()[]
-            code = int(byte_swap(data.unsafe_ptr().bitcast[UInt16]()[]))
+            data_u16 = data.unsafe_ptr().bitcast[UInt16]()[]
 
             @parameter
             if not is_big_endian():
-                code = int(byte_swap(data_ui16))
+                code = int(byte_swap(data_u16))
             else:
-                code = int(data_ui16)
+                code = int(data_u16)
             reason = StringRef(data.unsafe_ptr().offset(2), len(data) - 2)
             close = Close(code, reason)
             close.check()
@@ -338,7 +335,15 @@ struct Close:
         """
         self.check()
         # TODO: Check if this is equivalent to struct.pack("!H", self.code) + self.reason.encode()
-        return Bytes(self.code) + self.reason.as_bytes()
+        @parameter
+        if not is_big_endian():
+            code = byte_swap(self.code)
+        else:
+            code = self.code
+
+        bytes = UnsafePointer.address_of(code).bitcast[Byte]()
+        code_bytes = Bytes(bytes[0], bytes[1])
+        return code_bytes + self.reason.as_bytes()
 
     fn check(self) raises -> None:
         """
@@ -348,7 +353,8 @@ struct Close:
             Error: If the close code is invalid.
 
         """
-        if not (self.code in EXTERNAL_CLOSE_CODES or 3000 <= self.code < 5000):
+        code = int(self.code)
+        if not (code in EXTERNAL_CLOSE_CODES or 3000 <= code < 5000):
             raise Error("ProtocolError: invalid status code: {}".format(self.code))
 
 #

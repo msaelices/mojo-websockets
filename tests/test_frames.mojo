@@ -18,6 +18,10 @@ fn test_str() raises:
     assert_equal(str(Frame(OP_PONG, bytes("pong"))), "PONG 'pong' [text, 4 bytes, ]")
 
 
+fn test_close_serialize() raises:
+    assert_equal(Close(1000, "").serialize(), bytes("\x03\xe8"))
+    assert_equal(Close(1000, "OK").serialize(), bytes("\x03\xe8OK"))
+
 # def assert_generator_returns(gen):
 #     """
 #     Check that a generator-based coroutine completes and return its value.
