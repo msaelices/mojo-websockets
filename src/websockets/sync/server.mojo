@@ -7,7 +7,7 @@ from memory import UnsafePointer
 from python import Python, PythonObject
 from time import sleep
 
-from libc import FD, fd_set, timeval, select
+from libc import FD, c_int, fd_set, timeval, select
 
 from ..aliases import Bytes, DEFAULT_BUFFER_SIZE, DEFAULT_MAX_REQUEST_BODY_SIZE
 from ..http import Header, Headers, HTTPRequest, HTTPResponse, encode
