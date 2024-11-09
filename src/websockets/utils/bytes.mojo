@@ -7,7 +7,7 @@ data exchange with external sources (files or network connections), or data tran
 between the Python application and the C layer.
 """
 from sys.info import is_big_endian
-from memory import bitcast
+from memory import bitcast, UnsafePointer
 from utils import StringRef
 
 from ..aliases import Bytes
@@ -41,8 +41,8 @@ fn unpack(format: String, buffer: Bytes) raises -> List[Int]:
             values.append(reader.read_byte(order))
         elif c == ord('B'):
             values.append(reader.read_ubyte(order))
-        # elif c == ord('h'):
-        #     values.append(reader.read_short())
+        elif c == ord('h'):
+            values.append(reader.read_short(order))
         # elif c == ord('i'):
         #     values.append(reader.read_int())
         # elif c == ord('q'):
@@ -75,12 +75,32 @@ struct ByteReader:
         self.buffer = Pointer[Bytes, ImmutableAnyOrigin].address_of(buffer)
         self.index = 0
 
-    fn read_byte(inout self, order: String) -> Int:
-        var value = bitcast[DType.int8](self.buffer[][self.index])
-        self.index += 1
-        return int(value)
+    fn read_byte(inout self, order: String) raises -> Int:
+        return self._next[1]()
 
-    fn read_ubyte(inout self, order: String) -> Int:
-        var value = self.buffer[][self.index]
-        self.index += 1
-        return int(value)
+    fn read_ubyte(inout self, order: String) raises -> Int:
+        return self._next[1]()
+
+    fn read_short(inout self, order: String) raises -> Int:
+        var value = self._next[2]()
+        # TODO: Implement the order
+        return value
+
+    fn _next[bitwidth: Int](inout self) raises -> Int:
+        var ptr: UnsafePointer[Byte] = UnsafePointer.address_of(self.buffer[][self.index])
+        var value: Int = 10
+        @parameter
+        if bitwidth == 1:
+            value = int(ptr.bitcast[DType.int8]()[])
+        elif bitwidth == 2:
+            value = int(ptr.bitcast[DType.int16]()[])
+        elif bitwidth == 4:
+            value = int(ptr.bitcast[DType.int32]()[])
+        elif bitwidth == 8:
+            value = int(ptr.bitcast[DType.int64]()[])
+        else:
+            raise Error("ValueError: Unknown bitwidth: {}".format(bitwidth))
+        self.index += bitwidth
+        return value
+
+
