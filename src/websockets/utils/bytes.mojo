@@ -6,6 +6,8 @@ The module’s functions and objects can be used for two largely distinct applic
 data exchange with external sources (files or network connections), or data transfer 
 between the Python application and the C layer.
 """
+from bit import byte_swap
+from sys import bitwidthof
 from sys.info import is_big_endian
 from memory import bitcast, UnsafePointer
 from utils import StringRef
@@ -75,32 +77,33 @@ struct ByteReader:
         self.buffer = Pointer[Bytes, ImmutableAnyOrigin].address_of(buffer)
         self.index = 0
 
-    fn read_byte(inout self, order: String) raises -> Int:
-        return self._next[1]()
+    fn read_byte(inout self, order: String) raises -> Int8:
+        return self._next[DType.int8](order)
 
-    fn read_ubyte(inout self, order: String) raises -> Int:
-        return self._next[1]()
+    fn read_ubyte(inout self, order: String) raises -> UInt8:
+        return self._next[DType.uint8](order)
 
-    fn read_short(inout self, order: String) raises -> Int:
-        var value = self._next[2]()
-        # TODO: Implement the order
+    fn read_short(inout self, order: String) raises -> Int16:
+        var value = self._next[DType.int16](order)
         return value
 
-    fn _next[bitwidth: Int](inout self) raises -> Int:
+    fn _next[type: DType](inout self, order: String) raises -> SIMD[type, 1]:
         var ptr: UnsafePointer[Byte] = UnsafePointer.address_of(self.buffer[][self.index])
-        var value: Int = 10
-        @parameter
-        if bitwidth == 1:
-            value = int(ptr.bitcast[DType.int8]()[])
-        elif bitwidth == 2:
-            value = int(ptr.bitcast[DType.int16]()[])
-        elif bitwidth == 4:
-            value = int(ptr.bitcast[DType.int32]()[])
-        elif bitwidth == 8:
-            value = int(ptr.bitcast[DType.int64]()[])
-        else:
-            raise Error("ValueError: Unknown bitwidth: {}".format(bitwidth))
-        self.index += bitwidth
-        return value
+        alias width = bitwidthof[type]() 
+        var value: SIMD[type, 1] = ptr.bitcast[type]()[]
+        var ordered_value = self._set_order(value, order)
+        self.index += width
+        return ordered_value
 
+    fn _set_order[type: DType, width: Int, //](self, value: SIMD[type, width], order: String) raises -> SIMD[type, width]:
+        var ordered: SIMD[type, width] = value
+        @parameter
+        if not is_big_endian():
+            if order == '>':
+                ordered = byte_swap(value)
+        else:
+            if order == '<':
+                ordered = byte_swap(value)
+        return ordered
+        
 
