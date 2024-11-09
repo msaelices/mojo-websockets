@@ -45,8 +45,8 @@ fn unpack(format: String, buffer: Bytes) raises -> List[Int]:
             values.append(int(reader.read[DType.uint8](order)))
         elif c == ord('h'):
             values.append(int(reader.read[DType.int16](order)))
-        # elif c == ord('i'):
-        #     values.append(reader.read_int())
+        elif c == ord('i'):
+            values.append(int(reader.read[DType.int32](order)))
         # elif c == ord('q'):
         #     values.append(reader.read_long())
         # elif c == ord('H'):
@@ -97,7 +97,7 @@ struct ByteReader:
 
         @parameter
         if not is_big_endian():
-            if order == '>':
+            if order == '>' or order == '!':
                 ordered = byte_swap(value)
         else:
             if order == '<':
