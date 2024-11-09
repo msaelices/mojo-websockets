@@ -40,11 +40,11 @@ fn unpack(format: String, buffer: Bytes) raises -> List[Int]:
     for c_ref in fmt_span:
         c = c_ref[]
         if c == ord('b'):
-            values.append(reader.read_byte(order))
+            values.append(int(reader.read_byte(order)))
         elif c == ord('B'):
-            values.append(reader.read_ubyte(order))
+            values.append(int(reader.read_ubyte(order)))
         elif c == ord('h'):
-            values.append(reader.read_short(order))
+            values.append(int(reader.read_short(order)))
         # elif c == ord('i'):
         #     values.append(reader.read_int())
         # elif c == ord('q'):
@@ -92,11 +92,16 @@ struct ByteReader:
         alias width = bitwidthof[type]() 
         var value: SIMD[type, 1] = ptr.bitcast[type]()[]
         var ordered_value = self._set_order(value, order)
-        self.index += width
+        self.index += width // 8
         return ordered_value
 
-    fn _set_order[type: DType, width: Int, //](self, value: SIMD[type, width], order: String) raises -> SIMD[type, width]:
-        var ordered: SIMD[type, width] = value
+    fn _set_order[type: DType, //](self, value: SIMD[type, 1], order: String) raises -> Scalar[type]:
+        var ordered: Scalar[type] = value
+        alias width = bitwidthof[type]() 
+        @parameter
+        if width == 8:
+            return ordered
+
         @parameter
         if not is_big_endian():
             if order == '>':
