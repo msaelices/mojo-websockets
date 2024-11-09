@@ -40,11 +40,11 @@ fn unpack(format: String, buffer: Bytes) raises -> List[Int]:
     for c_ref in fmt_span:
         c = c_ref[]
         if c == ord('b'):
-            values.append(int(reader.read_byte(order)))
+            values.append(int(reader.read[DType.int8](order)))
         elif c == ord('B'):
-            values.append(int(reader.read_ubyte(order)))
+            values.append(int(reader.read[DType.uint8](order)))
         elif c == ord('h'):
-            values.append(int(reader.read_short(order)))
+            values.append(int(reader.read[DType.int16](order)))
         # elif c == ord('i'):
         #     values.append(reader.read_int())
         # elif c == ord('q'):
@@ -77,15 +77,8 @@ struct ByteReader:
         self.buffer = Pointer[Bytes, ImmutableAnyOrigin].address_of(buffer)
         self.index = 0
 
-    fn read_byte(inout self, order: String) raises -> Int8:
-        return self._next[DType.int8](order)
-
-    fn read_ubyte(inout self, order: String) raises -> UInt8:
-        return self._next[DType.uint8](order)
-
-    fn read_short(inout self, order: String) raises -> Int16:
-        var value = self._next[DType.int16](order)
-        return value
+    fn read[type: DType](inout self, order: String) raises -> Scalar[type]:
+        return self._next[type](order)
 
     fn _next[type: DType](inout self, order: String) raises -> SIMD[type, 1]:
         var ptr: UnsafePointer[Byte] = UnsafePointer.address_of(self.buffer[][self.index])
@@ -97,7 +90,7 @@ struct ByteReader:
 
     fn _set_order[type: DType, //](self, value: SIMD[type, 1], order: String) raises -> Scalar[type]:
         var ordered: Scalar[type] = value
-        alias width = bitwidthof[type]() 
+        alias width = bitwidthof[type]()
         @parameter
         if width == 8:
             return ordered
@@ -110,5 +103,5 @@ struct ByteReader:
             if order == '<':
                 ordered = byte_swap(value)
         return ordered
-        
+       
 
