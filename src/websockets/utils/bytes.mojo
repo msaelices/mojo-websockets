@@ -20,6 +20,22 @@ alias MODIFIERS = List[String]('>', '<', '!', '=')
 fn unpack(format: String, buffer: Bytes) raises -> List[Int]:
     """Unpack the buffer according to the format string.
 
+    See https://docs.python.org/3/library/struct.html for more information.
+
+    Supported formats:
+    - b: int8
+    - B: uint8
+    - h: int16
+    - H: uint16
+    - i: int32
+    - I: uint32
+    - l: int32
+    - L: uint32
+    - q: int64
+    - Q: uint64
+
+    Unsupported formats: b, B, s, S, f, F, because of they do not return integers.
+
     Args:
         format: The format string.
         buffer: The buffer to unpack.
@@ -59,14 +75,6 @@ fn unpack(format: String, buffer: Bytes) raises -> List[Int]:
             values.append(int(reader.read[DType.int64](order)))
         elif c == ord('Q'):
             values.append(int(reader.read[DType.uint64](order)))
-        # elif c == ord('f'):
-        #     values.append(reader.read_float())
-        # elif c == ord('d'):
-        #     values.append(reader.read_double())
-        # elif c == ord('s'):
-        #     values.append(reader.read_string())
-        # elif c == ord('S'):
-        #     values.append(reader.read_bytes())
         else:
             raise Error("ValueError: Unknown format character: {}".format(String(c)))
     return values
