@@ -45,16 +45,20 @@ fn unpack(format: String, buffer: Bytes) raises -> List[Int]:
             values.append(int(reader.read[DType.uint8](order)))
         elif c == ord('h'):
             values.append(int(reader.read[DType.int16](order)))
+        elif c == ord('H'):
+            values.append(int(reader.read[DType.uint16](order)))
         elif c == ord('i'):
             values.append(int(reader.read[DType.int32](order)))
-        # elif c == ord('q'):
-        #     values.append(reader.read_long())
-        # elif c == ord('H'):
-        #     values.append(reader.read_ushort())
-        # elif c == ord('I'):
-        #     values.append(reader.read_uint())
-        # elif c == ord('Q'):
-        #     values.append(reader.read_ulong())
+        elif c == ord('I'):
+            values.append(int(reader.read[DType.uint32](order)))
+        elif c == ord('l'):
+            values.append(int(reader.read[DType.int32](order)))
+        elif c == ord('L'):
+            values.append(int(reader.read[DType.uint32](order)))
+        elif c == ord('q'):
+            values.append(int(reader.read[DType.int64](order)))
+        elif c == ord('Q'):
+            values.append(int(reader.read[DType.uint64](order)))
         # elif c == ord('f'):
         #     values.append(reader.read_float())
         # elif c == ord('d'):
