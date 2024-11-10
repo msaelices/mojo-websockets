@@ -83,16 +83,42 @@ fn unpack(format: String, buffer: Bytes) raises -> List[Int]:
 @value
 struct ByteReader:
     var buffer: Pointer[Bytes, ImmutableAnyOrigin]
+    """The buffer to read from."""
     var index: Int
+    """The current index in the buffer."""
 
     fn __init__(inout self, buffer: Bytes):
+        """
+        Initialize the ByteReader.
+
+        Args:
+            buffer: The buffer to read from.
+        """
         self.buffer = Pointer[Bytes, ImmutableAnyOrigin].address_of(buffer)
         self.index = 0
 
     fn read[type: DType](inout self, order: String) raises -> Scalar[type]:
+        """
+        Read the next value from the buffer.
+
+        Args:
+            order: The order of the bytes in the buffer.
+
+        Returns:
+            The next value from the buffer.
+        """
         return self._next[type](order)
 
-    fn _next[type: DType](inout self, order: String) raises -> SIMD[type, 1]:
+    fn _next[type: DType](inout self, order: String) raises -> Scalar[type]:
+        """
+        Read the next value from the buffer.
+
+        Args:
+            order: The order of the bytes in the buffer.
+
+        Returns:
+            The next value from the buffer.
+        """
         var ptr: UnsafePointer[Byte] = UnsafePointer.address_of(self.buffer[][self.index])
         alias width = bitwidthof[type]() 
         var value: SIMD[type, 1] = ptr.bitcast[type]()[]
@@ -101,6 +127,16 @@ struct ByteReader:
         return ordered_value
 
     fn _set_order[type: DType, //](self, value: SIMD[type, 1], order: String) raises -> Scalar[type]:
+        """
+        Set the order of the bytes in the value.
+
+        Args:
+            value: The value to set the order.
+            order: The order of the bytes in the value.
+
+        Returns:
+            The value with the order set.
+        """
         var ordered: Scalar[type] = value
         alias width = bitwidthof[type]()
         @parameter
@@ -115,5 +151,4 @@ struct ByteReader:
             if order == '<':
                 ordered = byte_swap(value)
         return ordered
-       
 
