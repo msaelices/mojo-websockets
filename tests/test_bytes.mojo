@@ -9,48 +9,34 @@ fn test_new_features() raises:
     # Test some of the new features in detail
     # (format, argument, big-endian result, little-endian result, asymmetric)
     tests = List(
-        # ('c', b'a', b'a', b'a', 0),
-        # ('xc', b'a', b'\0a', b'\0a', 0),
-        # ('cx', b'a', b'a\0', b'a\0', 0),
-        # ('s', b'a', b'a', b'a', 0),
-        # Tuple('0s', 'helloworld', '', '', 1),
-        # ('1s', b'helloworld', b'h', b'h', 1),
-        # ('9s', b'helloworld', b'helloworl', b'helloworl', 1),
-        # ('10s', b'helloworld', b'helloworld', b'helloworld', 0),
-        # ('11s', b'helloworld', b'helloworld\0', b'helloworld\0', 1),
-        # ('20s', b'helloworld', b'helloworld'+10*b'\0', b'helloworld'+10*b'\0', 1),
-        Tuple('b', 7, Bytes(7), Bytes(7), 0),
-        Tuple('b', -7, Bytes(249), Bytes(249), 0),
-        Tuple('B', 7, Bytes(7), Bytes(7), 0),
-        Tuple('B', 249, Bytes(249), Bytes(249), 0),
-        # Tuple('h', 700, '0b\002\274', '0b\274\002', 0),
-        # Tuple('h', -700, '0b\375D', '0bD\375', 0),
-        # Tuple('H', 700, '0b\002\274', '0b\274\002', 0),
-        # Tuple('H', 0x10000-700, '0b\375D', '0bD\375', 0),
-        # ('i', 70000000, b'\004,\035\200', b'\200\035,\004', 0),
-        # ('i', -70000000, b'\373\323\342\200', b'\200\342\323\373', 0),
-        # ('I', 70000000, b'\004,\035\200', b'\200\035,\004', 0),
-        # ('I', 0x100000000-70000000, b'\373\323\342\200', b'\200\342\323\373', 0),
-        # ('l', 70000000, b'\004,\035\200', b'\200\035,\004', 0),
-        # ('l', -70000000, b'\373\323\342\200', b'\200\342\323\373', 0),
-        # ('L', 70000000, b'\004,\035\200', b'\200\035,\004', 0),
-        # ('L', 0x100000000-70000000, b'\373\323\342\200', b'\200\342\323\373', 0),
-        # ('f', 2.0, b'@\000\000\000', b'\000\000\000@', 0),
-        # ('d', 2.0, b'@\000\000\000\000\000\000\000',
-        #            b'\000\000\000\000\000\000\000@', 0),
-        # ('f', -2.0, b'\300\000\000\000', b'\000\000\000\300', 0),
-        # ('d', -2.0, b'\300\000\000\000\000\000\000\000',
-        #             b'\000\000\000\000\000\000\000\300', 0),
-        # ('?', 0, b'\0', b'\0', 0),
-        # ('?', 3, b'\1', b'\1', 1),
-        # ('?', True, b'\1', b'\1', 0),
-        # ('?', [], b'\0', b'\0', 1),
-        # ('?', (1,), b'\1', b'\1', 1),
+        Tuple('b', List(7, ), Bytes(7), Bytes(7), 0),
+        Tuple('b', List(-7, ), Bytes(249), Bytes(249), 0),
+        Tuple('B', List(7, ), Bytes(7), Bytes(7), 0),
+        Tuple('B', List(249, ), Bytes(249), Bytes(249), 0),
+        Tuple('h', List(700, ), Bytes(2, 188), Bytes(188, 2), 0),
+        Tuple('h', List(-700, ), Bytes(253, 68), Bytes(68, 253), 0),
+        Tuple('H', List(700, ), Bytes(2, 188), Bytes(188, 2), 0),
+        Tuple('H', List(0x10000-700, ), Bytes(253, 68), Bytes(68, 253), 0),
+        Tuple('i', List(1, ), Bytes(0, 0, 0, 1), Bytes(1, 0, 0, 0), 0),
+        Tuple('i', List(-1, ), Bytes(255, 255, 255, 255), Bytes(255, 255, 255, 255), 0),
+        Tuple('i', List(70006144, ), Bytes(4, 44, 53, 128), Bytes(128, 53, 44, 4), 0),
+        Tuple('I', List(1, ), Bytes(0, 0, 0, 1), Bytes(1, 0, 0, 0), 0),
+        Tuple('I', List(4294967295, ), Bytes(255, 255, 255, 255), Bytes(255, 255, 255, 255), 0),
+        Tuple('q', List(283686952306183, ), Bytes(0, 1, 2, 3, 4, 5, 6, 7), Bytes(7, 6, 5, 4, 3, 2, 1, 0), 0),
+        Tuple('i', List(70000000, ), Bytes(4, 44, 29, 128), Bytes(128, 29, 44, 4), 0),
+        Tuple('i', List(-70000000, ), Bytes(251, 211, 226, 128), Bytes(128, 226, 211, 251), 0),
+        Tuple('I', List(70000000, ), Bytes(4, 44, 29, 128), Bytes(128, 29, 44, 4), 0),
+        Tuple('I', List(0x100000000-70000000, ), Bytes(251, 211, 226, 128), Bytes(128, 226, 211, 251), 0),
+        Tuple('l', List(70000000, ), Bytes(4, 44, 29, 128), Bytes(128, 29, 44, 4), 0),
+        Tuple('l', List(-70000000, ), Bytes(251, 211, 226, 128), Bytes(128, 226, 211, 251), 0),
+        Tuple('L', List(70000000, ), Bytes(4, 44, 29, 128), Bytes(128, 29, 44, 4), 0),
+        Tuple('L', List(0x100000000-70000000, ), Bytes(251, 211, 226, 128), Bytes(128, 226, 211, 251), 0),
     )
+    var i: Int
 
     for test_ref in tests:
         test = test_ref[]
-        fmt, arg, big, lil, asy = test
+        fmt, args, big, lil, asy = test
         for op_ref in List(
              Tuple('>{}'.format(fmt), big),
              Tuple('!{}'.format(fmt), big),
@@ -59,7 +45,13 @@ fn test_new_features() raises:
         ):
             op = op_ref[]
             xfmt, exp = op
-            assert_equal(arg, bytes.unpack(xfmt, exp)[0])
+            values = bytes.unpack(xfmt, exp)
+            i = 0
+            assert_equal(len(values), len(args))
+            for value_ref in values:
+                value = value_ref[]
+                assert_equal(args[i], value, "unpack({!r}, {!r})".format(xfmt, String(exp)))
+                i += 1
         #     print(xfmt, exp)
             # res = bytes.pack(xfmt, arg)
             # assert_equal(res, exp)
