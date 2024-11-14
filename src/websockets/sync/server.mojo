@@ -367,7 +367,7 @@ struct Server:
     var read_fds: fd_set
     var write_fds: fd_set
 
-    fn __init__(inout self, host: String, port: Int, handler: ConnHandler, max_request_body_size: Int = 1024, tcp_keep_alive: Bool = False) raises:
+    fn __init__(out self, host: String, port: Int, handler: ConnHandler, max_request_body_size: Int = 1024, tcp_keep_alive: Bool = False) raises:
         """
         Initialize a new server.
 

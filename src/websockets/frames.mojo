@@ -181,7 +181,7 @@ struct Frame(Writable, Stringable):
     var rsv2: Bool
     var rsv3: Bool
 
-    fn __init__(inout self, opcode: Opcode, data: Bytes, fin: Bool = True):
+    fn __init__(out self, opcode: Opcode, data: Bytes, fin: Bool = True):
         self.opcode = opcode
         self.data = data
         self.fin = fin

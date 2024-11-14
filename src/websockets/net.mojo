@@ -55,10 +55,10 @@ trait AddrInfo:
 
 
 trait Net:
-    fn __init__(inout self) raises:
+    fn __init__(out self) raises:
         ...
 
-    fn __init__(inout self, keep_alive: Duration) raises:
+    fn __init__(out self, keep_alive: Duration) raises:
         ...
 
     # A listen method should be implemented on structs that implement Net.
@@ -68,7 +68,7 @@ trait Net:
 
 
 trait ListenConfig:
-    fn __init__(inout self, keep_alive: Duration) raises:
+    fn __init__(out self, keep_alive: Duration) raises:
         ...
 
     # A listen method should be implemented on structs that implement ListenConfig.
@@ -78,10 +78,10 @@ trait ListenConfig:
 
 
 trait Listener(Movable):
-    fn __init__(inout self) raises:
+    fn __init__(out self) raises:
         ...
 
-    fn __init__(inout self, addr: TCPAddr) raises:
+    fn __init__(out self, addr: TCPAddr) raises:
         ...
 
     fn accept(borrowed self) raises -> TCPConnection:
@@ -95,10 +95,10 @@ trait Listener(Movable):
 
 
 trait Connection(CollectionElement):
-    fn __init__(inout self, laddr: String, raddr: String) raises:
+    fn __init__(out self, laddr: String, raddr: String) raises:
         ...
 
-    fn __init__(inout self, laddr: TCPAddr, raddr: TCPAddr) raises:
+    fn __init__(out self, laddr: TCPAddr, raddr: TCPAddr) raises:
         ...
 
     fn read(self, inout buf: Bytes) raises -> Int:
@@ -118,10 +118,10 @@ trait Connection(CollectionElement):
 
 
 trait Addr(StringableCollectionElement):
-    fn __init__(inout self):
+    fn __init__(out self):
         ...
 
-    fn __init__(inout self, ip: String, port: Int):
+    fn __init__(out self, ip: String, port: Int):
         ...
 
     fn network(self) -> String:
@@ -152,12 +152,12 @@ struct TCPAddr(Addr):
     var port: Int
     var zone: String  # IPv6 addressing zone
 
-    fn __init__(inout self):
+    fn __init__(out self):
         self.ip = String("127.0.0.1")
         self.port = 8000
         self.zone = ""
 
-    fn __init__(inout self, ip: String, port: Int):
+    fn __init__(out self, ip: String, port: Int):
         self.ip = ip
         self.port = port
         self.zone = ""
@@ -180,19 +180,19 @@ struct TCPConnection(Connection):
     var laddr: TCPAddr
     var _write_buffer: Bytes
 
-    fn __init__(inout self, laddr: String, raddr: String) raises:
+    fn __init__(out self, laddr: String, raddr: String) raises:
         self.raddr = resolve_internet_addr(NetworkType.tcp4.value, raddr)
         self.laddr = resolve_internet_addr(NetworkType.tcp4.value, laddr)
         self.fd = socket(AF_INET, SOCK_STREAM, 0)
         self._write_buffer = Bytes()
 
-    fn __init__(inout self, laddr: TCPAddr, raddr: TCPAddr) raises:
+    fn __init__(out self, laddr: TCPAddr, raddr: TCPAddr) raises:
         self.raddr = raddr
         self.laddr = laddr
         self.fd = socket(AF_INET, SOCK_STREAM, 0)
         self._write_buffer = Bytes()
 
-    fn __init__(inout self, fd: c_int, laddr: TCPAddr, raddr: TCPAddr) raises:
+    fn __init__(out self, fd: c_int, laddr: TCPAddr, raddr: TCPAddr) raises:
         self.raddr = raddr
         self.laddr = laddr
         self.fd = fd
@@ -314,7 +314,7 @@ struct HostPort:
     var host: String
     var port: String
 
-    fn __init__(inout self, host: String, port: String):
+    fn __init__(out self, host: String, port: String):
         self.host = host
         self.port = port
 
@@ -451,7 +451,7 @@ struct addrinfo_macos(AddrInfo):
     var ai_addr: UnsafePointer[sockaddr]
     var ai_next: UnsafePointer[c_void]
 
-    fn __init__(inout self):
+    fn __init__(out self):
         self.ai_flags = 0
         self.ai_family = 0
         self.ai_socktype = 0
@@ -521,7 +521,7 @@ struct addrinfo_unix(AddrInfo):
     var ai_canonname: UnsafePointer[c_char]
     var ai_next: UnsafePointer[c_void]
 
-    fn __init__(inout self):
+    fn __init__(out self):
         self.ai_flags = 0
         self.ai_family = 0
         self.ai_socktype = 0
@@ -586,15 +586,15 @@ struct TCPListener(Listener):
     var fd: c_int
     var _addr: TCPAddr
 
-    fn __init__(inout self) raises:
+    fn __init__(out self) raises:
         self._addr = TCPAddr("localhost", 8080)
         self.fd = socket(AF_INET, SOCK_STREAM, 0)
 
-    fn __init__(inout self, addr: TCPAddr) raises:
+    fn __init__(out self, addr: TCPAddr) raises:
         self._addr = addr
         self.fd = socket(AF_INET, SOCK_STREAM, 0)
 
-    fn __init__(inout self, addr: TCPAddr, fd: c_int) raises:
+    fn __init__(out self, addr: TCPAddr, fd: c_int) raises:
         self._addr = addr
         self.fd = fd
 

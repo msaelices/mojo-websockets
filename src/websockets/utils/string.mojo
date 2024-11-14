@@ -101,7 +101,7 @@ struct Message:
 struct ByteWriter:
     var _inner: Bytes
 
-    fn __init__(inout self):
+    fn __init__(out self):
         self._inner = Bytes(capacity=DEFAULT_BUFFER_SIZE)
 
     @always_inline
@@ -134,7 +134,7 @@ struct ByteReader:
     var _inner: Bytes
     var read_pos: Int
 
-    fn __init__(inout self, owned b: Bytes):
+    fn __init__(out self, owned b: Bytes):
         self._inner = b^
         self.read_pos = 0
 

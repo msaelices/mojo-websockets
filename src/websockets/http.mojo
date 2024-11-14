@@ -68,10 +68,10 @@ struct Headers(Writable, Stringable):
 
     var _inner: Dict[String, String]
 
-    fn __init__(inout self):
+    fn __init__(out self):
         self._inner = Dict[String, String]()
 
-    fn __init__(inout self, owned *headers: Header):
+    fn __init__(out self, owned *headers: Header):
         self._inner = Dict[String, String]()
         for header in headers:
             self[header[].key.lower()] = header[].value
@@ -189,7 +189,7 @@ struct HTTPRequest(Writable, Stringable):
         return request
 
     fn __init__(
-        inout self,
+        out self,
         path: String,
         headers: Headers = Headers(),
         method: String = "GET",
@@ -312,7 +312,7 @@ struct HTTPResponse(Writable, Stringable):
             raise Error("Failed to read request body: " + e.__str__())
 
     fn __init__(
-        inout self,
+        out self,
         body_bytes: Bytes,
         headers: Headers = Headers(),
         status_code: Int = 200,

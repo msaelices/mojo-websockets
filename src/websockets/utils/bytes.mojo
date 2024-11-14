@@ -87,7 +87,7 @@ struct ByteReader:
     var index: Int
     """The current index in the buffer."""
 
-    fn __init__(inout self, buffer: Bytes):
+    fn __init__(out self, buffer: Bytes):
         """
         Initialize the ByteReader.
 

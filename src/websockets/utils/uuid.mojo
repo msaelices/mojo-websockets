@@ -19,7 +19,7 @@ struct MersenneTwister:
     var state: StaticTuple[Int32, Self.N]
     var index: Int
 
-    fn __init__(inout self, seed: Int):
+    fn __init__(out self, seed: Int):
         alias W: Int = 32
         alias F: Int32 = 1812433253
         alias D: Int32 = 0xFFFFFFFF
@@ -60,7 +60,7 @@ struct MersenneTwister:
 struct UUID(Stringable, EqualityComparableCollectionElement):
     var bytes: StaticTuple[UInt8, 16]
 
-    fn __init__(inout self):
+    fn __init__(out self):
         self.bytes = StaticTuple[UInt8, 16]()
 
     fn __setitem__(inout self, index: Int, value: UInt8):
@@ -98,7 +98,7 @@ struct UUID(Stringable, EqualityComparableCollectionElement):
 struct UUIDGenerator:
     var prng: MersenneTwister
 
-    fn __init__(inout self, seed: Int):
+    fn __init__(out self, seed: Int):
         self.prng = MersenneTwister(seed)
 
     fn next(inout self) -> UUID:
