@@ -6,13 +6,11 @@ from libc import Bytes
 from ..aliases import DEFAULT_BUFFER_SIZE
 
 
-alias strSlash = "/"
-alias strHttp = "http"
-alias http = "http"
-alias strHttps = "https"
-alias https = "https"
-alias strHttp11 = "HTTP/1.1"
-alias strHttp10 = "HTTP/1.0"
+alias SLASH = "/"
+alias HTTP = "http"
+alias HTTPS = "https"
+alias HTTP11 = "HTTP/1.1"
+alias HTTP10 = "HTTP/1.0"
 
 alias strMethodGet = "GET"
 

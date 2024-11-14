@@ -4,13 +4,11 @@ from libc import Bytes
 from .string import (
     bytes,
     bytes_equal,
-    http,
-    https,
-    strHttp,
-    strHttp10,
-    strHttp11,
-    strHttps,
-    strSlash,
+    HTTP,
+    HTTP10,
+    HTTP11,
+    HTTPS,
+    SLASH,
 )
 
 
@@ -68,7 +66,7 @@ struct URI:
 
     fn _parse(inout self) raises -> None:
         var raw_uri = self.full_uri
-        var proto_str = String(strHttp11)
+        var proto_str = String(HTTP11)
         var is_https = False
 
         var proto_end = raw_uri.find("://")
@@ -92,7 +90,7 @@ struct URI:
             self.host = host_and_port[:path_start]
         else:
             host_and_port = remainder_uri
-            request_uri = strSlash
+            request_uri = SLASH
             self.host = host_and_port
 
         if is_https:

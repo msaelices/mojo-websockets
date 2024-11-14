@@ -14,8 +14,8 @@ from .utils.string import (
     lineBreak, 
     nChar,
     rChar,
-    strHttp11,
-    strSlash,
+    HTTP11,
+    SLASH,
     to_string, 
     whitespace,
 )
@@ -193,7 +193,7 @@ struct HTTPRequest(Writable, Stringable):
         path: String,
         headers: Headers = Headers(),
         method: String = "GET",
-        protocol: String = strHttp11,
+        protocol: String = HTTP11,
         body: Bytes = Bytes(),
         server_is_tls: Bool = False,
         timeout: Duration = Duration(),
@@ -232,7 +232,7 @@ struct HTTPRequest(Writable, Stringable):
         writer.write(
             self.method,
             whitespace,
-            self.path if len(self.path) > 1 else strSlash,
+            self.path if len(self.path) > 1 else SLASH,
             whitespace,
             self.protocol,
             lineBreak,
@@ -251,7 +251,7 @@ struct HTTPRequest(Writable, Stringable):
         var writer = ByteWriter()
         writer.write(self.method)
         writer.write(whitespace)
-        var path = self.path if len(self.path) > 1 else strSlash
+        var path = self.path if len(self.path) > 1 else SLASH
         writer.write(path)
         writer.write(whitespace)
         writer.write(self.protocol)
@@ -317,7 +317,7 @@ struct HTTPResponse(Writable, Stringable):
         headers: Headers = Headers(),
         status_code: Int = 200,
         status_text: String = "OK",
-        protocol: String = strHttp11,
+        protocol: String = HTTP11,
     ):
         self.headers = headers
         if HeaderKey.CONTENT_TYPE not in self.headers:
