@@ -10,7 +10,7 @@ from bit import byte_swap
 from sys import bitwidthof
 from sys.info import is_big_endian
 from memory import bitcast, UnsafePointer
-from utils import StringRef
+from utils import Span, StringRef
 
 from ..aliases import Bytes
 
@@ -151,4 +151,34 @@ struct ByteReader:
             if order == '<':
                 ordered = byte_swap(value)
         return ordered
+
+
+# TODO: Remove this function if the https://github.com/modularml/mojo/pull/3768 is merged
+fn int_from_bytes[
+    type: DType, big_endian: Bool = False
+](bytes: Span[Byte]) raises -> Int:
+    """Converts a byte array to an integer.
+
+    Args:
+        bytes: The byte array to convert.
+
+    Parameters:
+        type: The type of the integer.
+        big_endian: Whether the byte array is big-endian.
+
+    Returns:
+        The integer value.
+    """
+    if type.sizeof() != len(bytes):
+        raise Error("Byte array size does not match the integer size.")
+    var ptr: UnsafePointer[Byte] = UnsafePointer.address_of(bytes[0])
+    var type_ptr: UnsafePointer[Scalar[type]] = ptr.bitcast[Scalar[type]]()
+    var value = type_ptr[]
+
+    @parameter
+    if is_big_endian() and not big_endian:
+        value = byte_swap(value)
+    elif not is_big_endian() and big_endian:
+        value = byte_swap(value)
+    return int(value)
 

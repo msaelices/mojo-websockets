@@ -62,3 +62,44 @@ fn test_new_features() raises:
             # if rev != arg:
             #     assert_true(asy)
 
+
+# TODO: Remove this test if the https://github.com/modularml/mojo/pull/3768 is merged
+fn test_int_from_bytes() raises:
+    assert_equal(bytes.int_from_bytes[DType.int16, big_endian=True](Bytes(0, 16)), 16)
+    assert_equal(
+        bytes.int_from_bytes[DType.int16, big_endian=False](Bytes(0, 16)), 4096
+    )
+    assert_equal(
+        bytes.int_from_bytes[DType.int16, big_endian=True](Bytes(252, 0)), -1024
+    )
+    assert_equal(
+        bytes.int_from_bytes[DType.uint16, big_endian=True](Bytes(252, 0)), 64512
+    )
+    assert_equal(
+        bytes.int_from_bytes[DType.int16, big_endian=False](Bytes(252, 0)), 252
+    )
+    assert_equal(
+        bytes.int_from_bytes[DType.int32, big_endian=True](Bytes(0, 0, 0, 1)), 1
+    )
+    assert_equal(
+        bytes.int_from_bytes[DType.int32, big_endian=False](Bytes(0, 0, 0, 1)),
+        16777216,
+    )
+    assert_equal(
+        bytes.int_from_bytes[DType.int32, big_endian=True](Bytes(1, 0, 0, 0)),
+        16777216,
+    )
+    assert_equal(
+        bytes.int_from_bytes[DType.int32, big_endian=True](Bytes(1, 0, 0, 1)),
+        16777217,
+    )
+    assert_equal(
+        bytes.int_from_bytes[DType.int32, big_endian=False](Bytes(1, 0, 0, 1)),
+        16777217,
+    )
+    assert_equal(
+        bytes.int_from_bytes[DType.int32, big_endian=True](Bytes(255, 0, 0, 0)),
+        -16777216,
+    )
+
+    
