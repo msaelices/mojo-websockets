@@ -624,7 +624,7 @@ struct TCPListener(Listener):
         var bin_port = htons(UInt16(addr.port))
 
         var ai = sockaddr_in(
-            address_family, bin_port, raw_ip, StaticTuple[c_char, 8]()
+            address_family, bin_port, in_addr(raw_ip), StaticTuple[c_char, 8]()
         )
         var ai_ptr = Pointer.address_of(ai)
 
