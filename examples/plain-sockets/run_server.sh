@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 
-mojo -I ../../ server.mojo
+mojo -I ../../src/ server.mojo
