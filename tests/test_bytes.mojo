@@ -102,4 +102,18 @@ fn test_int_from_bytes() raises:
         -16777216,
     )
 
+
+# TODO: Remove this test if the https://github.com/modularml/mojo/pull/3795 is merged
+fn test_int_as_bytes() raises:
+    for x_ref in List[Int](10, 100, -12, 0, 1, -1, 1000, -1000):
+        x = x_ref[]
+
+        @parameter
+        for b in range(2):
+            assert_equal(
+                bytes.int_from_bytes[DType.int16, big_endian=b](
+                    bytes.int_as_bytes[DType.int16, big_endian=b](x)
+                ),
+                x,
+            )
     

@@ -9,7 +9,7 @@ between the Python application and the C layer.
 from bit import byte_swap
 from sys import bitwidthof
 from sys.info import is_big_endian
-from memory import bitcast, UnsafePointer
+from memory import bitcast, memcpy, UnsafePointer
 from utils import Span, StringRef
 
 from ..aliases import Bytes
@@ -181,4 +181,35 @@ fn int_from_bytes[
     elif not is_big_endian() and big_endian:
         value = byte_swap(value)
     return int(value)
+
+
+fn int_as_bytes[
+    type: DType, big_endian: Bool = False
+](value: Scalar[type]) -> Bytes:
+    """Convert the integer to a byte array.
+    Parameters:
+        type: The type of the integer.
+        big_endian: Whether the byte array should be big-endian.
+    Returns:
+        The byte array.
+    """
+    alias type_len = type.sizeof()
+    var ordered_value: Scalar[type]
+
+    @parameter
+    if is_big_endian() and not big_endian:
+        ordered_value = byte_swap(value)
+    elif not is_big_endian() and big_endian:
+        ordered_value = byte_swap(value)
+    else:
+        ordered_value = value
+
+    var ptr: UnsafePointer[Scalar[type]] = UnsafePointer.address_of(ordered_value)
+    var byte_ptr: UnsafePointer[Byte] = ptr.bitcast[Byte]()
+    var list = List[Byte](capacity=type_len)
+
+    memcpy(list.unsafe_ptr(), byte_ptr, type_len)
+    list.size = type_len
+
+    return list^
 
