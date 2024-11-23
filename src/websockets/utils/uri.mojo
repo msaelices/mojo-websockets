@@ -59,10 +59,10 @@ struct URI:
         self.password = ""
 
     fn is_https(self) -> Bool:
-        return self.scheme == https
+        return self.scheme == HTTPS
 
     fn is_http(self) -> Bool:
-        return self.scheme == http or len(self.scheme) == 0
+        return self.scheme == HTTP or len(self.scheme) == 0
 
     fn _parse(inout self) raises -> None:
         var raw_uri = self.full_uri
@@ -73,7 +73,7 @@ struct URI:
         var remainder_uri: String
         if proto_end >= 0:
             proto_str = raw_uri[:proto_end]
-            if proto_str == https:
+            if proto_str == HTTPS:
                 is_https = True
             remainder_uri = raw_uri[proto_end + 3:]
         else:
@@ -94,9 +94,9 @@ struct URI:
             self.host = host_and_port
 
         if is_https:
-            self.scheme = https
+            self.scheme = HTTPS
         else:
-            self.scheme = http
+            self.scheme = HTTP
         
         var n = request_uri.find("?")
         if n >= 0:
