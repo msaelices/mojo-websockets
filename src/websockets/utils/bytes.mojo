@@ -121,7 +121,7 @@ struct ByteReader:
         """
         var ptr: UnsafePointer[Byte] = UnsafePointer.address_of(self.buffer[][self.index])
         alias width = bitwidthof[type]() 
-        var value: SIMD[type, 1] = ptr.bitcast[type]()[]
+        var value: SIMD[type, 1] = ptr.bitcast[Scalar[type]]()[]
         var ordered_value = self._set_order(value, order)
         self.index += width // 8
         return ordered_value
@@ -206,7 +206,7 @@ fn int_as_bytes[
 
     var ptr: UnsafePointer[Scalar[type]] = UnsafePointer.address_of(ordered_value)
     var byte_ptr: UnsafePointer[Byte] = ptr.bitcast[Byte]()
-    var list = List[Byte](capacity=type_len)
+    var list = Bytes(capacity=type_len)
 
     memcpy(list.unsafe_ptr(), byte_ptr, type_len)
     list.size = type_len

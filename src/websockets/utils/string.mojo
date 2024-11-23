@@ -1,9 +1,7 @@
 from memory import memcpy
 from utils import Span
 
-from libc import Bytes
-
-from ..aliases import DEFAULT_BUFFER_SIZE
+from ..aliases import Bytes, DEFAULT_BUFFER_SIZE
 
 
 alias SLASH = "/"

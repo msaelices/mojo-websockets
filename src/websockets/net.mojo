@@ -1,4 +1,4 @@
-from sys.info import sizeof
+from sys.info import alignof, sizeof
 from sys import external_call, os_is_macos
 from memory import UnsafePointer, Pointer
 from utils import StaticTuple, StringRef
@@ -380,7 +380,7 @@ fn convert_binary_ip_to_string(
     # It seems like the len of the buffer depends on the length of the string IP.
     # Allocating 10 works for localhost (127.0.0.1) which I suspect is 9 bytes + 1 null terminator byte. So max should be 16 (15 + 1).
     var ip_buffer = UnsafePointer[c_char].alloc(16)
-    var ip_address_ptr = UnsafePointer.address_of(ip_address).bitcast[Byte]()
+    var ip_address_ptr = UnsafePointer.address_of(ip_address).bitcast[Byte, alignment=1]()
     _ = inet_ntop(address_family, ip_address_ptr, ip_buffer, 16)
 
     var string_buf = ip_buffer.bitcast[Int8]()
