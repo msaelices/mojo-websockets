@@ -63,7 +63,7 @@ fn test_new_features() raises:
             #     assert_true(asy)
 
 
-# TODO: Remove this test if the https://github.com/modularml/mojo/pull/3768 is merged
+# TODO: Remove this test if the https://github.com/modularml/mojo/pull/3795 is merged
 fn test_int_from_bytes() raises:
     assert_equal(bytes.int_from_bytes[DType.int16, big_endian=True](Bytes(0, 16)), 16)
     assert_equal(

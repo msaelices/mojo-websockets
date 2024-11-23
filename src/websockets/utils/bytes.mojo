@@ -153,7 +153,7 @@ struct ByteReader:
         return ordered
 
 
-# TODO: Remove this function if the https://github.com/modularml/mojo/pull/3768 is merged
+# TODO: Remove this function if the https://github.com/modularml/mojo/pull/3795 is merged
 fn int_from_bytes[
     type: DType, big_endian: Bool = False
 ](bytes: Span[Byte]) raises -> Int:
