@@ -43,40 +43,29 @@ fn test_read_line_not_enough_data() raises:
     with assert_raises(contains="EOFError: stream ends after 3 bytes, before end of line"):
         _ = reader.read_line(SIZE)
 
+
+fn test_read_line_too_long() raises:
+    reader = StreamReader()
+    reader.feed_data(str_to_bytes("spam\neggs\n"))
+
+    with assert_raises(contains="RuntimeError: read 5 bytes, expected no more than 2 bytes"):
+        _ = reader.read_line(2)
+
+
+fn test_read_line_too_long_need_more_data() raises:
+    reader = StreamReader()
+    reader.feed_data(str_to_bytes("spa"))
+
+    with assert_raises(contains="RuntimeError: read 3 bytes, expected no more than 2 bytes"):
+        _ = reader.read_line(2)
+
+#
 # from .utils import GeneratorTestCase
 #
 #
 # class StreamReaderTests(GeneratorTestCase):
 #     def setUp(self):
 #         self.reader = StreamReader()
-#
-#
-#     def test_read_line_need_more_data(self):
-#         self.reader.feed_data(b"spa")
-#
-#         gen = self.reader.read_line(SIZE)
-#         self.assertGeneratorRunning(gen)
-#         self.reader.feed_data(b"m\neg")
-#         line = self.assertGeneratorReturns(gen)
-#         self.assertEqual(line, b"spam\n")
-#
-#         gen = self.reader.read_line(SIZE)
-#         self.assertGeneratorRunning(gen)
-#         self.reader.feed_data(b"gs\n")
-#         line = self.assertGeneratorReturns(gen)
-#         self.assertEqual(line, b"eggs\n")
-#
-#     def test_read_line_not_enough_data(self):
-#         self.reader.feed_data(b"spa")
-#         self.reader.feed_eof()
-#
-#         gen = self.reader.read_line(SIZE)
-#         with self.assertRaises(EOFError) as raised:
-#             next(gen)
-#         self.assertEqual(
-#             str(raised.exception),
-#             "stream ends after 3 bytes, before end of line",
-#         )
 #
 #     def test_read_line_too_long(self):
 #         self.reader.feed_data(b"spam\neggs\n")

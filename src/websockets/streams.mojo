@@ -65,24 +65,26 @@ struct StreamReader:
         """
         var n: Int = 0  # number of bytes to read
         var p: Int = 0  # number of bytes without a newline
+        var found: Bool = False
 
         start = self.offset + p
         for i in range(start, len(self.buffer)):
             if self.buffer[i] == EOL:
+                found = True
                 n = i + 1
                 break
         else:  # no break in the for loop, so not found
-            n = self.offset
+            n = len(self.buffer)
 
-        p = len(self.buffer) - self.offset
+        p = n - self.offset
         if p > m:
             raise Error("RuntimeError: read {} bytes, expected no more than {} bytes".format(p, m))
-        if self.eof:
+        if not found and self.eof:
             raise Error("EOFError: stream ends after {} bytes, before end of line".format(p))
         if n > m + self.offset:
             raise Error("RuntimeError: read {} bytes, expected no more than {} bytes".format(n, m))
 
-        if n == self.offset:
+        if not found:
             return None
 
         result = self.buffer[self.offset:n]
