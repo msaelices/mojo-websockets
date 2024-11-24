@@ -59,73 +59,50 @@ fn test_read_line_too_long_need_more_data() raises:
     with assert_raises(contains="RuntimeError: read 3 bytes, expected no more than 2 bytes"):
         _ = reader.read_line(2)
 
-#
+
+fn test_read_exact() raises:
+    reader = StreamReader()
+    reader.feed_data(str_to_bytes("spameggs"))
+
+    data = reader.read_exact(4)
+    assert_equal(data.value(), str_to_bytes("spam"))
+
+    data = reader.read_exact(4)
+    assert_equal(data.value(), str_to_bytes("eggs"))
+
+
+fn test_read_exact_need_more_data() raises:
+    reader = StreamReader()
+    reader.feed_data(str_to_bytes("spa"))
+
+    data = reader.read_exact(4)
+    assert_false(bool(data))
+    reader.feed_data(str_to_bytes("meg"))
+    data = reader.read_exact(4)
+    assert_equal(data.value(), str_to_bytes("spam"))
+
+    data = reader.read_exact(4)
+    assert_false(bool(data))
+    reader.feed_data(str_to_bytes("gs"))
+    data = reader.read_exact(4)
+    assert_equal(data.value(), str_to_bytes("eggs"))
+
+
+fn test_read_exact_not_enough_data() raises:
+    reader = StreamReader()
+    reader.feed_data(str_to_bytes("spa"))
+    reader.feed_eof()
+
+    with assert_raises(contains="EOFError: stream ends after 3 bytes, expected 4 bytes"):
+        _ = reader.read_exact(4)
+
+
 # from .utils import GeneratorTestCase
 #
 #
 # class StreamReaderTests(GeneratorTestCase):
 #     def setUp(self):
 #         self.reader = StreamReader()
-#
-#     def test_read_line_too_long(self):
-#         self.reader.feed_data(b"spam\neggs\n")
-#
-#         gen = self.reader.read_line(2)
-#         with self.assertRaises(RuntimeError) as raised:
-#             next(gen)
-#         self.assertEqual(
-#             str(raised.exception),
-#             "read 5 bytes, expected no more than 2 bytes",
-#         )
-#
-#     def test_read_line_too_long_need_more_data(self):
-#         self.reader.feed_data(b"spa")
-#
-#         gen = self.reader.read_line(2)
-#         with self.assertRaises(RuntimeError) as raised:
-#             next(gen)
-#         self.assertEqual(
-#             str(raised.exception),
-#             "read 3 bytes, expected no more than 2 bytes",
-#         )
-#
-#     def test_read_exact(self):
-#         self.reader.feed_data(b"spameggs")
-#
-#         gen = self.reader.read_exact(4)
-#         data = self.assertGeneratorReturns(gen)
-#         self.assertEqual(data, b"spam")
-#
-#         gen = self.reader.read_exact(4)
-#         data = self.assertGeneratorReturns(gen)
-#         self.assertEqual(data, b"eggs")
-#
-#     def test_read_exact_need_more_data(self):
-#         self.reader.feed_data(b"spa")
-#
-#         gen = self.reader.read_exact(4)
-#         self.assertGeneratorRunning(gen)
-#         self.reader.feed_data(b"meg")
-#         data = self.assertGeneratorReturns(gen)
-#         self.assertEqual(data, b"spam")
-#
-#         gen = self.reader.read_exact(4)
-#         self.assertGeneratorRunning(gen)
-#         self.reader.feed_data(b"gs")
-#         data = self.assertGeneratorReturns(gen)
-#         self.assertEqual(data, b"eggs")
-#
-#     def test_read_exact_not_enough_data(self):
-#         self.reader.feed_data(b"spa")
-#         self.reader.feed_eof()
-#
-#         gen = self.reader.read_exact(4)
-#         with self.assertRaises(EOFError) as raised:
-#             next(gen)
-#         self.assertEqual(
-#             str(raised.exception),
-#             "stream ends after 3 bytes, expected 4 bytes",
-#         )
 #
 #     def test_read_to_eof(self):
 #         gen = self.reader.read_to_eof(SIZE)

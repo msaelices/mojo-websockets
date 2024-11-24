@@ -67,7 +67,7 @@ struct StreamReader:
         var p: Int = 0  # number of bytes without a newline
         var found: Bool = False
 
-        start = self.offset + p
+        start = self.offset
         for i in range(start, len(self.buffer)):
             if self.buffer[i] == EOL:
                 found = True
@@ -90,6 +90,26 @@ struct StreamReader:
         result = self.buffer[self.offset:n]
         self.offset = n 
 
+        return result
+
+    fn read_exact(inout self, n: Int) raises -> Optional[Bytes]:
+        """
+        Read a given number of bytes from the stream.
+        This is a generator-based coroutine.
+
+        Args:
+            n: How many bytes to read.
+
+        Raises:
+            EOFError: If the stream ends in less than `n` bytes.
+        """
+        if len(self.buffer) - self.offset < n:
+            if self.eof:
+                p = len(self.buffer)
+                raise Error("EOFError: stream ends after {} bytes, expected {} bytes".format(p, n))
+            return None
+        result = self.buffer[self.offset: self.offset + n]
+        self.offset += n
         return result
 
     # def __init__(self) -> None:
