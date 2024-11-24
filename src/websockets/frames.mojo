@@ -5,6 +5,7 @@ from utils import StringRef
 from sys.info import is_big_endian
 
 from websockets.utils.string import Bytes
+from websockets.utils.bytes import unpack, int_as_bytes, int_from_bytes
 
 alias Opcode = Int
 
@@ -157,6 +158,24 @@ fn get_close_code_explanation(code: UInt16) raises -> String:
     return explanation
 
 
+fn apply_mask(data: Bytes, mask: Bytes) raises -> Bytes:
+    """
+    Apply masking to the data of a WebSocket message.
+
+    Args:
+        data: Data to mask.
+        mask: 4-bytes mask.
+
+    """
+    if len(mask) != 4:
+        raise Error("ValueError: mask must contain 4 bytes")
+
+    data_int = int_from_bytes[DType.int16, big_endian=is_big_endian()](data)
+    mask_repeated = mask * (len(data) // 4) + mask[: len(data) % 4]
+    mask_int = int_from_bytes[DType.int16, big_endian=is_big_endian()](mask_repeated)
+    return int_as_bytes[DType.int16, big_endian=is_big_endian()](data_int ^ mask_int)
+
+
 @value
 struct Frame(Writable, Stringable):
     """
@@ -265,6 +284,87 @@ struct Frame(Writable, Stringable):
         for byte in self.data:
             s += "{} ".format(hex(ord(str(byte))))
         return s.strip()
+
+    @staticmethod
+    fn parse(
+        read_exact: fn (Int) -> Bytes,
+        *,
+        mask: Bool,
+    ) raises -> Frame:
+        """
+        Parse a WebSocket frame.
+
+        This is a generator-based coroutine.
+
+        Args:
+            read_exact: Generator-based coroutine that reads the requested
+                bytes or raises an exception if there isn't enough data.
+            mask: Whether the frame should be masked i.e. whether the read
+                happens on the server side.
+
+        Returns:
+            The parsed frame.
+
+        Raises:
+            EOFError: If the connection is closed without a full WebSocket frame.
+            UnicodeDecodeError: If the frame contains invalid UTF-8.
+            PayloadTooBig: If the frame's payload size exceeds ``max_size``.
+            ProtocolError: If the frame contains incorrect values.
+
+        """
+        # Read the header.
+        data = read_exact(2)
+        unpacked_data = unpack("!BB", data)
+        head1 = unpacked_data[0]
+        head2 = unpacked_data[1]
+
+        # While not Pythonic, this is marginally faster than calling bool().
+        fin = True if head1 & 0b10000000 else False
+        rsv1 = True if head1 & 0b01000000 else False
+        rsv2 = True if head1 & 0b00100000 else False
+        rsv3 = True if head1 & 0b00010000 else False
+
+        opcode = Opcode(head1 & 0b00001111)
+
+        if (True if head2 & 0b10000000 else False) != mask:
+            raise Error("ProtocolError: incorrect masking")
+
+        length = head2 & 0b01111111
+        if length == 126:
+            data = read_exact(2)
+            length = unpack("!H", data)[0]
+        elif length == 127:
+            data = read_exact(8)
+            length = unpack("!Q", data)[0]
+        if mask:
+            mask_bytes = read_exact(4)
+            data = read_exact(length)
+            if mask:
+                data = apply_mask(data, mask_bytes)
+        else:
+            data = read_exact(length)
+
+        frame = Frame(opcode, data, fin, rsv1, rsv2, rsv3)
+        frame.check()
+
+        return frame
+
+    fn check(self) raises -> None:
+        """
+        Check that reserved bits and opcode have acceptable values.
+
+        Raises:
+            ProtocolError: If a reserved bit or the opcode is invalid.
+
+        """
+        if self.rsv1 or self.rsv2 or self.rsv3:
+            raise Error("ProtocolError: reserved bits must be 0")
+
+        if self.opcode in CTRL_OPCODES:
+            if len(self.data) > 125:
+                raise Error("ProtocolError: control frame too long")
+            if not self.fin:
+                raise Error("ProtocolError: fragmented control frame")
 
 
 @value
