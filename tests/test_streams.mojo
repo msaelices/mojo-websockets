@@ -1,4 +1,4 @@
-from testing import assert_equal, assert_false, assert_raises
+from testing import assert_equal, assert_false, assert_raises, assert_true
 
 from websockets.aliases import Bytes
 from websockets.utils.bytes import str_to_bytes
@@ -121,65 +121,67 @@ fn test_read_to_eof_too_long() raises:
     with assert_raises(contains="RuntimeError: read 4 bytes, expected no more than 2 bytes"):
         _ = reader.read_to_eof(2)
 
+
+fn test_feed_data_after_feed_data() raises:
+    reader = StreamReader()
+    reader.feed_data(str_to_bytes("spam"))
+    reader.feed_data(str_to_bytes("eggs"))
+
+    data = reader.read_exact(8)
+    assert_equal(data.value(), str_to_bytes("spameggs"))
+    eof = reader.at_eof()
+    assert_false(eof)
+
+
+fn test_feed_eof_after_feed_data() raises:
+    reader = StreamReader()
+    reader.feed_data(str_to_bytes("spam"))
+    reader.feed_eof()
+
+    data = reader.read_exact(4)
+    assert_equal(data.value(), str_to_bytes("spam"))
+    eof = reader.at_eof()
+    assert_true(eof)
+
+
+fn test_at_eof_after_feed_data() raises:
+    reader = StreamReader()
+    eof = reader.at_eof()
+    assert_false(eof)
+    reader.feed_data(str_to_bytes("spam"))
+    eof = reader.at_eof()
+    assert_false(eof)
+
+
+fn test_at_eof_after_feed_eof() raises:
+    reader = StreamReader()
+    eof = reader.at_eof()
+    assert_false(eof)
+    reader.feed_eof()
+    eof = reader.at_eof()
+    assert_true(eof)
+
+
+fn test_feed_data_after_feed_eof() raises:
+    reader = StreamReader()
+    reader.feed_eof()
+    with assert_raises(contains="EOFError: stream ended"):
+        reader.feed_data(str_to_bytes("spam"))
+
+
+fn test_feed_eof_after_feed_eof() raises:
+    reader = StreamReader()
+    reader.feed_eof()
+    with assert_raises(contains="EOFError: stream ended"):
+        reader.feed_eof()
+
+
 # from .utils import GeneratorTestCase
 #
 #
 # class StreamReaderTests(GeneratorTestCase):
 #     def setUp(self):
 #         self.reader = StreamReader()
-#
-#     def test_at_eof_after_feed_data(self):
-#         gen = self.reader.at_eof()
-#         self.assertGeneratorRunning(gen)
-#         self.reader.feed_data(b"spam")
-#         eof = self.assertGeneratorReturns(gen)
-#         self.assertFalse(eof)
-#
-#     def test_at_eof_after_feed_eof(self):
-#         gen = self.reader.at_eof()
-#         self.assertGeneratorRunning(gen)
-#         self.reader.feed_eof()
-#         eof = self.assertGeneratorReturns(gen)
-#         self.assertTrue(eof)
-#
-#     def test_feed_data_after_feed_data(self):
-#         self.reader.feed_data(b"spam")
-#         self.reader.feed_data(b"eggs")
-#
-#         gen = self.reader.read_exact(8)
-#         data = self.assertGeneratorReturns(gen)
-#         self.assertEqual(data, b"spameggs")
-#         gen = self.reader.at_eof()
-#         self.assertGeneratorRunning(gen)
-#
-#     def test_feed_eof_after_feed_data(self):
-#         self.reader.feed_data(b"spam")
-#         self.reader.feed_eof()
-#
-#         gen = self.reader.read_exact(4)
-#         data = self.assertGeneratorReturns(gen)
-#         self.assertEqual(data, b"spam")
-#         gen = self.reader.at_eof()
-#         eof = self.assertGeneratorReturns(gen)
-#         self.assertTrue(eof)
-#
-#     def test_feed_data_after_feed_eof(self):
-#         self.reader.feed_eof()
-#         with self.assertRaises(EOFError) as raised:
-#             self.reader.feed_data(b"spam")
-#         self.assertEqual(
-#             str(raised.exception),
-#             "stream ended",
-#         )
-#
-#     def test_feed_eof_after_feed_eof(self):
-#         self.reader.feed_eof()
-#         with self.assertRaises(EOFError) as raised:
-#             self.reader.feed_eof()
-#         self.assertEqual(
-#             str(raised.exception),
-#             "stream ended",
-#         )
 #
 #     def test_discard(self):
 #         gen = self.reader.read_to_eof(SIZE)

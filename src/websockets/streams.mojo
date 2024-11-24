@@ -128,6 +128,16 @@ struct StreamReader:
         self.offset = len(self.buffer)
         return result
 
+    def at_eof(self) -> Bool:
+        """
+        Tell whether the stream has ended and all data was read.
+        """
+        if self.offset < len(self.buffer):
+            return False
+        if self.eof:
+            return True
+        return False
+
     # def __init__(self) -> None:
     #     self.buffer = bytearray()
     #     self.eof = False
@@ -147,37 +157,6 @@ struct StreamReader:
     #         # When all data was read but the stream hasn't ended, we can't
     #         # tell if until either feed_data() or feed_eof() is called.
     #         yield
-    #
-    # def feed_data(self, data: bytes) -> None:
-    #     """
-    #     Write data to the stream.
-    #
-    #     :meth:`feed_data` cannot be called after :meth:`feed_eof`.
-    #
-    #     Args:
-    #         data: Data to write.
-    #
-    #     Raises:
-    #         EOFError: If the stream has ended.
-    #
-    #     """
-    #     if self.eof:
-    #         raise EOFError("stream ended")
-    #     self.buffer += data
-    #
-    # def feed_eof(self) -> None:
-    #     """
-    #     End the stream.
-    #
-    #     :meth:`feed_eof` cannot be called more than once.
-    #
-    #     Raises:
-    #         EOFError: If the stream has ended.
-    #
-    #     """
-    #     if self.eof:
-    #         raise EOFError("stream ended")
-    #     self.eof = True
     #
     # def discard(self) -> None:
     #     """
