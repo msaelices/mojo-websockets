@@ -97,40 +97,36 @@ fn test_read_exact_not_enough_data() raises:
         _ = reader.read_exact(4)
 
 
+fn test_read_to_eof() raises:
+    reader = StreamReader()
+    data = reader.read_to_eof(SIZE)
+    assert_false(bool(data))
+    reader.feed_data(str_to_bytes("spam"))
+    reader.feed_eof()
+    data = reader.read_to_eof(SIZE)
+    assert_equal(data.value(), str_to_bytes("spam"))
+
+fn test_read_to_eof_at_eof() raises:
+    reader = StreamReader()
+    reader.feed_eof()
+
+    data = reader.read_to_eof(SIZE)
+    assert_equal(data.value(), str_to_bytes(""))
+
+
+fn test_read_to_eof_too_long() raises:
+    reader = StreamReader()
+
+    reader.feed_data(str_to_bytes("spam"))
+    with assert_raises(contains="RuntimeError: read 4 bytes, expected no more than 2 bytes"):
+        _ = reader.read_to_eof(2)
+
 # from .utils import GeneratorTestCase
 #
 #
 # class StreamReaderTests(GeneratorTestCase):
 #     def setUp(self):
 #         self.reader = StreamReader()
-#
-#     def test_read_to_eof(self):
-#         gen = self.reader.read_to_eof(SIZE)
-#
-#         self.reader.feed_data(b"spam")
-#         self.assertGeneratorRunning(gen)
-#
-#         self.reader.feed_eof()
-#         data = self.assertGeneratorReturns(gen)
-#         self.assertEqual(data, b"spam")
-#
-#     def test_read_to_eof_at_eof(self):
-#         self.reader.feed_eof()
-#
-#         gen = self.reader.read_to_eof(SIZE)
-#         data = self.assertGeneratorReturns(gen)
-#         self.assertEqual(data, b"")
-#
-#     def test_read_to_eof_too_long(self):
-#         gen = self.reader.read_to_eof(2)
-#
-#         self.reader.feed_data(b"spam")
-#         with self.assertRaises(RuntimeError) as raised:
-#             next(gen)
-#         self.assertEqual(
-#             str(raised.exception),
-#             "read 4 bytes, expected no more than 2 bytes",
-#         )
 #
 #     def test_at_eof_after_feed_data(self):
 #         gen = self.reader.at_eof()

@@ -112,6 +112,26 @@ struct StreamReader:
         self.offset += n
         return result
 
+    fn read_to_eof(inout self, m: Int) raises -> Optional[Bytes]:
+        """
+        Read all bytes from the stream.
+        This is a generator-based coroutine.
+
+        Args:
+            m: Maximum number bytes to read; this is a security limit.
+
+        Raises:
+            RuntimeError: If the stream ends in more than `m` bytes.
+        """
+        if not self.eof:
+            p = len(self.buffer) - self.offset
+            if p > m:
+                raise Error("RuntimeError: read {} bytes, expected no more than {} bytes".format(p, m))
+            return None
+        result = self.buffer[self.offset:]
+        self.offset = len(self.buffer)
+        return result
+
     # def __init__(self) -> None:
     #     self.buffer = bytearray()
     #     self.eof = False
