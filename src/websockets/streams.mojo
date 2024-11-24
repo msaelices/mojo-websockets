@@ -1,3 +1,4 @@
+from collections import Optional
 from websockets.aliases import Bytes, DEFAULT_BUFFER_SIZE
 from websockets.utils.bytes import EOL
 
@@ -47,7 +48,7 @@ struct StreamReader:
             raise Error("EOFError: stream ended")
         self.eof = True
 
-    fn read_line(inout self, m: Int) raises -> Bytes:
+    fn read_line(inout self, m: Int) raises -> Optional[Bytes]:
         """
         Read a LF-terminated line from the stream.
 
@@ -61,31 +62,33 @@ struct StreamReader:
         Raises:
             EOFError: If the stream ends without a LF.
             RuntimeError: If the stream ends in more than ``m`` bytes.
-
         """
         var n: Int = 0  # number of bytes to read
         var p: Int = 0  # number of bytes without a newline
 
-        while True:
-            start = self.offset + p
-            for i in range(start, len(self.buffer)):
-                if self.buffer[i] == EOL:
-                    n = i + 1
-                    break
-            else:  # no break, so not found
-                n = self.offset
-            if n > start:
+        start = self.offset + p
+        for i in range(start, len(self.buffer)):
+            if self.buffer[i] == EOL:
+                n = i + 1
                 break
-            p = len(self.buffer) - self.offset
-            if p > m:
-                raise Error("RuntimeError: read {} bytes, expected no more than {} bytes".format(p, m))
-            if self.eof:
-                raise Error("EOFError: stream ends after {} bytes, before end of line".format(p))
+        else:  # no break in the for loop, so not found
+            n = self.offset
+
+        p = len(self.buffer) - self.offset
+        if p > m:
+            raise Error("RuntimeError: read {} bytes, expected no more than {} bytes".format(p, m))
+        if self.eof:
+            raise Error("EOFError: stream ends after {} bytes, before end of line".format(p))
         if n > m + self.offset:
             raise Error("RuntimeError: read {} bytes, expected no more than {} bytes".format(n, m))
-        r = self.buffer[self.offset:n]
+
+        if n == self.offset:
+            return None
+
+        result = self.buffer[self.offset:n]
         self.offset = n 
-        return r
+
+        return result
 
     # def __init__(self) -> None:
     #     self.buffer = bytearray()
