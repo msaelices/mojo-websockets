@@ -15,6 +15,7 @@ from utils import Span, StringRef
 from ..aliases import Bytes
 
 alias MODIFIERS = List[String]('>', '<', '!', '=')
+alias EOL = Byte(10)
 
 
 fn unpack(format: String, buffer: Bytes) raises -> List[Int]:
@@ -213,3 +214,18 @@ fn int_as_bytes[
 
     return list^
 
+
+fn str_to_bytes(s: String) -> Bytes:
+    """Convert a string to a byte array.
+
+    Args:
+        s: The string to convert.
+
+    Returns:
+        The byte array.
+    """
+    capacity = len(s)
+    bytes = Bytes(capacity=capacity)
+    for c in s:
+        bytes.append(ord(c))
+    return bytes

@@ -1,21 +1,47 @@
-from testing import assert_equal
+from testing import assert_equal, assert_false, assert_raises
 
 from websockets.aliases import Bytes
 from websockets.utils.bytes import str_to_bytes
 from websockets.streams import StreamReader
 
+alias SIZE = 32
 
 
-fn test_read_line() raises -> None:
+fn test_read_line() raises:
     reader = StreamReader()
     reader.feed_data(str_to_bytes("spam\neggs\n"))
 
-    line = reader.read_line(32)
-    assert_equal(line, str_to_bytes("spam\n"))
+    line = reader.read_line(SIZE)
+    assert_equal(line.value(), str_to_bytes("spam\n"))
 
-    line = reader.read_line(32)
-    assert_equal(line, str_to_bytes("eggs\n"))
+    line = reader.read_line(SIZE)
+    assert_equal(line.value(), str_to_bytes("eggs\n"))
 
+
+fn test_read_line_need_more_data() raises:
+    reader = StreamReader()
+    reader.feed_data(str_to_bytes("spa"))
+
+    line = reader.read_line(SIZE)
+    assert_false(bool(line)) 
+    reader.feed_data(str_to_bytes("m\neg"))
+    line2 = reader.read_line(SIZE)
+    assert_equal(line2.value(), str_to_bytes("spam\n"))
+
+    line3 = reader.read_line(SIZE)
+    assert_false(bool(line3)) 
+    reader.feed_data(str_to_bytes("gs\n"))
+    line4 = reader.read_line(SIZE)
+    assert_equal(line4.value(), str_to_bytes("eggs\n"))
+
+
+fn test_read_line_not_enough_data() raises:
+    reader = StreamReader()
+    reader.feed_data(str_to_bytes("spa"))
+    reader.feed_eof()
+
+    with assert_raises(contains="EOFError: stream ends after 3 bytes, before end of line"):
+        _ = reader.read_line(SIZE)
 
 # from .utils import GeneratorTestCase
 #
@@ -24,27 +50,17 @@ fn test_read_line() raises -> None:
 #     def setUp(self):
 #         self.reader = StreamReader()
 #
-#     def test_read_line(self):
-#         self.reader.feed_data(b"spam\neggs\n")
-#
-#         gen = self.reader.read_line(32)
-#         line = self.assertGeneratorReturns(gen)
-#         self.assertEqual(line, b"spam\n")
-#
-#         gen = self.reader.read_line(32)
-#         line = self.assertGeneratorReturns(gen)
-#         self.assertEqual(line, b"eggs\n")
 #
 #     def test_read_line_need_more_data(self):
 #         self.reader.feed_data(b"spa")
 #
-#         gen = self.reader.read_line(32)
+#         gen = self.reader.read_line(SIZE)
 #         self.assertGeneratorRunning(gen)
 #         self.reader.feed_data(b"m\neg")
 #         line = self.assertGeneratorReturns(gen)
 #         self.assertEqual(line, b"spam\n")
 #
-#         gen = self.reader.read_line(32)
+#         gen = self.reader.read_line(SIZE)
 #         self.assertGeneratorRunning(gen)
 #         self.reader.feed_data(b"gs\n")
 #         line = self.assertGeneratorReturns(gen)
@@ -54,7 +70,7 @@ fn test_read_line() raises -> None:
 #         self.reader.feed_data(b"spa")
 #         self.reader.feed_eof()
 #
-#         gen = self.reader.read_line(32)
+#         gen = self.reader.read_line(SIZE)
 #         with self.assertRaises(EOFError) as raised:
 #             next(gen)
 #         self.assertEqual(
@@ -123,7 +139,7 @@ fn test_read_line() raises -> None:
 #         )
 #
 #     def test_read_to_eof(self):
-#         gen = self.reader.read_to_eof(32)
+#         gen = self.reader.read_to_eof(SIZE)
 #
 #         self.reader.feed_data(b"spam")
 #         self.assertGeneratorRunning(gen)
@@ -135,7 +151,7 @@ fn test_read_line() raises -> None:
 #     def test_read_to_eof_at_eof(self):
 #         self.reader.feed_eof()
 #
-#         gen = self.reader.read_to_eof(32)
+#         gen = self.reader.read_to_eof(SIZE)
 #         data = self.assertGeneratorReturns(gen)
 #         self.assertEqual(data, b"")
 #
@@ -204,7 +220,7 @@ fn test_read_line() raises -> None:
 #         )
 #
 #     def test_discard(self):
-#         gen = self.reader.read_to_eof(32)
+#         gen = self.reader.read_to_eof(SIZE)
 #
 #         self.reader.feed_data(b"spam")
 #         self.reader.discard()
