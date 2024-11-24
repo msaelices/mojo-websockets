@@ -176,20 +176,13 @@ fn test_feed_eof_after_feed_eof() raises:
         reader.feed_eof()
 
 
-# from .utils import GeneratorTestCase
-#
-#
-# class StreamReaderTests(GeneratorTestCase):
-#     def setUp(self):
-#         self.reader = StreamReader()
-#
-#     def test_discard(self):
-#         gen = self.reader.read_to_eof(SIZE)
-#
-#         self.reader.feed_data(b"spam")
-#         self.reader.discard()
-#         self.assertGeneratorRunning(gen)
-#
-#         self.reader.feed_eof()
-#         data = self.assertGeneratorReturns(gen)
-#         self.assertEqual(data, b"")
+fn test_discard() raises:
+    reader = StreamReader()
+    data = reader.read_to_eof(SIZE)
+
+    reader.feed_data(str_to_bytes("spam"))
+    reader.discard()
+    reader.feed_eof()
+    data = reader.read_to_eof(SIZE)
+    assert_equal(data.value(), str_to_bytes(""))
+

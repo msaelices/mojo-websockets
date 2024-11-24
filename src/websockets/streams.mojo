@@ -128,7 +128,7 @@ struct StreamReader:
         self.offset = len(self.buffer)
         return result
 
-    def at_eof(self) -> Bool:
+    fn at_eof(self) -> Bool:
         """
         Tell whether the stream has ended and all data was read.
         """
@@ -138,29 +138,10 @@ struct StreamReader:
             return True
         return False
 
-    # def __init__(self) -> None:
-    #     self.buffer = bytearray()
-    #     self.eof = False
-    #
-    # def at_eof(self) -> Generator[None, None, bool]:
-    #     """
-    #     Tell whether the stream has ended and all data was read.
-    #
-    #     This is a generator-based coroutine.
-    #
-    #     """
-    #     while True:
-    #         if self.buffer:
-    #             return False
-    #         if self.eof:
-    #             return True
-    #         # When all data was read but the stream hasn't ended, we can't
-    #         # tell if until either feed_data() or feed_eof() is called.
-    #         yield
-    #
-    # def discard(self) -> None:
-    #     """
-    #     Discard all buffered data, but don't end the stream.
-    #
-    #     """
-    #     del self.buffer[:]
+    fn discard(inout self) -> None:
+        """
+        Discard all buffered data, but don't end the stream.
+    
+        """
+        self.offset = len(self.buffer)
+
