@@ -3,8 +3,83 @@ from websockets.aliases import Bytes, DEFAULT_BUFFER_SIZE
 from websockets.utils.bytes import EOL
 
 
+trait Streamable:
+
+    fn feed_data(inout self, data: Bytes) raises -> None:
+        """
+        Write data to the stream.
+
+        `feed_data` cannot be called after `feed_eof`.
+
+        Args:
+            data: Data to write.
+
+        Raises:
+            EOFError: If the stream has ended.
+
+        """
+        ...
+
+    fn feed_eof(inout self) raises -> None:
+        """
+        End the stream.
+
+        `feed_eof` cannot be called more than once.
+
+        Raises:
+            EOFError: If the stream has ended.
+
+        """
+        ...
+
+    fn read_line(inout self, m: Int) raises -> Optional[Bytes]:
+        """
+        Read a LF-terminated line from the stream.
+
+        The return value includes the LF character.
+
+        Args:
+            m: Maximum number bytes to read; this is a security limit.
+
+        Raises:
+            EOFError: If the stream ends without a LF.
+            RuntimeError: If the stream ends in more than ``m`` bytes.
+        """
+        ...
+
+    fn read_exact(inout self, n: Int) raises -> Optional[Bytes]:
+        """
+        Read a given number of bytes from the stream.
+
+        Args:
+            n: How many bytes to read.
+
+        Raises:
+            EOFError: If the stream ends in less than `n` bytes.
+        """
+        ...
+
+    fn read_to_eof(inout self, m: Int) raises -> Optional[Bytes]:
+        """
+        Read all bytes from the stream.
+
+        Args:
+            m: Maximum number bytes to read; this is a security limit.
+
+        Raises:
+            RuntimeError: If the stream ends in more than `m` bytes.
+        """
+        ...
+
+    fn at_eof(self) -> Bool:
+        """
+        Tell whether the stream has ended and all data was read.
+        """
+        ...
+
+
 @value
-struct StreamReader:
+struct StreamReader(Streamable):
     """
     Stream reader.
     """
