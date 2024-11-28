@@ -20,13 +20,13 @@ from websockets.utils.string import (
 
 alias DEFAULT_SERVER_CONN_STRING = "http://localhost:8080"
 
-def test_header():
+fn test_header() raises:
     test_parse_request_header()
     test_parse_response_header()
     test_header_case_insensitive()
 
 
-def test_header_case_insensitive():
+fn test_header_case_insensitive() raises:
     var headers = Headers(Header("Host", "SomeHost"))
     assert_true("host" in headers)
     assert_true("HOST" in headers)
@@ -35,7 +35,7 @@ def test_header_case_insensitive():
     assert_equal(headers["host"], "SomeHost")
 
 
-def test_parse_request_header():
+fn test_parse_request_header() raises:
     var headers_str = bytes(
         """GET /index.html HTTP/1.1\r\nHost:example.com\r\nUser-Agent: Mozilla/5.0\r\nContent-Type: text/html\r\nContent-Length: 1234\r\nConnection: close\r\nTrailer: end-of-message\r\n\r\n"""
     )
@@ -56,7 +56,7 @@ def test_parse_request_header():
     assert_equal(header["Connection"], "close")
 
 
-def test_parse_response_header():
+fn test_parse_response_header() raises:
     var headers_str = bytes(
         """HTTP/1.1 200 OK\r\nServer: example.com\r\nUser-Agent: Mozilla/5.0\r\nContent-Type: text/html\r\nContent-Encoding: gzip\r\nContent-Length: 1234\r\nConnection: close\r\nTrailer: end-of-message\r\n\r\n"""
     )
@@ -77,12 +77,12 @@ def test_parse_response_header():
     assert_equal(header["Trailer"], "end-of-message")
 
 
-def test_http():
+fn test_http() raises:
     test_encode_http_request()
     test_encode_http_response()
 
 
-def test_encode_http_request():
+fn test_encode_http_request() raises:
     var uri = URI(DEFAULT_SERVER_CONN_STRING + "/foobar?baz")
     var req = HTTPRequest(
         uri.path,
@@ -102,7 +102,7 @@ def test_encode_http_request():
     assert_equal(req_encoded, as_str)
 
 
-def test_encode_http_response():
+fn test_encode_http_response() raises:
     var res = HTTPResponse(bytes("Hello, World!"))
     res.headers[HeaderKey.DATE] = "2024-06-02T13:41:50.766880+00:00"
     var as_str = str(res)

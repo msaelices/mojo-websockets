@@ -1,2 +1,4 @@
-def test_server():
+
+
+fn test_server():
     pass

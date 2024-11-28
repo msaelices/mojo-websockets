@@ -5,7 +5,7 @@ from websockets.aliases import Bytes
 from websockets.utils.string import bytes_equal, bytes
 
 
-def test_io():
+fn test_io() raises:
     test_string_literal_to_bytes()
 
 
