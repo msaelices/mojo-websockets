@@ -327,7 +327,7 @@ struct Frame(Writable, Stringable):
 
         opcode = Opcode(head1 & 0b00001111)
 
-        if (True if head2 & 0b10000000 else False) != mask:
+        if bool(head2 & 0b10000000) != mask:
             raise Error("ProtocolError: incorrect masking")
 
         length = head2 & 0b01111111
