@@ -4,6 +4,7 @@ from memory import bitcast, UnsafePointer
 from utils import StringRef
 from sys.info import is_big_endian
 
+from websockets.streams import Streamable
 from websockets.utils.string import Bytes
 from websockets.utils.bytes import unpack, int_as_bytes, int_from_bytes
 
@@ -286,8 +287,8 @@ struct Frame(Writable, Stringable):
         return s.strip()
 
     @staticmethod
-    fn parse(
-        read_exact: fn (Int) -> Bytes,
+    fn parse[T: Streamable](
+        inout stream: T,
         *,
         mask: Bool,
     ) raises -> Frame:
@@ -297,8 +298,7 @@ struct Frame(Writable, Stringable):
         This is a generator-based coroutine.
 
         Args:
-            read_exact: Generator-based coroutine that reads the requested
-                bytes or raises an exception if there isn't enough data.
+            stream: Stream to read from.
             mask: Whether the frame should be masked i.e. whether the read
                 happens on the server side.
 
@@ -313,8 +313,9 @@ struct Frame(Writable, Stringable):
 
         """
         # Read the header.
-        data = read_exact(2)
+        data = stream.read_exact(2).value()
         unpacked_data = unpack("!BB", data)
+
         head1 = unpacked_data[0]
         head2 = unpacked_data[1]
 
@@ -331,18 +332,18 @@ struct Frame(Writable, Stringable):
 
         length = head2 & 0b01111111
         if length == 126:
-            data = read_exact(2)
+            data = stream.read_exact(2).value()
             length = unpack("!H", data)[0]
         elif length == 127:
-            data = read_exact(8)
+            data = stream.read_exact(8).value()
             length = unpack("!Q", data)[0]
         if mask:
-            mask_bytes = read_exact(4)
-            data = read_exact(length)
+            mask_bytes = stream.read_exact(4).value()
+            data = stream.read_exact(length).value()
             if mask:
                 data = apply_mask(data, mask_bytes)
         else:
-            data = read_exact(length)
+            data = stream.read_exact(length).value()
 
         frame = Frame(opcode, data, fin, rsv1, rsv2, rsv3)
         frame.check()

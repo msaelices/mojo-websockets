@@ -175,10 +175,10 @@ struct StreamReader(Streamable):
         Raises:
             EOFError: If the stream ends in less than `n` bytes.
         """
-        if len(self.buffer) - self.offset < n:
+        remaining = len(self.buffer) - self.offset
+        if remaining < n:
             if self.eof:
-                p = len(self.buffer)
-                raise Error("EOFError: stream ends after {} bytes, expected {} bytes".format(p, n))
+                raise Error("EOFError: stream ends after {} bytes, expected {} bytes".format(remaining, n))
             return None
         result = self.buffer[self.offset: self.offset + n]
         self.offset += n

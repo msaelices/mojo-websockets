@@ -41,7 +41,7 @@ fn parse(data: Bytes, mask: Bool) raises -> Frame:
     reader = StreamReader()
     reader.feed_data(data)
     reader.feed_eof()
-    frame = Frame.parse[StreamReader](
+    frame = Frame.parse(
         reader, mask=mask,
     )
     return frame
@@ -68,9 +68,10 @@ fn assert_frame_data(frame: Frame, data: Bytes, mask: Bool) raises:
 
 
 fn test_text_unmasked() raises:
+    data = Bytes(129, 4) + str_to_bytes("Spam")
     assert_frame_data(
         Frame(OP_TEXT, str_to_bytes("Spam")),
-        str_to_bytes("\x81\x04Spam"),
+        data,
         mask=False,
     )
 
