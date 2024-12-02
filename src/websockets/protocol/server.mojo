@@ -12,11 +12,13 @@ struct ServerProtocol(Protocol):
     """
     var reader: StreamReader
     var events: List[Event]
+    var writes: Bytes
     var state: Int
 
     fn __init__(inout self) -> None:
         self.reader = StreamReader()
         self.events = List[Event]()
+        self.writes = Bytes()
         self.state = CONNECTING
 
     fn receive_data(inout self, data: Bytes) raises:
@@ -36,6 +38,70 @@ struct ServerProtocol(Protocol):
         else:
             frame = parse(self.reader, data, mask=True)
             self.events.append(frame)
+
+    fn events_received(inout self) -> List[Event]:
+        """
+        Fetch events generated from data received from the network.
+
+        Call this method immediately after any of the ``receive_*()`` methods.
+
+        Process resulting events, likely by passing them to the application.
+
+        Returns:
+            Events read from the connection.
+        """
+        events = self.events^
+        self.events = List[Event]()
+        return events
+
+    # Public method for getting outgoing data after receiving data or sending events.
+
+    fn data_to_send(inout self) -> Bytes:
+        """
+        Obtain data to send to the network.
+
+        Call this method immediately after any of the `receive_*()`,
+        `send_*()`, or `fail` methods.
+
+        Write resulting data to the connection.
+
+        The empty bytestring `websockets.protocol.SEND_EOF` signals
+        the end of the data stream. When you receive it, half-close the TCP
+        connection.
+
+        Returns:
+            Data to write to the connection.
+
+        """
+        writes = self.writes^
+        self.writes = Bytes()
+        return writes
+
+    fn close_expected(self) -> Bool:
+        """
+        Tell if the TCP connection is expected to close soon.
+
+        Call this method immediately after any of the ``receive_*()``,
+        ``send_close()``, or :meth:`fail` methods.
+
+        If it returns :obj:`True`, schedule closing the TCP connection after a
+        short timeout if the other side hasn't already closed it.
+
+        Returns:
+            Whether the TCP connection is expected to close soon.
+
+        """
+        # We expect a TCP close if and only if we sent a close frame:
+        # * Normal closure: once we send a close frame, we expect a TCP close:
+        #   server waits for client to complete the TCP closing handshake;
+        #   client waits for server to initiate the TCP closing handshake.
+        # * Abnormal closure: we always send a close frame and the same logic
+        #   applies, except on EOFError where we don't send a close frame
+        #   because we already received the TCP close, so we don't expect it.
+        # We already got a TCP Close if and only if the state is CLOSED.
+
+        # TODO: Implement the handshake_exc logic
+        return self.state == CLOSING  # or self.handshake_exc is not None
 
     # from ServerProtocol.parse() in websockets/protocol/server.py
     # if self.state is CONNECTING:

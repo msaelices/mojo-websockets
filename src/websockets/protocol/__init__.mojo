@@ -18,6 +18,39 @@ trait Protocol:
         """Feed data and receive frames."""
         pass
 
+    fn events_received(inout self) -> List[Event]:
+        """
+        Fetch events generated from data received from the network.
+
+        Call this method immediately after any of the ``receive_*()`` methods.
+
+        Process resulting events, likely by passing them to the application.
+
+        Returns:
+            Events read from the connection.
+        """
+        pass
+
+    # Public method for getting outgoing data after receiving data or sending events.
+
+    fn data_to_send(inout self) -> Bytes:
+        """
+        Obtain data to send to the network.
+
+        Call this method immediately after any of the ``receive_*()``,
+        ``send_*()``, or `fail` methods.
+
+        Write resulting data to the connection.
+
+        The empty bytestring `~websockets.protocol.SEND_EOF` signals
+        the end of the data stream. When you receive it, half-close the TCP
+        connection.
+
+        Returns:
+            Data to write to the connection.
+        """
+        ...
+
 
 fn parse(inout reader: StreamReader, data: Bytes, mask: Bool) raises -> Frame:
     """
