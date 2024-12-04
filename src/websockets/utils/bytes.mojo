@@ -81,6 +81,75 @@ fn unpack(format: String, buffer: Bytes) raises -> List[Int]:
     return values
 
 
+fn pack[format: String](*values: Int) raises -> Bytes:
+    """Pack the values according to the format string.
+
+    See https://docs.python.org/3/library/struct.html for more information.
+
+    Supported formats:
+    - b: int8
+    - B: uint8
+    - h: int16
+    - H: uint16
+    - i: int32
+    - I: uint32
+    - l: int32
+    - L: uint32
+    - q: int64
+    - Q: uint64
+
+    Unsupported formats: b, B, s, S, f, F, because of they do not return integers.
+
+    Parameters:
+        format: The format string.
+
+    Args:
+        values: The values to pack.
+
+    Returns:
+        The packed buffer.
+    """
+    alias order: String = '>' if is_big_endian() else '<'
+    var offset = 0
+
+    @parameter
+    if len(format) > 1 and format[0] in MODIFIERS:
+        # big-endian, little-endian, network, native
+        offset = 1
+
+    var fmt_span = format.as_bytes()[offset:]
+    var i = 0
+    alias big_endian = format[0] == '>' or format[0] == '!' or is_big_endian()
+
+    var buffer = Bytes(capacity=len(fmt_span) * 8)  # 8 is the maximum size of a type
+    for c_ref in fmt_span:
+        c = c_ref[]
+        if c == ord('b'):
+            buffer += int_as_bytes[DType.int8, big_endian](values[i])
+        elif c == ord('B'):
+            buffer += int_as_bytes[DType.uint8, big_endian](values[i])
+        elif c == ord('h'):
+            buffer += int_as_bytes[DType.int16, big_endian](values[i])
+        elif c == ord('H'):
+            buffer += int_as_bytes[DType.uint16, big_endian](values[i])
+        elif c == ord('i'):
+            buffer += int_as_bytes[DType.int32, big_endian](values[i])
+        elif c == ord('I'):
+            buffer += int_as_bytes[DType.uint32, big_endian](values[i])
+        elif c == ord('l'):
+            buffer += int_as_bytes[DType.int32, big_endian](values[i])
+        elif c == ord('L'):
+            buffer += int_as_bytes[DType.uint32, big_endian](values[i])
+        elif c == ord('q'):
+            buffer += int_as_bytes[DType.int64, big_endian](values[i])
+        elif c == ord('Q'):
+            buffer += int_as_bytes[DType.uint64, big_endian](values[i])
+        else:
+            raise Error("ValueError: Unknown format character: {}".format(String(c)))
+        i += 1
+    return buffer
+
+
 @value
 struct ByteReader:
     var buffer: Pointer[Bytes, ImmutableAnyOrigin]

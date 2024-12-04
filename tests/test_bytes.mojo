@@ -5,8 +5,8 @@ from websockets.aliases import Bytes
 from websockets.utils import bytes
 
 
-fn test_new_features() raises:
-    # Test some of the new features in detail
+fn test_unpack() raises:
+    # Test some of the unpack features in detail
     # (format, argument, big-endian result, little-endian result)
     tests = List(
         Tuple('b', List(7, ), Bytes(7), Bytes(7)),
@@ -61,6 +61,27 @@ fn test_new_features() raises:
             # rev = bytes.unpack(xfmt, res)[0]
             # if rev != arg:
             #     assert_true(asy)
+
+fn test_pack() raises:
+    assert_equal(bytes.pack['b'](7), Bytes(7))
+    assert_equal(bytes.pack['b'](-7), Bytes(249))
+    assert_equal(bytes.pack['B'](7), Bytes(7))
+    assert_equal(bytes.pack['B'](249), Bytes(249))
+    assert_equal(bytes.pack['h'](700), Bytes(188, 2))
+    assert_equal(bytes.pack['H'](700), Bytes(188, 2))
+    assert_equal(bytes.pack['h'](-700), Bytes(68, 253))
+    assert_equal(bytes.pack['hh'](258, 772), Bytes(2, 1, 4, 3))
+    assert_equal(bytes.pack['H'](0x10000-700), Bytes(68, 253))
+    assert_equal(bytes.pack['i'](1), Bytes(1, 0, 0, 0))
+    assert_equal(bytes.pack['i'](-1), Bytes(255, 255, 255, 255))
+    assert_equal(bytes.pack['i'](70006144), Bytes(128, 53, 44, 4))
+    assert_equal(bytes.pack['ii'](16909060, 84281096), Bytes(4, 3, 2, 1, 8, 7, 6, 5))
+    assert_equal(bytes.pack['I'](1), Bytes(1, 0, 0, 0))
+    assert_equal(bytes.pack['I'](4294967295), Bytes(255, 255, 255, 255))
+    assert_equal(bytes.pack['q'](283686952306183), Bytes(7, 6, 5, 4, 3, 2, 1, 0))
+    assert_equal(bytes.pack['l'](70000000), Bytes(128, 29, 44, 4))
+    assert_equal(bytes.pack['l'](-70000000), Bytes(128, 226, 211, 251))
+    assert_equal(bytes.pack['L'](70000000), Bytes(128, 29, 44, 4))
 
 
 # TODO: Remove this test if the https://github.com/modularml/mojo/pull/3795 is merged
