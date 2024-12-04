@@ -23,11 +23,13 @@ struct ServerProtocol(Protocol):
 
     fn receive_data(inout self, data: Bytes) raises:
         """Feed data and receive frames."""
+        # See https://github.com/python-websockets/websockets/blob/59d4dcf779fe7d2b0302083b072d8b03adce2f61/src/websockets/protocol.py#L254
         self.reader.feed_data(data)
         self.parse(data)
 
     fn parse(inout self, data: Bytes) raises:
         """Parse a frame from a bytestring."""
+        # See https://github.com/python-websockets/websockets/blob/59d4dcf779fe7d2b0302083b072d8b03adce2f61/src/websockets/server.py#L549
         if self.state == CONNECTING:
             response = HTTPRequest.from_bytes(
                 'http://localhost',   # TODO: Use actual host
@@ -73,6 +75,7 @@ struct ServerProtocol(Protocol):
             Data to write to the connection.
 
         """
+        # See https://github.com/python-websockets/websockets/blob/59d4dcf779fe7d2b0302083b072d8b03adce2f61/src/websockets/protocol.py#L494
         writes = self.writes^
         self.writes = Bytes()
         return writes
@@ -99,28 +102,8 @@ struct ServerProtocol(Protocol):
         #   applies, except on EOFError where we don't send a close frame
         #   because we already received the TCP close, so we don't expect it.
         # We already got a TCP Close if and only if the state is CLOSED.
+        # See https://github.com/python-websockets/websockets/blob/59d4dcf779fe7d2b0302083b072d8b03adce2f61/src/websockets/protocol.py#L514
 
         # TODO: Implement the handshake_exc logic
         return self.state == CLOSING  # or self.handshake_exc is not None
 
-    # from ServerProtocol.parse() in websockets/protocol/server.py
-    # if self.state is CONNECTING:
-    #     try:
-    #         request = yield from Request.parse(
-    #             self.reader.read_line,
-    #         )
-    #     except Exception as exc:
-    #         self.handshake_exc = exc
-    #         self.send_eof()
-    #         self.parser = self.discard()
-    #         next(self.parser)  # start coroutine
-    #         yield
-    #
-    #     if self.debug:
-    #         self.logger.debug("< GET %s HTTP/1.1", request.path)
-    #         for key, value in request.headers.raw_items():
-    #             self.logger.debug("< %s: %s", key, value)
-    #
-    #     self.events.append(request)
-    #
-    # yield from super().parse()

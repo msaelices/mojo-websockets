@@ -46,26 +46,26 @@ fn test_receive_request() raises:
     assert_equal(server.state, CONNECTING)
 
 
-# def test_accept_and_send_successful_response(self, _formatdate):
-#     """Server accepts a handshake request and sends a successful response."""
-#     server = ServerProtocol()
-#     request = make_request()
-#     response = server.accept(request)
-#     server.send_response(response)
-#
-#     self.assertEqual(
-#         server.data_to_send(),
-#         [
-#             f"HTTP/1.1 101 Switching Protocols\r\n"
-#             f"Date: {DATE}\r\n"
-#             f"Upgrade: websocket\r\n"
-#             f"Connection: Upgrade\r\n"
-#             f"Sec-WebSocket-Accept: {ACCEPT}\r\n"
-#             f"\r\n".encode()
-#         ],
-#     )
-#     self.assertFalse(server.close_expected())
-#     self.assertEqual(server.state, OPEN)
+fn test_accept_and_send_successful_response():
+    """Server accepts a handshake request and sends a successful response."""
+    server = ServerProtocol()
+    request = make_request()
+    response = server.accept(request)
+    server.send_response(response)
+
+    self.assertEqual(
+        server.data_to_send(),
+        [
+            f"HTTP/1.1 101 Switching Protocols\r\n"
+            f"Date: {DATE}\r\n"
+            f"Upgrade: websocket\r\n"
+            f"Connection: Upgrade\r\n"
+            f"Sec-WebSocket-Accept: {ACCEPT}\r\n"
+            f"\r\n".encode()
+        ],
+    )
+    self.assertFalse(server.close_expected())
+    self.assertEqual(server.state, OPEN)
 #
 #
 # def test_send_response_after_failed_accept(self, _formatdate):
