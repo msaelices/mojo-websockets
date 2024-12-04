@@ -14,6 +14,11 @@ alias Event = Variant[HTTPRequest, HTTPResponse, Frame]
 
 
 trait Protocol:
+
+    fn get_state(inout self) -> Int:
+        """Get the state of the protocol."""
+        ...
+
     fn receive_data(inout self, data: Bytes) raises:
         """Feed data and receive frames."""
         pass
@@ -30,6 +35,10 @@ trait Protocol:
             Events read from the connection.
         """
         pass
+
+    fn add_event(inout self, event: Event) -> None:
+        """Add an event to the protocol."""
+        ...
 
     # Public method for getting outgoing data after receiving data or sending events.
 
@@ -51,14 +60,3 @@ trait Protocol:
         """
         ...
 
-
-fn parse(inout reader: StreamReader, data: Bytes, mask: Bool) raises -> Frame:
-    """
-    Parse incoming data into frames.
-    """
-    reader.feed_data(data)
-    reader.feed_eof()
-    frame = Frame.parse(
-        reader, mask=mask,
-    )
-    return frame

@@ -3,7 +3,8 @@ from websockets.http import HTTPRequest
 from websockets.frames import Frame
 from websockets.streams import StreamReader
 
-from . import CONNECTING, Protocol, Event, parse
+from . import CONNECTING, Protocol, Event
+from .base import receive_data
 
 
 struct ServerProtocol(Protocol):
@@ -21,25 +22,19 @@ struct ServerProtocol(Protocol):
         self.writes = Bytes()
         self.state = CONNECTING
 
+    fn get_state(inout self) -> Int:
+        """
+        Get the current state of the connection.
+
+        Returns:
+            The current state of the connection.
+        """
+        return self.state
+
     fn receive_data(inout self, data: Bytes) raises:
         """Feed data and receive frames."""
         # See https://github.com/python-websockets/websockets/blob/59d4dcf779fe7d2b0302083b072d8b03adce2f61/src/websockets/protocol.py#L254
-        self.reader.feed_data(data)
-        self.parse(data)
-
-    fn parse(inout self, data: Bytes) raises:
-        """Parse a frame from a bytestring."""
-        # See https://github.com/python-websockets/websockets/blob/59d4dcf779fe7d2b0302083b072d8b03adce2f61/src/websockets/server.py#L549
-        if self.state == CONNECTING:
-            response = HTTPRequest.from_bytes(
-                'http://localhost',   # TODO: Use actual host
-                DEFAULT_MAX_REQUEST_BODY_SIZE,
-                data, 
-            )
-            self.events.append(response)
-        else:
-            frame = parse(self.reader, data, mask=True)
-            self.events.append(frame)
+        self.add_event(receive_data(self.reader, self.get_state(), data))
 
     fn events_received(inout self) -> List[Event]:
         """
@@ -55,6 +50,18 @@ struct ServerProtocol(Protocol):
         events = self.events^
         self.events = List[Event]()
         return events
+
+    fn add_event(inout self, event: Event) -> None:
+        """
+        Add an event to the list of events to return to the application.
+
+        Call this method immediately after any of the ``receive_*()`` methods.
+
+        Args:
+            event: Event to add to the list of events.
+
+        """
+        self.events.append(event)
 
     # Public method for getting outgoing data after receiving data or sending events.
 
