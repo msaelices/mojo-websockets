@@ -117,32 +117,33 @@ fn pack[format: String](*values: Int) raises -> Bytes:
         # big-endian, little-endian, network, native
         offset = 1
 
-    var fmt_span = format.as_bytes()[offset:]
+    var fmt_span = format[offset:]
+    print("fmt_span: ", String(fmt_span))
     var i = 0
     alias big_endian = format[0] == '>' or format[0] == '!' or is_big_endian()
 
     var buffer = Bytes(capacity=len(fmt_span) * 8)  # 8 is the maximum size of a type
-    for c_ref in fmt_span:
-        c = c_ref[]
-        if c == ord('b'):
+    for c in fmt_span:
+        print("c: ", String(c))
+        if c == 'b':
             buffer += int_as_bytes[DType.int8, big_endian](values[i])
-        elif c == ord('B'):
+        elif c == 'B':
             buffer += int_as_bytes[DType.uint8, big_endian](values[i])
-        elif c == ord('h'):
+        elif c == 'h':
             buffer += int_as_bytes[DType.int16, big_endian](values[i])
-        elif c == ord('H'):
+        elif c == 'H':
             buffer += int_as_bytes[DType.uint16, big_endian](values[i])
-        elif c == ord('i'):
+        elif c == 'i':
             buffer += int_as_bytes[DType.int32, big_endian](values[i])
-        elif c == ord('I'):
+        elif c == 'I':
             buffer += int_as_bytes[DType.uint32, big_endian](values[i])
-        elif c == ord('l'):
+        elif c == 'l':
             buffer += int_as_bytes[DType.int32, big_endian](values[i])
-        elif c == ord('L'):
+        elif c == 'L':
             buffer += int_as_bytes[DType.uint32, big_endian](values[i])
-        elif c == ord('q'):
+        elif c == 'q':
             buffer += int_as_bytes[DType.int64, big_endian](values[i])
-        elif c == ord('Q'):
+        elif c == 'Q':
             buffer += int_as_bytes[DType.uint64, big_endian](values[i])
         else:
             raise Error("ValueError: Unknown format character: {}".format(String(c)))
@@ -267,9 +268,9 @@ fn int_as_bytes[
     var ordered_value: Scalar[type]
 
     @parameter
-    if is_big_endian() and not big_endian:
+    if type_len % 2 == 0 and is_big_endian() and not big_endian:
         ordered_value = byte_swap(value)
-    elif not is_big_endian() and big_endian:
+    elif type_len % 2 == 0 and not is_big_endian() and big_endian:
         ordered_value = byte_swap(value)
     else:
         ordered_value = value

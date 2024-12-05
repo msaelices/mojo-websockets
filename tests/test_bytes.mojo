@@ -67,6 +67,7 @@ fn test_pack() raises:
     assert_equal(bytes.pack['b'](-7), Bytes(249))
     assert_equal(bytes.pack['B'](7), Bytes(7))
     assert_equal(bytes.pack['B'](249), Bytes(249))
+    assert_equal(bytes.pack['!B'](7), Bytes(7))
     assert_equal(bytes.pack['h'](700), Bytes(188, 2))
     assert_equal(bytes.pack['H'](700), Bytes(188, 2))
     assert_equal(bytes.pack['h'](-700), Bytes(68, 253))
