@@ -1,12 +1,13 @@
 from bit import byte_swap
 from collections import Dict, Optional
 from memory import bitcast, UnsafePointer
+from random import randint
 from utils import StringRef
 from sys.info import is_big_endian
 
 from websockets.streams import Streamable
-from websockets.utils.string import Bytes
-from websockets.utils.bytes import unpack, int_as_bytes, int_from_bytes
+from websockets.utils.string import Bytes, ByteWriter
+from websockets.utils.bytes import pack, unpack, int_as_bytes, int_from_bytes
 
 alias Opcode = Int
 
@@ -61,6 +62,8 @@ alias OK_CLOSE_CODES = (
     CLOSE_CODE_GOING_AWAY,
     CLOSE_CODE_NO_STATUS_RCVD,
 )
+
+alias MAX_FRAME_OVERHEAD = 14  # FIN bit and opcode (1 byte) + length (1 or 3 or 9 bytes) + mask (4 bytes)
 
 
 @always_inline
@@ -366,6 +369,58 @@ struct Frame(Writable, Stringable):
                 raise Error("ProtocolError: control frame too long")
             if not self.fin:
                 raise Error("ProtocolError: fragmented control frame")
+
+    fn serialize(
+        self,
+        *,
+        mask: Bool,
+    ) raises -> Bytes:
+        """
+        Serialize a WebSocket frame.
+
+        Args:
+            mask: Whether the frame should be masked i.e. whether the write
+                happens on the client side.
+
+        Raises:
+            ProtocolError: If the frame contains incorrect values.
+
+        Returns:
+            The serialized frame.
+        """
+        self.check()
+
+        length = len(self.data)
+        output = ByteWriter(capacity=length + MAX_FRAME_OVERHEAD)
+
+        # Prepare the header.
+        head1 = (
+            (0b10000000 if self.fin else 0)
+            | (0b01000000 if self.rsv1 else 0)
+            | (0b00100000 if self.rsv2 else 0)
+            | (0b00010000 if self.rsv3 else 0)
+            | self.opcode
+        )
+        head2 = 0b10000000 if mask else 0
+
+        if length < 126:
+            output.write(pack["!BB"](head1, head2 | length))
+        elif length < 65536:
+            output.write(pack["!BBH"](head1, head2 | 126, length))
+        else:
+            output.write(pack["!BBQ"](head1, head2 | 127, length))
+
+        if mask:
+            # TODO: Optimize to avoid creating a new Bytes object.
+            mask_bytes = Bytes(4)
+            randint[Byte.type](mask_bytes.unsafe_ptr(), 4, 0, 255)
+            output.write(mask_bytes)
+            data = apply_mask(self.data, mask_bytes)
+        else:
+            data = self.data
+        output.write(data)
+
+        return output.consume()
 
 
 @value
