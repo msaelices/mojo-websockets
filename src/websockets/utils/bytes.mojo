@@ -9,8 +9,8 @@ between the Python application and the C layer.
 from bit import byte_swap
 from sys import bitwidthof
 from sys.info import is_big_endian
-from memory import bitcast, memcpy, UnsafePointer
-from utils import Span, StringRef
+from memory import bitcast, memcpy, Span, UnsafePointer
+from utils import StringRef
 
 from ..aliases import Bytes
 
@@ -118,13 +118,11 @@ fn pack[format: String](*values: Int) raises -> Bytes:
         offset = 1
 
     var fmt_span = format[offset:]
-    print("fmt_span: ", String(fmt_span))
     var i = 0
     alias big_endian = format[0] == '>' or format[0] == '!' or is_big_endian()
 
     var buffer = Bytes(capacity=len(fmt_span) * 8)  # 8 is the maximum size of a type
     for c in fmt_span:
-        print("c: ", String(c))
         if c == 'b':
             buffer += int_as_bytes[DType.int8, big_endian](values[i])
         elif c == 'B':

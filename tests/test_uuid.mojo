@@ -1,4 +1,4 @@
-from time import now
+from time import perf_counter_ns as now
 from testing import assert_equal, assert_true, assert_false
 
 from websockets.utils.uuid import UUIDGenerator, UUID

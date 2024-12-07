@@ -1,5 +1,4 @@
-from memory import memcpy
-from utils import Span
+from memory import memcpy, Span
 
 from ..aliases import Bytes, DEFAULT_BUFFER_SIZE
 
@@ -97,8 +96,8 @@ struct Message:
 struct ByteWriter:
     var _inner: Bytes
 
-    fn __init__(out self):
-        self._inner = Bytes(capacity=DEFAULT_BUFFER_SIZE)
+    fn __init__(out self, capacity: Int = DEFAULT_BUFFER_SIZE):
+        self._inner = Bytes(capacity=capacity)
 
     @always_inline
     fn write(inout self, owned b: Bytes):

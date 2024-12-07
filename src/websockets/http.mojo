@@ -1,5 +1,5 @@
 from collections import Dict
-from time import now
+from time import perf_counter_ns as now
 
 from libc import Bytes
 
