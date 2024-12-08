@@ -5,6 +5,9 @@ from websockets.frames import Frame
 from websockets.http import HTTPRequest, HTTPResponse
 from websockets.streams import StreamReader
 
+alias SERVER = 0
+alias CLIENT = 1
+
 alias CONNECTING = 0
 alias OPEN = 1
 alias CLOSING = 2
@@ -15,13 +18,17 @@ alias Event = Variant[HTTPRequest, HTTPResponse, Frame]
 
 trait Protocol:
 
-    fn get_state(inout self) -> Int:
+    fn get_state(self) -> Int:
         """Get the state of the protocol."""
         ...
 
     fn receive_data(inout self, data: Bytes) raises:
         """Feed data and receive frames."""
-        pass
+        ...
+
+    fn write_data(inout self, data: Bytes) -> None:
+        """Write data to the protocol."""
+        ...
 
     fn events_received(inout self) -> List[Event]:
         """
@@ -34,7 +41,7 @@ trait Protocol:
         Returns:
             Events read from the connection.
         """
-        pass
+        ...
 
     fn add_event(inout self, event: Event) -> None:
         """Add an event to the protocol."""
@@ -60,3 +67,14 @@ trait Protocol:
         """
         ...
 
+    fn expect_continuation_frame(self) -> Bool:
+        """Check if a continuation frame is expected."""
+        ...
+
+    fn set_expect_continuation_frame(inout self, value: Bool) -> None:
+        """Set the expectation of a continuation frame."""
+        ...
+
+    fn is_masked(self) -> Bool:
+        """Check if the protocol is masked."""
+        ...
