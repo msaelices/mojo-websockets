@@ -1,4 +1,4 @@
-from websockets.aliases import Bytes, DEFAULT_MAX_REQUEST_BODY_SIZE
+from websockets.aliases import Bytes, DEFAULT_MAX_REQUEST_BODY_SIZE, DEFAULT_BUFFER_SIZE
 from websockets.http import HTTPRequest
 from websockets.frames import Frame
 from websockets.streams import StreamReader
@@ -15,14 +15,16 @@ struct ServerProtocol(Protocol):
     var events: List[Event]
     var writes: Bytes
     var state: Int
+    var expect_cont_frame: Bool
 
     fn __init__(inout self) -> None:
         self.reader = StreamReader()
         self.events = List[Event]()
-        self.writes = Bytes()
+        self.writes = Bytes(capacity=DEFAULT_BUFFER_SIZE)
         self.state = CONNECTING
+        self.expect_cont_frame = False
 
-    fn get_state(inout self) -> Int:
+    fn get_state(self) -> Int:
         """
         Get the current state of the connection.
 
@@ -31,10 +33,23 @@ struct ServerProtocol(Protocol):
         """
         return self.state
 
+    fn is_masked(self) -> Bool:
+        """
+        Check if the connection is masked.
+
+        Returns:
+            Whether the connection is masked.
+        """
+        return True  # Server connections are always masked
+
     fn receive_data(inout self, data: Bytes) raises:
         """Feed data and receive frames."""
         # See https://github.com/python-websockets/websockets/blob/59d4dcf779fe7d2b0302083b072d8b03adce2f61/src/websockets/protocol.py#L254
         self.add_event(receive_data(self.reader, self.get_state(), data))
+
+    fn write_data(inout self, data: Bytes) -> None:
+        """Write data to the protocol."""
+        self.writes += data
 
     fn events_received(inout self) -> List[Event]:
         """
@@ -113,4 +128,12 @@ struct ServerProtocol(Protocol):
 
         # TODO: Implement the handshake_exc logic
         return self.state == CLOSING  # or self.handshake_exc is not None
+
+    fn expect_continuation_frame(self) -> Bool:
+        """Check if a continuation frame is expected."""
+        return self.expect_cont_frame
+
+    fn set_expect_continuation_frame(inout self, value: Bool) -> None:
+        """Set the expectation of a continuation frame."""
+        self.expect_cont_frame = value
 
