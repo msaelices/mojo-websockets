@@ -37,12 +37,12 @@ struct Header:
 
 
 @always_inline
-fn write_header[W: Writer](inout writer: W, key: String, value: String):
+fn write_header[W: Writer](mut writer: W, key: String, value: String):
     writer.write(key + ": ", value, lineBreak)
 
 
 @always_inline
-fn write_header(inout writer: ByteWriter, key: String, inout value: String):
+fn write_header(mut writer: ByteWriter, key: String, inout value: String):
     var k = key + ": "
     writer.write(k)
     writer.write(value)
@@ -126,11 +126,11 @@ struct Headers(Writable, Stringable):
             self._inner[to_string(key^).lower()] = to_string(value^)
         return (to_string(first^), to_string(second^), to_string(third^))
 
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         for header in self._inner.items():
             write_header(writer, header[].key, header[].value)
 
-    fn encode_to(inout self, inout writer: ByteWriter):
+    fn encode_to(inout self, mut writer: ByteWriter):
         for header in self._inner.items():
             write_header(writer, header[].key, header[].value)
 
@@ -228,7 +228,7 @@ struct HTTPRequest(Writable, Stringable):
         r.consume(self.body_raw)
         self.set_content_length(content_length)
 
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         writer.write(
             self.method,
             whitespace,
@@ -355,7 +355,7 @@ struct HTTPResponse(Writable, Stringable):
     fn read_body(inout self, inout r: ByteReader) raises -> None:
         r.consume(self.body_raw)
 
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         writer.write(
             self.protocol,
             whitespace,

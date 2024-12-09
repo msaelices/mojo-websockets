@@ -213,7 +213,7 @@ struct Frame(Writable, Stringable):
         self.rsv2 = False
         self.rsv3 = False
 
-    fn write_repr_to[W: Writer](self, inout writer: W) raises:
+    fn write_repr_to[W: Writer](self, mut writer: W) raises:
         """
         Return a human-readable representation of a frame.
         """
@@ -265,7 +265,7 @@ struct Frame(Writable, Stringable):
             s = "ERROR representing frame"
         return s
 
-    fn write_to[W: Writer](self, inout writer: W) -> None:
+    fn write_to[W: Writer](self, mut writer: W) -> None:
         """
         Serialize the frame to a writer.
         """
@@ -330,6 +330,7 @@ struct Frame(Writable, Stringable):
 
         opcode = Opcode(head1 & 0b00001111)
 
+        # Check if the mask bit is set correctly.
         if bool(head2 & 0b10000000) != mask:
             raise Error("ProtocolError: incorrect masking")
 

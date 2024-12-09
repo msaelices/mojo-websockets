@@ -177,7 +177,7 @@ struct ByteReader:
         memcpy(buffer.data, self._inner.data + pos, read_len)
 
 
-fn to_string[T: Writer](inout writer: T) -> String:
+fn to_string[T: Writer](mut writer: T) -> String:
     var s = String()
     s.write_to(writer)
     return s
