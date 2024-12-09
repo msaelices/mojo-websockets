@@ -5,14 +5,14 @@ from websockets.streams import StreamReader
 from . import CONNECTING, Protocol, Event
 
 
-fn receive_data(inout reader: StreamReader, state: Int, data: Bytes) raises -> Event:
+fn receive_data(inout reader: StreamReader, state: Int, data: Bytes, mask: Bool = False) raises -> Event:
     """Feed data and receive frames."""
     # See https://github.com/python-websockets/websockets/blob/59d4dcf779fe7d2b0302083b072d8b03adce2f61/src/websockets/protocol.py#L254
     reader.feed_data(data)
-    return parse(reader, state, data)
+    return parse(reader, state, data, mask)
 
 
-fn parse(inout reader: StreamReader, state: Int, data: Bytes) raises -> Event:
+fn parse(inout reader: StreamReader, state: Int, data: Bytes, mask: Bool = False) raises -> Event:
     """Parse a frame from a bytestring."""
     # See https://github.com/python-websockets/websockets/blob/59d4dcf779fe7d2b0302083b072d8b03adce2f61/src/websockets/server.py#L549
     if state == CONNECTING:
@@ -23,8 +23,7 @@ fn parse(inout reader: StreamReader, state: Int, data: Bytes) raises -> Event:
         )
         return response
     else:
-        # TODO: Mask depending on the side (server, client)
-        return parse_frame(reader, data, mask=True)
+        return parse_frame(reader, data, mask=mask)
 
 
 fn parse_frame(inout reader: StreamReader, data: Bytes, mask: Bool) raises -> Frame:
