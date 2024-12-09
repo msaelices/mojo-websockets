@@ -174,10 +174,12 @@ fn apply_mask(data: Bytes, mask: Bytes) raises -> Bytes:
     if len(mask) != 4:
         raise Error("ValueError: mask must contain 4 bytes")
 
-    data_int = int_from_bytes[DType.int16, big_endian=is_big_endian()](data)
+    # TODO: Use SIMD instructions to apply the mask.
     mask_repeated = mask * (len(data) // 4) + mask[: len(data) % 4]
-    mask_int = int_from_bytes[DType.int16, big_endian=is_big_endian()](mask_repeated)
-    return int_as_bytes[DType.int16, big_endian=is_big_endian()](data_int ^ mask_int)
+    masked = Bytes(capacity=len(data))
+    for i in range(len(data)):
+        masked += Byte(data[i] ^ mask_repeated[i])
+    return masked
 
 
 @value
