@@ -300,6 +300,7 @@ fn str_to_bytes(s: String) -> Bytes:
     return bytes
 
 
+@always_inline
 fn gen_mask() -> Bytes:
     """
     Generate a random mask.

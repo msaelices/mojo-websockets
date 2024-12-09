@@ -416,6 +416,7 @@ struct Frame(Writable, Stringable):
 
         if mask:
             mask_bytes = gen_mask_func()
+            output.write(mask_bytes)
             data = apply_mask(self.data, mask_bytes)
         else:
             data = self.data
