@@ -1,13 +1,12 @@
 from bit import byte_swap
 from collections import Dict, Optional
 from memory import bitcast, UnsafePointer
-from random import randint
 from utils import StringRef
 from sys.info import is_big_endian
 
 from websockets.streams import Streamable
 from websockets.utils.string import Bytes, ByteWriter
-from websockets.utils.bytes import pack, unpack, int_as_bytes, int_from_bytes
+from websockets.utils.bytes import pack, unpack, int_as_bytes, int_from_bytes, gen_mask
 
 alias Opcode = Int
 
@@ -180,17 +179,6 @@ fn apply_mask(data: Bytes, mask: Bytes) raises -> Bytes:
     for i in range(len(data)):
         masked += Byte(data[i] ^ mask_repeated[i])
     return masked
-
-
-fn gen_mask() -> Bytes:
-    """
-    Generate a random mask.
-
-    """
-    # TODO: Optimize to avoid creating a new Bytes object.
-    mask = Bytes(4)
-    randint[Byte.type](mask.unsafe_ptr(), 4, 0, 255)
-    return mask^
 
 
 @value
@@ -385,7 +373,7 @@ struct Frame(Writable, Stringable):
                 raise Error("ProtocolError: fragmented control frame")
 
     fn serialize[
-       mask_func: fn () -> Bytes = gen_mask,
+       gen_mask_func: fn () -> Bytes = gen_mask,
     ](
         self,
         *,
@@ -427,7 +415,7 @@ struct Frame(Writable, Stringable):
             output.write(pack["!BBQ"](head1, head2 | 127, length))
 
         if mask:
-            mask_bytes = mask_func()
+            mask_bytes = gen_mask_func()
             data = apply_mask(self.data, mask_bytes)
         else:
             data = self.data

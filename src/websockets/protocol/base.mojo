@@ -2,6 +2,7 @@ from websockets.aliases import Bytes, DEFAULT_MAX_REQUEST_BODY_SIZE
 from websockets.http import HTTPRequest
 from websockets.frames import Frame, OP_TEXT
 from websockets.streams import StreamReader
+from websockets.utils.bytes import gen_mask
 from . import CONNECTING, Protocol, Event
 
 
@@ -38,7 +39,10 @@ fn parse_frame(inout reader: StreamReader, data: Bytes, mask: Bool) raises -> Fr
     return frame
 
 
-fn send_text[T: Protocol](inout protocol: T, data: Bytes, fin: Bool = True) raises -> None:
+fn send_text[
+    T: Protocol,
+    gen_mask_func: fn () -> Bytes = gen_mask,
+](inout protocol: T, data: Bytes, fin: Bool = True) raises -> None:
     """
     Send a `Text frame`_.
 
@@ -47,6 +51,7 @@ fn send_text[T: Protocol](inout protocol: T, data: Bytes, fin: Bool = True) rais
 
     Parameters:
         T: Protocol.
+        gen_mask_func: Function to generate a mask.
 
     Args:
         protocol: Protocol instance.
@@ -65,15 +70,19 @@ fn send_text[T: Protocol](inout protocol: T, data: Bytes, fin: Bool = True) rais
         raise Error("InvalidState: connection is {}".format(state))
 
     protocol.set_expect_continuation_frame(not fin)
-    send_frame(protocol, Frame(OP_TEXT, data, fin))
+    send_frame[gen_mask_func=gen_mask_func](protocol, Frame(OP_TEXT, data, fin))
 
 
-fn send_frame[T: Protocol](inout protocol: T, frame: Frame) raises -> None:
+fn send_frame[
+    T: Protocol,
+    gen_mask_func: fn () -> Bytes = gen_mask,
+](inout protocol: T, frame: Frame) raises -> None:
     """
     Send a frame.
 
     Parameters:
         T: Protocol.
+        gen_mask_func: Function to generate a mask.
 
     Args:
         protocol: Protocol instance.
@@ -83,7 +92,7 @@ fn send_frame[T: Protocol](inout protocol: T, frame: Frame) raises -> None:
         ProtocolError: If a fragmented message is in progress.
     """
     protocol.write_data(
-        frame.serialize(
+        frame.serialize[gen_mask_func=gen_mask_func](
             mask=protocol.is_masked(),
         )
     )

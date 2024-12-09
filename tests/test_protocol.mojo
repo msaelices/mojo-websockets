@@ -77,9 +77,10 @@ fn test_client_receives_unmasked_frame() raises:
     
 
 fn test_client_sends_masked_frame() raises:
-    client = DummyProtocol[False](OPEN, StreamReader(), Bytes(), List[Event]())
-    with enforce_mask(str_to_bytes("\x00\xff\x00\xff")):
-        send_text(client, str_to_bytes("Spam"), True)
+    client = DummyProtocol[True](OPEN, StreamReader(), Bytes(), List[Event]())
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 255, 0, 255)
+    send_text[gen_mask_func=gen_mask](client, str_to_bytes("Spam"), True)
     assert_equal(client.data_to_send(), masked_text_frame_data)
 
 

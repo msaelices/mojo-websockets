@@ -10,6 +10,7 @@ from bit import byte_swap
 from sys import bitwidthof
 from sys.info import is_big_endian
 from memory import bitcast, memcpy, Span, UnsafePointer
+from random import randint
 from utils import StringRef
 
 from ..aliases import Bytes
@@ -297,3 +298,13 @@ fn str_to_bytes(s: String) -> Bytes:
     for c in s:
         bytes.append(ord(c))
     return bytes
+
+
+fn gen_mask() -> Bytes:
+    """
+    Generate a random mask.
+
+    """
+    mask = Bytes(4)
+    randint[Byte.type](mask.unsafe_ptr(), 4, 0, 255)
+    return mask^
