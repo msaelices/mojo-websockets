@@ -238,8 +238,8 @@ fn int_from_bytes[
     Returns:
         The integer value.
     """
-    if type.sizeof() != len(bytes):
-        raise Error("Byte array size does not match the integer size.")
+    if len(bytes) % type.sizeof() != 0:
+        raise Error("Byte array size is not a multiple of the integer size.")
     var ptr: UnsafePointer[Byte] = UnsafePointer.address_of(bytes[0])
     var type_ptr: UnsafePointer[Scalar[type]] = ptr.bitcast[Scalar[type]]()
     var value = type_ptr[]
