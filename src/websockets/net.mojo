@@ -63,7 +63,7 @@ trait Net:
 
     # A listen method should be implemented on structs that implement Net.
     # Signature is not enforced for now.
-    # fn listen(inout self, network: String, addr: String) raises -> Listener:
+    # fn listen(mut self, network: String, addr: String) raises -> Listener:
     #    ...
 
 
@@ -73,7 +73,7 @@ trait ListenConfig:
 
     # A listen method should be implemented on structs that implement ListenConfig.
     # Signature is not enforced for now.
-    # fn listen(inout self, network: String, address: String) raises -> Listener:
+    # fn listen(mut self, network: String, address: String) raises -> Listener:
     #    ...
 
 
@@ -110,7 +110,7 @@ trait Connection(CollectionElement):
     fn close(self) raises:
         ...
 
-    fn local_addr(inout self) raises -> TCPAddr:
+    fn local_addr(mut self) raises -> TCPAddr:
         ...
 
     fn remote_addr(self) raises -> TCPAddr:
@@ -201,7 +201,7 @@ struct TCPConnection(Connection):
     fn write_buffer(self) -> Bytes:
         return self._write_buffer
     
-    fn set_write_buffer(inout self, buf: Bytes):
+    fn set_write_buffer(mut self, buf: Bytes):
         self._write_buffer = buf
 
     fn read(self, inout buf: Bytes) raises -> Int:
@@ -262,7 +262,7 @@ struct TCPConnection(Connection):
         if result == -1:
             print("Failed to set flags")
 
-    fn local_addr(inout self) raises -> TCPAddr:
+    fn local_addr(mut self) raises -> TCPAddr:
         return self.laddr
 
     fn remote_addr(self) raises -> TCPAddr:
@@ -598,7 +598,7 @@ struct TCPListener(Listener):
         self._addr = addr
         self.fd = fd
 
-    fn listen(inout self) raises: 
+    fn listen(mut self) raises: 
         var address_family = AF_INET
         var ip_buf_size = 4
         var addr = self._addr

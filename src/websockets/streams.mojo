@@ -5,7 +5,7 @@ from websockets.utils.bytes import EOL
 
 trait Streamable:
 
-    fn feed_data(inout self, data: Bytes) raises -> None:
+    fn feed_data(mut self, data: Bytes) raises -> None:
         """
         Write data to the stream.
 
@@ -20,7 +20,7 @@ trait Streamable:
         """
         ...
 
-    fn feed_eof(inout self) raises -> None:
+    fn feed_eof(mut self) raises -> None:
         """
         End the stream.
 
@@ -32,7 +32,7 @@ trait Streamable:
         """
         ...
 
-    fn read_line(inout self, m: Int) raises -> Optional[Bytes]:
+    fn read_line(mut self, m: Int) raises -> Optional[Bytes]:
         """
         Read a LF-terminated line from the stream.
 
@@ -47,7 +47,7 @@ trait Streamable:
         """
         ...
 
-    fn read_exact(inout self, n: Int) raises -> Optional[Bytes]:
+    fn read_exact(mut self, n: Int) raises -> Optional[Bytes]:
         """
         Read a given number of bytes from the stream.
 
@@ -59,7 +59,7 @@ trait Streamable:
         """
         ...
 
-    fn read_to_eof(inout self, m: Int) raises -> Optional[Bytes]:
+    fn read_to_eof(mut self, m: Int) raises -> Optional[Bytes]:
         """
         Read all bytes from the stream.
 
@@ -92,7 +92,7 @@ struct StreamReader(Streamable):
         self.offset = 0
         self.eof = False
 
-    fn feed_data(inout self, data: Bytes) raises -> None:
+    fn feed_data(mut self, data: Bytes) raises -> None:
         """
         Write data to the stream.
 
@@ -109,7 +109,7 @@ struct StreamReader(Streamable):
             raise Error("EOFError: stream ended")
         self.buffer += data
 
-    fn feed_eof(inout self) raises -> None:
+    fn feed_eof(mut self) raises -> None:
         """
         End the stream.
 
@@ -123,7 +123,7 @@ struct StreamReader(Streamable):
             raise Error("EOFError: stream ended")
         self.eof = True
 
-    fn read_line(inout self, m: Int) raises -> Optional[Bytes]:
+    fn read_line(mut self, m: Int) raises -> Optional[Bytes]:
         """
         Read a LF-terminated line from the stream.
 
@@ -165,7 +165,7 @@ struct StreamReader(Streamable):
 
         return result
 
-    fn read_exact(inout self, n: Int) raises -> Optional[Bytes]:
+    fn read_exact(mut self, n: Int) raises -> Optional[Bytes]:
         """
         Read a given number of bytes from the stream.
 
@@ -184,7 +184,7 @@ struct StreamReader(Streamable):
         self.offset += n
         return result
 
-    fn read_to_eof(inout self, m: Int) raises -> Optional[Bytes]:
+    fn read_to_eof(mut self, m: Int) raises -> Optional[Bytes]:
         """
         Read all bytes from the stream.
 
@@ -213,7 +213,7 @@ struct StreamReader(Streamable):
             return True
         return False
 
-    fn discard(inout self) -> None:
+    fn discard(mut self) -> None:
         """
         Discard all buffered data, but don't end the stream.
     

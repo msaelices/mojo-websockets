@@ -29,19 +29,19 @@ struct DummyProtocol[masked: Bool](Protocol):
         """Get the current state of the connection."""
         return self.state
 
-    fn write_data(inout self, data: Bytes) -> None:
+    fn write_data(mut self, data: Bytes) -> None:
         """Write data to the protocol."""
         self.writes += data
 
-    fn receive_data(inout self, data: Bytes) raises -> None:
+    fn receive_data(mut self, data: Bytes) raises -> None:
         """Receive data from the protocol."""
         self.add_event(receive_data(self.reader, self.get_state(), data))
 
-    fn add_event(inout self, event: Event) -> None:
+    fn add_event(mut self, event: Event) -> None:
         """Add an event to the protocol."""
         self.events.append(event)
 
-    fn data_to_send(inout self) -> Bytes:
+    fn data_to_send(mut self) -> Bytes:
         """Get data to send to the protocol."""
         return self.writes
 
@@ -49,11 +49,11 @@ struct DummyProtocol[masked: Bool](Protocol):
         """Check if a continuation frame is expected."""
         return False
 
-    fn set_expect_continuation_frame(inout self, value: Bool) -> None:
+    fn set_expect_continuation_frame(mut self, value: Bool) -> None:
         """Set the expectation of a continuation frame."""
         pass
 
-    fn events_received(inout self) -> List[Event]:
+    fn events_received(mut self) -> List[Event]:
         """
         Fetch events generated from data received from the network.
         """
@@ -88,22 +88,14 @@ fn test_server_sends_unmasked_frame() raises:
     send_text(server, str_to_bytes("Spam"), True)
     assert_equal(server.data_to_send(), unmasked_text_frame_data)
 
-#
-# fn test_client_receives_unmasked_frame():
-#     client = Protocol(CLIENT)
-#     client.receive_data(self.unmasked_text_frame_date)
-#     self.assertFrameReceived(
-#         client,
-#         Frame(OP_TEXT, b"Spam"),
-#     )
-#
-# fn test_server_receives_masked_frame():
-#     server = Protocol(SERVER)
-#     server.receive_data(self.masked_text_frame_data)
-#     self.assertFrameReceived(
-#         server,
-#         Frame(OP_TEXT, b"Spam"),
-#     )
+
+fn test_server_receives_masked_frame() raises:
+    server = DummyProtocol[True](OPEN, StreamReader(), Bytes(), List[Event]())
+    server.receive_data(masked_text_frame_data)
+    events = server.events_received()
+    assert_true(events[0].isa[Frame]())
+    assert_equal(events[0][Frame].data, Frame(OP_TEXT, str_to_bytes("Spam")).data)
+
 #
 # fn test_client_receives_masked_frame():
 #     client = Protocol(CLIENT)

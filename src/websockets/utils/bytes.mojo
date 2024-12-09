@@ -166,7 +166,7 @@ struct ByteReader:
         self.buffer = Pointer[Bytes, ImmutableAnyOrigin].address_of(buffer)
         self.index = 0
 
-    fn read[type: DType](inout self, order: String) raises -> Scalar[type]:
+    fn read[type: DType](mut self, order: String) raises -> Scalar[type]:
         """
         Read the next value from the buffer.
 
@@ -178,7 +178,7 @@ struct ByteReader:
         """
         return self._next[type](order)
 
-    fn _next[type: DType](inout self, order: String) raises -> Scalar[type]:
+    fn _next[type: DType](mut self, order: String) raises -> Scalar[type]:
         """
         Read the next value from the buffer.
 

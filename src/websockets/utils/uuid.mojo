@@ -31,7 +31,7 @@ struct MersenneTwister:
         for i in range(1, Self.N):
             self.state[i] = (F * (self.state[i - 1] ^ (self.state[i - 1] >> (W - 2))) + i) & D
         
-    fn next(inout self) -> Int32:
+    fn next(mut self) -> Int32:
         if self.index >= Self.N:
             for i in range(Self.N):
                 var x = (self.state[i] & Self.UPPER_MASK) + (
@@ -52,7 +52,7 @@ struct MersenneTwister:
         
         return y
 
-    fn next_ui8(inout self) -> UInt8:
+    fn next_ui8(mut self) -> UInt8:
         return self.next().value & 0xFF
 
 
@@ -63,7 +63,7 @@ struct UUID(Stringable, EqualityComparableCollectionElement):
     fn __init__(out self):
         self.bytes = StaticTuple[UInt8, 16]()
 
-    fn __setitem__(inout self, index: Int, value: UInt8):
+    fn __setitem__(mut self, index: Int, value: UInt8):
         self.bytes[index] = value
 
     fn __getitem__(self, index: Int) -> UInt8:
@@ -101,7 +101,7 @@ struct UUIDGenerator:
     fn __init__(out self, seed: Int):
         self.prng = MersenneTwister(seed)
 
-    fn next(inout self) -> UUID:
+    fn next(mut self) -> UUID:
         var uuid = UUID()
 
         @parameter

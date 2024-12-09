@@ -22,15 +22,15 @@ trait Protocol:
         """Get the state of the protocol."""
         ...
 
-    fn receive_data(inout self, data: Bytes) raises:
+    fn receive_data(mut self, data: Bytes) raises:
         """Feed data and receive frames."""
         ...
 
-    fn write_data(inout self, data: Bytes) -> None:
+    fn write_data(mut self, data: Bytes) -> None:
         """Write data to the protocol."""
         ...
 
-    fn events_received(inout self) -> List[Event]:
+    fn events_received(mut self) -> List[Event]:
         """
         Fetch events generated from data received from the network.
 
@@ -43,13 +43,13 @@ trait Protocol:
         """
         ...
 
-    fn add_event(inout self, event: Event) -> None:
+    fn add_event(mut self, event: Event) -> None:
         """Add an event to the protocol."""
         ...
 
     # Public method for getting outgoing data after receiving data or sending events.
 
-    fn data_to_send(inout self) -> Bytes:
+    fn data_to_send(mut self) -> Bytes:
         """
         Obtain data to send to the network.
 
@@ -71,7 +71,7 @@ trait Protocol:
         """Check if a continuation frame is expected."""
         ...
 
-    fn set_expect_continuation_frame(inout self, value: Bool) -> None:
+    fn set_expect_continuation_frame(mut self, value: Bool) -> None:
         """Set the expectation of a continuation frame."""
         ...
 

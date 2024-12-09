@@ -44,7 +44,7 @@ struct URI:
         return u
 
     fn __init__(
-        inout self,
+        mut self,
         uri: String = "",
     ) -> None:
         self._original_path = "/"
@@ -64,7 +64,7 @@ struct URI:
     fn is_http(self) -> Bool:
         return self.scheme == HTTP or len(self.scheme) == 0
 
-    fn _parse(inout self) raises -> None:
+    fn _parse(mut self) raises -> None:
         var raw_uri = self.full_uri
         var proto_str = String(HTTP11)
         var is_https = False

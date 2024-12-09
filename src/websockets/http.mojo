@@ -92,7 +92,7 @@ struct Headers(Writable, Stringable):
             return String()
 
     @always_inline
-    fn __setitem__(inout self, key: String, value: String):
+    fn __setitem__(mut self, key: String, value: String):
         self._inner[key.lower()] = value
 
     fn content_length(self) -> Int:
@@ -104,7 +104,7 @@ struct Headers(Writable, Stringable):
             return 0
 
     fn parse_raw(
-        inout self, inout r: ByteReader
+        mut self, inout r: ByteReader
     ) raises -> (String, String, String):
         var first_byte = r.peek()
         if not first_byte:
@@ -130,7 +130,7 @@ struct Headers(Writable, Stringable):
         for header in self._inner.items():
             write_header(writer, header[].key, header[].value)
 
-    fn encode_to(inout self, mut writer: ByteWriter):
+    fn encode_to(mut self, mut writer: ByteWriter):
         for header in self._inner.items():
             write_header(writer, header[].key, header[].value)
 
@@ -209,10 +209,10 @@ struct HTTPRequest(Writable, Stringable):
         if HeaderKey.CONNECTION not in self.headers:
             self.set_connection_close()
 
-    fn set_connection_close(inout self):
+    fn set_connection_close(mut self):
         self.headers[HeaderKey.CONNECTION] = "close"
 
-    fn set_content_length(inout self, l: Int):
+    fn set_content_length(mut self, l: Int):
         self.headers[HeaderKey.CONTENT_LENGTH] = str(l)
 
     fn connection_close(self) -> Bool:
@@ -220,7 +220,7 @@ struct HTTPRequest(Writable, Stringable):
 
     @always_inline
     fn read_body(
-        inout self, inout r: ByteReader, content_length: Int, max_body_size: Int
+        mut self, inout r: ByteReader, content_length: Int, max_body_size: Int
     ) raises -> None:
         if content_length > max_body_size:
             raise Error("Request body too large")
@@ -242,7 +242,7 @@ struct HTTPRequest(Writable, Stringable):
         writer.write(lineBreak)
         writer.write(to_string(self.body_raw))
 
-    fn _encoded(inout self) -> Bytes:
+    fn _encoded(mut self) -> Bytes:
         """Encodes request as bytes.
 
         This method consumes the data in this request and it should
@@ -337,22 +337,22 @@ struct HTTPResponse(Writable, Stringable):
         return self.body_raw
 
     @always_inline
-    fn set_connection_close(inout self):
+    fn set_connection_close(mut self):
         self.headers[HeaderKey.CONNECTION] = "close"
 
     @always_inline
-    fn set_connection_keep_alive(inout self):
+    fn set_connection_keep_alive(mut self):
         self.headers[HeaderKey.CONNECTION] = "keep-alive"
 
     fn connection_close(self) -> Bool:
         return self.headers[HeaderKey.CONNECTION] == "close"
 
     @always_inline
-    fn set_content_length(inout self, l: Int):
+    fn set_content_length(mut self, l: Int):
         self.headers[HeaderKey.CONTENT_LENGTH] = str(l)
 
     @always_inline
-    fn read_body(inout self, inout r: ByteReader) raises -> None:
+    fn read_body(mut self, inout r: ByteReader) raises -> None:
         r.consume(self.body_raw)
 
     fn write_to[W: Writer](self, mut writer: W):
@@ -377,7 +377,7 @@ struct HTTPResponse(Writable, Stringable):
         writer.write(lineBreak)
         writer.write(to_string(self.body_raw))
 
-    fn _encoded(inout self) -> Bytes:
+    fn _encoded(mut self) -> Bytes:
         """Encodes response as bytes.
 
         This method consumes the data in this request and it should
