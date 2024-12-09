@@ -182,6 +182,17 @@ fn apply_mask(data: Bytes, mask: Bytes) raises -> Bytes:
     return masked
 
 
+fn gen_mask() -> Bytes:
+    """
+    Generate a random mask.
+
+    """
+    # TODO: Optimize to avoid creating a new Bytes object.
+    mask = Bytes(4)
+    randint[Byte.type](mask.unsafe_ptr(), 4, 0, 255)
+    return mask^
+
+
 @value
 struct Frame(Writable, Stringable):
     """
@@ -373,7 +384,9 @@ struct Frame(Writable, Stringable):
             if not self.fin:
                 raise Error("ProtocolError: fragmented control frame")
 
-    fn serialize(
+    fn serialize[
+       mask_func: fn () -> Bytes = gen_mask,
+    ](
         self,
         *,
         mask: Bool,
@@ -414,10 +427,7 @@ struct Frame(Writable, Stringable):
             output.write(pack["!BBQ"](head1, head2 | 127, length))
 
         if mask:
-            # TODO: Optimize to avoid creating a new Bytes object.
-            mask_bytes = Bytes(4)
-            randint[Byte.type](mask_bytes.unsafe_ptr(), 4, 0, 255)
-            output.write(mask_bytes)
+            mask_bytes = mask_func()
             data = apply_mask(self.data, mask_bytes)
         else:
             data = self.data
