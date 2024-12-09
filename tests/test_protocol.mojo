@@ -35,7 +35,7 @@ struct DummyProtocol[masked: Bool](Protocol):
 
     fn receive_data(mut self, data: Bytes) raises -> None:
         """Receive data from the protocol."""
-        self.add_event(receive_data(self.reader, self.get_state(), data))
+        self.add_event(receive_data(self.reader, self.get_state(), data, mask=self.is_masked()))
 
     fn add_event(mut self, event: Event) -> None:
         """Add an event to the protocol."""
