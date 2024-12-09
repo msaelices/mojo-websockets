@@ -16,7 +16,7 @@ This software is in a early stage of development, using the Mojo nightly version
 
 ## Installation
 
-1. **Install [Mojo nightly](https://docs.modular.com/mojo/manual/get-started) 🔥**
+1. **Install [magic](https://docs.modular.com/magic#install-magic)**
 
 2. **Add the WebSockets Package** (at the top level of your project):
 
