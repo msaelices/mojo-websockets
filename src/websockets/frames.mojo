@@ -1,6 +1,6 @@
 from bit import byte_swap
 from collections import Dict, Optional
-from memory import bitcast, UnsafePointer
+from memory import bitcast, memcmp, UnsafePointer
 from utils import StringRef
 from sys.info import is_big_endian
 
@@ -215,14 +215,17 @@ struct Frame(Writable, Stringable, EqualityComparable):
         self.rsv3 = False
 
     fn __eq__(self, other: Frame) -> Bool:
-        return (
+        var meta_is_eq = (
             self.opcode == other.opcode
             and self.fin == other.fin
             and self.rsv1 == other.rsv1
             and self.rsv2 == other.rsv2
             and self.rsv3 == other.rsv3
-            and self.data.data[] == other.data.data[]
+            and len(self.data) == len(other.data)
         )
+        # TODO: Figure out why the single self.data == other.data comparison doesn't work
+        # so we need to do this hack with memcmp
+        return meta_is_eq and memcmp(self.data.data, other.data.data, min(len(self.data), len(other.data))) == 0
 
     fn __ne__(self, other: Frame) -> Bool:
         return not (self == other)
