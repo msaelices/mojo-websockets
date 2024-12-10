@@ -112,19 +112,13 @@ fn test_server_receives_masked_frame() raises:
 
 fn test_client_receives_masked_frame() raises:
     client = DummyProtocol[False](OPEN, StreamReader(), Bytes(), List[Event]())
-    masked_text_frame_data = Bytes(129, 132, 0, 255, 0, 255, 83, 143, 97, 146)
     client.receive_data(masked_text_frame_data)
     events = client.events_received()
     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: incorrect masking").serialize(), fin=True))
-    # self.assertConnectionFailing(
-    #     client, CloseCode.PROTOCOL_ERROR, "incorrect masking"
-    # )
-#
-# fn test_server_receives_unmasked_frame():
-#     server = Protocol(SERVER)
-#     server.receive_data(self.unmasked_text_frame_date)
-#     self.assertIsInstance(server.parser_exc, ProtocolError)
-#     self.assertEqual(str(server.parser_exc), "incorrect masking")
-#     self.assertConnectionFailing(
-#         server, CloseCode.PROTOCOL_ERROR, "incorrect masking"
-#     )
+
+
+fn test_server_receives_unmasked_frame() raises:
+    server = DummyProtocol[True](OPEN, StreamReader(), Bytes(), List[Event]())
+    server.receive_data(unmasked_text_frame_data)
+    events = server.events_received()
+    assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: incorrect masking").serialize(), fin=True))
