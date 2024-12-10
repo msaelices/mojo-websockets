@@ -1,8 +1,9 @@
-from testing import assert_equal, assert_true
+from testing import assert_equal, assert_raises, assert_true
+from collections import Optional
 
 from testutils import enforce_mask
 from websockets.aliases import Bytes
-from websockets.frames import Frame, OP_TEXT
+from websockets.frames import Close, Frame, CLOSE_CODE_PROTOCOL_ERROR, OP_TEXT, OP_CLOSE
 from websockets.protocol import Event, CLIENT, SERVER, OPEN
 from websockets.protocol.base import receive_data, send_text, Protocol
 from websockets.streams import StreamReader
@@ -20,6 +21,14 @@ struct DummyProtocol[masked: Bool](Protocol):
     var reader: StreamReader
     var writes: Bytes
     var events: List[Event]
+    var parser_exc: Optional[Error]
+
+    fn __init__(out self, state: Int, reader: StreamReader, writes: Bytes, events: List[Event]):
+        self.state = state
+        self.reader = reader
+        self.writes = writes
+        self.events = events
+        self.parser_exc = None
 
     fn is_masked(self) -> Bool:
         """Check if the connection is masked."""
@@ -35,7 +44,10 @@ struct DummyProtocol[masked: Bool](Protocol):
 
     fn receive_data(mut self, data: Bytes) raises -> None:
         """Receive data from the protocol."""
-        self.add_event(receive_data(self.reader, self.get_state(), data, mask=self.is_masked()))
+        res = receive_data(self.reader, self.get_state(), data, mask=self.is_masked())
+        event = res[0]
+        self.add_event(event)
+        self.parser_exc = res[1]
 
     fn add_event(mut self, event: Event) -> None:
         """Add an event to the protocol."""
@@ -97,15 +109,16 @@ fn test_server_receives_masked_frame() raises:
     assert_true(events[0].isa[Frame]())
     assert_equal(events[0][Frame].data, Frame(OP_TEXT, str_to_bytes("Spam")).data)
 
-#
-# fn test_client_receives_masked_frame():
-#     client = Protocol(CLIENT)
-#     client.receive_data(self.masked_text_frame_data)
-#     self.assertIsInstance(client.parser_exc, ProtocolError)
-#     self.assertEqual(str(client.parser_exc), "incorrect masking")
-#     self.assertConnectionFailing(
-#         client, CloseCode.PROTOCOL_ERROR, "incorrect masking"
-#     )
+
+fn test_client_receives_masked_frame() raises:
+    client = DummyProtocol[False](OPEN, StreamReader(), Bytes(), List[Event]())
+    masked_text_frame_data = Bytes(129, 132, 0, 255, 0, 255, 83, 143, 97, 146)
+    client.receive_data(masked_text_frame_data)
+    events = client.events_received()
+    assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "Error").serialize(), fin=True))
+    # self.assertConnectionFailing(
+    #     client, CloseCode.PROTOCOL_ERROR, "incorrect masking"
+    # )
 #
 # fn test_server_receives_unmasked_frame():
 #     server = Protocol(SERVER)

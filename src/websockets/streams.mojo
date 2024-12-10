@@ -87,7 +87,7 @@ struct StreamReader(Streamable):
     var eof: Bool
     var offset: Int
 
-    fn __init__(out self) -> None:
+    fn __init__(out self):
         self.buffer = Bytes(capacity=DEFAULT_BUFFER_SIZE)
         self.offset = 0
         self.eof = False

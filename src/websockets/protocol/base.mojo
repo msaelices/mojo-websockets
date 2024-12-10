@@ -1,16 +1,26 @@
+from collections import Optional
+
 from websockets.aliases import Bytes, DEFAULT_MAX_REQUEST_BODY_SIZE
 from websockets.http import HTTPRequest
-from websockets.frames import Frame, OP_TEXT
+from websockets.frames import Close, Frame, OP_TEXT, OP_CLOSE, CLOSE_CODE_PROTOCOL_ERROR
 from websockets.streams import StreamReader
 from websockets.utils.bytes import gen_mask
 from . import CONNECTING, Protocol, Event
 
 
-fn receive_data(inout reader: StreamReader, state: Int, data: Bytes, mask: Bool = False) raises -> Event:
+fn receive_data(inout reader: StreamReader, state: Int, data: Bytes, mask: Bool = False) raises -> Tuple[Event, Optional[Error]]:
     """Feed data and receive frames."""
     # See https://github.com/python-websockets/websockets/blob/59d4dcf779fe7d2b0302083b072d8b03adce2f61/src/websockets/protocol.py#L254
     reader.feed_data(data)
-    return parse(reader, state, data, mask)
+    var err: Optional[Error] = None
+    try:
+        event = parse(reader, state, data, mask)
+        err = None
+    except error:
+        err = error
+        # TODO: Differentiate between protocol errors, connection and other kind of errors
+        event = Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "Error").serialize(), fin=True)  # Close the connection on error
+    return event, err
 
 
 fn parse(inout reader: StreamReader, state: Int, data: Bytes, mask: Bool = False) raises -> Event:
