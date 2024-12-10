@@ -115,7 +115,7 @@ fn test_client_receives_masked_frame() raises:
     masked_text_frame_data = Bytes(129, 132, 0, 255, 0, 255, 83, 143, 97, 146)
     client.receive_data(masked_text_frame_data)
     events = client.events_received()
-    assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "Error").serialize(), fin=True))
+    assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: incorrect masking").serialize(), fin=True))
     # self.assertConnectionFailing(
     #     client, CloseCode.PROTOCOL_ERROR, "incorrect masking"
     # )

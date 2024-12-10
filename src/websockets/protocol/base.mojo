@@ -19,7 +19,7 @@ fn receive_data(inout reader: StreamReader, state: Int, data: Bytes, mask: Bool 
     except error:
         err = error
         # TODO: Differentiate between protocol errors, connection and other kind of errors
-        event = Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "Error").serialize(), fin=True)  # Close the connection on error
+        event = Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, str(error._message())).serialize(), fin=True)  # Close the connection on error
     return event, err
 
 
