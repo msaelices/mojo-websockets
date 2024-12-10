@@ -182,7 +182,7 @@ fn apply_mask(data: Bytes, mask: Bytes) raises -> Bytes:
 
 
 @value
-struct Frame(Writable, Stringable):
+struct Frame(Writable, Stringable, EqualityComparable):
     """
     WebSocket frame.
 
@@ -213,6 +213,19 @@ struct Frame(Writable, Stringable):
         self.rsv1 = False
         self.rsv2 = False
         self.rsv3 = False
+
+    fn __eq__(self, other: Frame) -> Bool:
+        return (
+            self.opcode == other.opcode
+            and self.fin == other.fin
+            and self.rsv1 == other.rsv1
+            and self.rsv2 == other.rsv2
+            and self.rsv3 == other.rsv3
+            and self.data.data == other.data.data
+        )
+
+    fn __ne__(self, other: Frame) -> Bool:
+        return not (self == other)
 
     fn write_repr_to[W: Writer](self, mut writer: W) raises:
         """
