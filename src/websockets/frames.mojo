@@ -221,7 +221,7 @@ struct Frame(Writable, Stringable, EqualityComparable):
             and self.rsv1 == other.rsv1
             and self.rsv2 == other.rsv2
             and self.rsv3 == other.rsv3
-            and self.data.data == other.data.data
+            and self.data.data[] == other.data.data[]
         )
 
     fn __ne__(self, other: Frame) -> Bool:
