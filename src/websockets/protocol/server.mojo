@@ -20,7 +20,7 @@ struct ServerProtocol(Protocol):
     var expect_cont_frame: Bool
     var parser_exc: Optional[Error]
 
-    fn __init__(mut self) -> None:
+    fn __init__(out self):
         self.reader = StreamReader()
         self.events = List[Event]()
         self.writes = Bytes(capacity=DEFAULT_BUFFER_SIZE)
