@@ -2,7 +2,14 @@ from collections import Optional
 
 from websockets.aliases import Bytes, DEFAULT_MAX_REQUEST_BODY_SIZE
 from websockets.http import HTTPRequest
-from websockets.frames import Close, Frame, OP_TEXT, OP_CLOSE, CLOSE_CODE_PROTOCOL_ERROR
+from websockets.frames import (
+       Close,
+       Frame,
+       CLOSE_CODE_PROTOCOL_ERROR,
+       OP_CLOSE,
+       OP_CONT,
+       OP_TEXT,
+)
 from websockets.streams import StreamReader
 from websockets.utils.bytes import gen_mask
 from . import CONNECTING, Protocol, Event
@@ -106,4 +113,34 @@ fn send_frame[
             mask=protocol.is_masked(),
         )
     )
+
+
+fn send_continuation[
+    T: Protocol,
+](inout protocol: T, data: Bytes, fin: Bool) raises -> None:
+    """
+    Send a `Continuation frame`_.
+
+    .. _Continuation frame:
+        https://datatracker.ietf.org/doc/html/rfc6455#section-5.6
+
+    Parameters:
+        T: Protocol.
+
+    Args:
+        protocol: Protocol instance.
+        data: Payload containing the same kind of data
+            as the initial frame.
+        fin: FIN bit; set it to :obj:`True` if this is the last frame
+            of a fragmented message and to :obj:`False` otherwise.
     
+    Raises:
+        ProtocolError: If an unexpected continuation frame is received.
+        InvalidState: If the connection is not open.
+    """
+    if not protocol.expect_continuation_frame():
+        raise Error("ProtocolError: unexpected continuation frame")
+    if protocol.get_state() != OPEN:
+        raise Error("InvalidState: connection is not open")
+    protocol.set_expect_continuation_frame(not fin)
+    send_frame(protocol, Frame(OP_CONT, data, fin))

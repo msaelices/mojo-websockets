@@ -5,7 +5,12 @@ from testutils import enforce_mask
 from websockets.aliases import Bytes
 from websockets.frames import Close, Frame, CLOSE_CODE_PROTOCOL_ERROR, OP_TEXT, OP_CLOSE
 from websockets.protocol import Event, CLIENT, SERVER, OPEN
-from websockets.protocol.base import receive_data, send_text, Protocol
+from websockets.protocol.base import (
+    receive_data, 
+    send_continuation,
+    send_text, 
+    Protocol,
+)
 from websockets.streams import StreamReader
 from websockets.utils.bytes import str_to_bytes
 
@@ -122,3 +127,80 @@ fn test_server_receives_unmasked_frame() raises:
     server.receive_data(unmasked_text_frame_data)
     events = server.events_received()
     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: incorrect masking").serialize(), fin=True))
+
+
+fn test_client_sends_unexpected_continuation() raises:
+    client = DummyProtocol[False](OPEN, StreamReader(), Bytes(), List[Event]())
+    with assert_raises(contains='ProtocolError: unexpected continuation frame'):
+        send_continuation(client, str_to_bytes(""), fin=False)
+
+
+fn test_server_sends_unexpected_continuation() raises:
+    server = DummyProtocol[True](OPEN, StreamReader(), Bytes(), List[Event]())
+    with assert_raises(contains="ProtocolError: unexpected continuation frame"):
+        send_continuation(server, str_to_bytes(""), fin=False)
+
+
+# TODO: Make this test pass
+fn test_client_receives_unexpected_continuation() raises:
+    client = DummyProtocol[False](OPEN, StreamReader(), Bytes(), List[Event]())
+    client.receive_data(Bytes(0, 0))
+    events = client.events_received()
+    assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: unexpected continuation frame").serialize(), fin=True))
+
+# def test_client_receives_unexpected_continuation(self):
+#     client = Protocol(CLIENT)
+#     client.receive_data(b"\x00\x00")
+#     self.assertIsInstance(client.parser_exc, ProtocolError)
+#     self.assertEqual(str(client.parser_exc), "unexpected continuation frame")
+#     self.assertConnectionFailing(
+#         client, CloseCode.PROTOCOL_ERROR, "unexpected continuation frame"
+#     )
+#
+# def test_server_receives_unexpected_continuation(self):
+#     server = Protocol(SERVER)
+#     server.receive_data(b"\x00\x80\x00\x00\x00\x00")
+#     self.assertIsInstance(server.parser_exc, ProtocolError)
+#     self.assertEqual(str(server.parser_exc), "unexpected continuation frame")
+#     self.assertConnectionFailing(
+#         server, CloseCode.PROTOCOL_ERROR, "unexpected continuation frame"
+#     )
+#
+# def test_client_sends_continuation_after_sending_close(self):
+#     client = Protocol(CLIENT)
+#     # Since it isn't possible to send a close frame in a fragmented
+#     # message (see test_client_send_close_in_fragmented_message), in fact,
+#     # this is the same test as test_client_sends_unexpected_continuation.
+#     with self.enforce_mask(b"\x00\x00\x00\x00"):
+#         client.send_close(CloseCode.GOING_AWAY)
+#     self.assertEqual(client.data_to_send(), [b"\x88\x82\x00\x00\x00\x00\x03\xe9"])
+#     with self.assertRaises(ProtocolError) as raised:
+#         client.send_continuation(b"", fin=False)
+#     self.assertEqual(str(raised.exception), "unexpected continuation frame")
+#
+# def test_server_sends_continuation_after_sending_close(self):
+#     # Since it isn't possible to send a close frame in a fragmented
+#     # message (see test_server_send_close_in_fragmented_message), in fact,
+#     # this is the same test as test_server_sends_unexpected_continuation.
+#     server = Protocol(SERVER)
+#     server.send_close(CloseCode.NORMAL_CLOSURE)
+#     self.assertEqual(server.data_to_send(), [b"\x88\x02\x03\xe8"])
+#     with self.assertRaises(ProtocolError) as raised:
+#         server.send_continuation(b"", fin=False)
+#     self.assertEqual(str(raised.exception), "unexpected continuation frame")
+#
+# def test_client_receives_continuation_after_receiving_close(self):
+#     client = Protocol(CLIENT)
+#     client.receive_data(b"\x88\x02\x03\xe8")
+#     self.assertConnectionClosing(client, CloseCode.NORMAL_CLOSURE)
+#     client.receive_data(b"\x00\x00")
+#     self.assertFrameReceived(client, None)
+#     self.assertFrameSent(client, None)
+#
+# def test_server_receives_continuation_after_receiving_close(self):
+#     server = Protocol(SERVER)
+#     server.receive_data(b"\x88\x82\x00\x00\x00\x00\x03\xe9")
+#     self.assertConnectionClosing(server, CloseCode.GOING_AWAY)
+#     server.receive_data(b"\x00\x80\x00\xff\x00\xff")
+#     self.assertFrameReceived(server, None)
+#     self.assertFrameSent(server, None)
