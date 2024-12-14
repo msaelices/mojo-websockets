@@ -44,9 +44,9 @@ struct URI:
         return u
 
     fn __init__(
-        mut self,
+        out self,
         uri: String = "",
-    ) -> None:
+    ):
         self._original_path = "/"
         self._hash = ""
         self.scheme = 
