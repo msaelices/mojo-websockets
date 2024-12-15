@@ -24,7 +24,6 @@ fn receive_data[T: Protocol](mut protocol: T, data: Bytes) raises -> Tuple[Event
     Args:
         protocol: Protocol instance.
         data: Data to feed.
-        mask: Whether the frame is masked.
 
     Parameters:
         T: Protocol.
