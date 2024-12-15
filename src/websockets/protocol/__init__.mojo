@@ -2,7 +2,7 @@ from collections import Optional
 from utils import Variant
 
 from websockets.aliases import Bytes
-from websockets.frames import Frame
+from websockets.frames import Frame, Close
 from websockets.http import HTTPRequest, HTTPResponse
 from websockets.streams import StreamReader
 
@@ -14,13 +14,28 @@ alias OPEN = 1
 alias CLOSING = 2
 alias CLOSED = 3
 
+alias SEND_EOF = Bytes()
+"""Sentinel signaling that the TCP connection must be half-closed."""
+
 alias Event = Variant[HTTPRequest, HTTPResponse, Frame]
 
 
 trait Protocol:
 
+    fn get_reader(self) -> StreamReader:
+        """Get the reader of the protocol."""
+        ...
+
     fn get_state(self) -> Int:
         """Get the state of the protocol."""
+        ...
+
+    fn set_state(mut self, state: Int):
+        """Set the state of the protocol.
+
+        Args:
+            state: The state of the protocol.
+        """
         ...
 
     fn receive_data(mut self, data: Bytes) raises:
@@ -80,6 +95,10 @@ trait Protocol:
         """Check if the protocol is masked."""
         ...
 
+    fn get_side(self) -> Int:
+        """Get the side of the protocol."""
+        ...
+
     fn get_curr_size(self) -> Optional[Int]:
         """Get the current size of the protocol."""
         ...
@@ -104,7 +123,7 @@ trait Protocol:
         """Set the close frame sent."""
         ...
 
-    fn close_rcvd_then_sent(self) -> Optional[Bool]:
+    fn get_close_rcvd_then_sent(self) -> Optional[Bool]:
         """Check if the close frame was received then sent."""
         ...
 
@@ -112,3 +131,10 @@ trait Protocol:
         """Set if the close frame was received then sent."""
         ...
 
+    fn get_eof_sent(self) -> Bool:
+        """Check if the EOF was sent."""
+        ...
+
+    fn set_eof_sent(mut self, value: Bool) -> None:
+        """Set if the EOF was sent."""
+        ...

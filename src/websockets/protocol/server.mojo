@@ -5,8 +5,8 @@ from websockets.http import HTTPRequest
 from websockets.frames import Frame, Close
 from websockets.streams import StreamReader
 
-from . import CONNECTING, Protocol, Event
-from .base import receive_data
+from . import CONNECTING, SERVER, Protocol, Event
+from .base import receive_data, receive_frame
 
 
 struct ServerProtocol(Protocol):
@@ -24,6 +24,7 @@ struct ServerProtocol(Protocol):
     var close_rcvd: Optional[Close]
     var close_sent: Optional[Close]
     var close_rcvd_then_sent: Optional[Bool]
+    var eof_sent: Bool
 
     fn __init__(out self):
         self.reader = StreamReader()
@@ -37,6 +38,11 @@ struct ServerProtocol(Protocol):
         self.close_rcvd = None
         self.close_sent = None
         self.close_rcvd_then_sent = None
+        self.eof_sent = False
+
+    fn get_reader(self) -> StreamReader:
+        """Get the reader of the protocol."""
+        return self.reader
 
     fn get_state(self) -> Int:
         """
@@ -47,6 +53,14 @@ struct ServerProtocol(Protocol):
         """
         return self.state
 
+    fn set_state(mut self, state: Int):
+        """Set the state of the protocol.
+
+        Args:
+            state: The state of the protocol.
+        """
+        self.state = state
+
     fn is_masked(self) -> Bool:
         """
         Check if the connection is masked.
@@ -56,13 +70,20 @@ struct ServerProtocol(Protocol):
         """
         return True  # Server connections are always masked
 
+    fn get_side(self) -> Int:
+        """Get the side of the protocol."""
+        return SERVER
+
     fn receive_data(mut self, data: Bytes) raises:
         """Feed data and receive frames."""
         # See https://github.com/python-websockets/websockets/blob/59d4dcf779fe7d2b0302083b072d8b03adce2f61/src/websockets/protocol.py#L254
         response = receive_data(self.reader, self.get_state(), data, mask=self.is_masked())
         event = response[0]
+        error = response[1]
+        if not error:
+            receive_frame(self, event[Frame])
         self.add_event(event)
-        self.parser_exc = response[1]
+        self.parser_exc = error
 
     fn write_data(mut self, data: Bytes) -> None:
         """Write data to the protocol."""
@@ -186,3 +207,10 @@ struct ServerProtocol(Protocol):
         """Set if the close frame was received then sent."""
         self.close_rcvd_then_sent = value
 
+    fn get_eof_sent(self) -> Bool:
+        """Check if the EOF was sent."""
+        return self.eof_sent
+
+    fn set_eof_sent(mut self, value: Bool) -> None:
+        """Set if the EOF was sent."""
+        self.eof_sent = value
