@@ -80,7 +80,7 @@ struct ServerProtocol(Protocol):
         response = receive_data(self.reader, self.get_state(), data, mask=self.is_masked())
         event = response[0]
         error = response[1]
-        if not error:
+        if not error and event.isa[Frame]():
             receive_frame(self, event[Frame])
         self.add_event(event)
         self.parser_exc = error
