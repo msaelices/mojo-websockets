@@ -19,7 +19,7 @@ from websockets.utils.bytes import gen_mask
 from . import CONNECTING, Protocol, Event
 
 
-fn receive_data[T: Protocol](mut protocol: T, state: Int, data: Bytes, mask: Bool = False) raises -> Tuple[Event, Optional[Error]]:
+fn receive_data[T: Protocol](mut protocol: T, data: Bytes, mask: Bool = False) raises -> Tuple[Event, Optional[Error]]:
     """Feed data and receive frames."""
     # See https://github.com/python-websockets/websockets/blob/59d4dcf779fe7d2b0302083b072d8b03adce2f61/src/websockets/protocol.py#L254
     reader = protocol.get_reader()

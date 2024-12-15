@@ -77,7 +77,7 @@ struct ServerProtocol(Protocol):
     fn receive_data(mut self, data: Bytes) raises:
         """Feed data and receive frames."""
         # See https://github.com/python-websockets/websockets/blob/59d4dcf779fe7d2b0302083b072d8b03adce2f61/src/websockets/protocol.py#L254
-        response = receive_data(self, self.get_state(), data, mask=self.is_masked())
+        response = receive_data(self, data, mask=self.is_masked())
         event = response[0]
         optional_error = response[1]
         self.add_event(event)
