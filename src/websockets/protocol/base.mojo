@@ -26,7 +26,7 @@ fn receive_data[T: Protocol](mut protocol: T, state: Int, data: Bytes, mask: Boo
     reader.feed_data(data)
     var err: Optional[Error] = None
     try:
-        event = parse(reader, state, data, mask)
+        event = parse(protocol, data, mask)
         if event.isa[Frame]():
             receive_frame(protocol, event[Frame])
         err = None
@@ -37,10 +37,10 @@ fn receive_data[T: Protocol](mut protocol: T, state: Int, data: Bytes, mask: Boo
     return event, err
 
 
-fn parse(mut reader: StreamReader, state: Int, data: Bytes, mask: Bool = False) raises -> Event:
+fn parse[T: Protocol](mut protocol: T, data: Bytes, mask: Bool = False) raises -> Event:
     """Parse a frame from a bytestring."""
     # See https://github.com/python-websockets/websockets/blob/59d4dcf779fe7d2b0302083b072d8b03adce2f61/src/websockets/server.py#L549
-    if state == CONNECTING:
+    if protocol.get_state() == CONNECTING:
         response = HTTPRequest.from_bytes(
             'http://localhost',   # TODO: Use actual host
             DEFAULT_MAX_REQUEST_BODY_SIZE,
@@ -48,13 +48,14 @@ fn parse(mut reader: StreamReader, state: Int, data: Bytes, mask: Bool = False) 
         )
         return response
     else:
-        return parse_frame(reader, data, mask=mask)
+        return parse_frame(protocol, data, mask=mask)
 
 
-fn parse_frame(mut reader: StreamReader, data: Bytes, mask: Bool) raises -> Frame:
+fn parse_frame[T: Protocol](mut protocol: T, data: Bytes, mask: Bool) raises -> Frame:
     """
     Parse incoming data into frames.
     """
+    reader = protocol.get_reader()
     reader.feed_data(data)
     reader.feed_eof()
     frame = Frame.parse(
