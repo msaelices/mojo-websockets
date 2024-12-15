@@ -205,7 +205,6 @@ fn test_server_sends_unexpected_continuation() raises:
         send_continuation(server, str_to_bytes(""), fin=False)
 
 
-# TODO: Make this test pass
 fn test_client_receives_unexpected_continuation() raises:
     client = DummyProtocol[False](OPEN, StreamReader(), Bytes(), List[Event]())
     client.receive_data(Bytes(0, 0))

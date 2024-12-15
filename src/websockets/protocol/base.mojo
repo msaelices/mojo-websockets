@@ -80,7 +80,7 @@ fn receive_frame[
         else:
             protocol.set_curr_size(len(frame.data))
 
-    elif frame.opcode != OP_CONT:
+    elif frame.opcode == OP_CONT:
         if not protocol.get_curr_size():
             raise Error("ProtocolError: unexpected continuation frame")
         if frame.fin:
