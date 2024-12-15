@@ -2,7 +2,7 @@ from collections import Optional
 
 from websockets.aliases import Bytes, DEFAULT_MAX_REQUEST_BODY_SIZE, DEFAULT_BUFFER_SIZE
 from websockets.http import HTTPRequest
-from websockets.frames import Frame
+from websockets.frames import Frame, Close
 from websockets.streams import StreamReader
 
 from . import CONNECTING, Protocol, Event
@@ -20,6 +20,10 @@ struct ServerProtocol(Protocol):
     var expect_cont_frame: Bool
     var parser_exc: Optional[Error]
     var curr_size: Optional[Int]
+    # Close code and reason, set when a close frame is sent or received.
+    var close_rcvd: Optional[Close]
+    var close_sent: Optional[Close]
+    var close_rcvd_then_sent: Optional[Bool]
 
     fn __init__(out self):
         self.reader = StreamReader()
@@ -28,6 +32,11 @@ struct ServerProtocol(Protocol):
         self.state = CONNECTING
         self.expect_cont_frame = False
         self.parser_exc = None
+        self.curr_size = None
+
+        self.close_rcvd = None
+        self.close_sent = None
+        self.close_rcvd_then_sent = None
 
     fn get_state(self) -> Int:
         """
@@ -152,3 +161,28 @@ struct ServerProtocol(Protocol):
     fn set_curr_size(mut self, size: Optional[Int]) -> None:
         """Set the current size of the protocol."""
         self.curr_size = size
+
+    fn get_close_rcvd(self) -> Optional[Close]:
+        """Get the close frame received."""
+        return self.close_rcvd
+
+    fn set_close_rcvd(mut self, close: Optional[Close]) -> None:
+        """Set the close frame received."""
+        self.close_rcvd = close
+
+    fn get_close_sent(self) -> Optional[Close]:
+        """Get the close frame sent."""
+        return self.close_sent
+
+    fn set_close_sent(mut self, close: Optional[Close]) -> None:
+        """Set the close frame sent."""
+        self.close_sent = close
+
+    fn get_close_rcvd_then_sent(self) -> Optional[Bool]:
+        """Check if the close frame was received then sent."""
+        return self.close_rcvd_then_sent
+
+    fn set_close_rcvd_then_sent(mut self, value: Optional[Bool]) -> None:
+        """Set if the close frame was received then sent."""
+        self.close_rcvd_then_sent = value
+

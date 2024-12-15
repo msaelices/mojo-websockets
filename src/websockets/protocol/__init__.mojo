@@ -88,3 +88,27 @@ trait Protocol:
         """Set the current size of the protocol."""
         ...
 
+    fn get_close_rcvd(self) -> Optional[Close]:
+        """Get the close frame received."""
+        ...
+
+    fn set_close_rcvd(mut self, close: Optional[Close]) -> None:
+        """Set the close frame received."""
+        ...
+
+    fn get_close_sent(self) -> Optional[Close]:
+        """Get the close frame sent."""
+        ...
+
+    fn set_close_sent(mut self, close: Optional[Close]) -> None:
+        """Set the close frame sent."""
+        ...
+
+    fn close_rcvd_then_sent(self) -> Optional[Bool]:
+        """Check if the close frame was received then sent."""
+        ...
+
+    fn set_close_rcvd_then_sent(mut self, value: Optional[Bool]) -> None:
+        """Set if the close frame was received then sent."""
+        ...
+
