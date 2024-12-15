@@ -19,6 +19,7 @@ alias unmasked_text_frame_data = Bytes(129, 4, 83, 112, 97, 109)
 # 129 is 0x81, 132 is 0x84, 0 is the first byte of the mask, 255 is the second byte of the mask
 alias masked_text_frame_data = Bytes(129, 132, 0, 255, 0, 255, 83, 143, 97, 146)
 
+
 @value
 struct DummyProtocol[masked: Bool](Protocol):
     """Protocol that does not mask frames."""
@@ -27,6 +28,12 @@ struct DummyProtocol[masked: Bool](Protocol):
     var writes: Bytes
     var events: List[Event]
     var parser_exc: Optional[Error]
+    var curr_size: Optional[Int]
+    # Close code and reason, set when a close frame is sent or received.
+    var close_rcvd: Optional[Close]
+    var close_sent: Optional[Close]
+    var close_rcvd_then_sent: Optional[Bool]
+    var eof_sent: Bool
 
     fn __init__(out self, state: Int, reader: StreamReader, writes: Bytes, events: List[Event]):
         self.state = state
@@ -34,6 +41,15 @@ struct DummyProtocol[masked: Bool](Protocol):
         self.writes = writes
         self.events = events
         self.parser_exc = None
+        self.curr_size = None
+        self.close_rcvd = None
+        self.close_sent = None
+        self.close_rcvd_then_sent = None
+        self.eof_sent = False
+
+    fn get_reader(self) -> StreamReader:
+        """Get the reader of the protocol."""
+        return self.reader
 
     fn is_masked(self) -> Bool:
         """Check if the connection is masked."""
@@ -42,6 +58,14 @@ struct DummyProtocol[masked: Bool](Protocol):
     fn get_state(self) -> Int:
         """Get the current state of the connection."""
         return self.state
+
+    fn set_state(mut self, state: Int) -> None:
+        """Set the state of the protocol."""
+        self.state = state
+
+    fn get_side(self) -> Int:
+        """Get the side of the protocol."""
+        return SERVER if masked else CLIENT
 
     fn write_data(mut self, data: Bytes) -> None:
         """Write data to the protocol."""
@@ -75,6 +99,46 @@ struct DummyProtocol[masked: Bool](Protocol):
         Fetch events generated from data received from the network.
         """
         return self.events
+
+    fn get_curr_size(self) -> Optional[Int]:
+        """Get the current size of the protocol."""
+        return self.curr_size
+
+    fn set_curr_size(mut self, size: Optional[Int]) -> None:
+        """Set the current size of the protocol."""
+        self.curr_size = size
+
+    fn get_close_rcvd(self) -> Optional[Close]:
+        """Get the close frame received."""
+        return self.close_rcvd
+
+    fn set_close_rcvd(mut self, close: Optional[Close]) -> None:
+        """Set the close frame received."""
+        self.close_rcvd = close
+
+    fn get_close_sent(self) -> Optional[Close]:
+        """Get the close frame sent."""
+        return self.close_sent
+
+    fn set_close_sent(mut self, close: Optional[Close]) -> None:
+        """Set the close frame sent."""
+        self.close_sent = close
+
+    fn get_close_rcvd_then_sent(self) -> Optional[Bool]:
+        """Check if the close frame was received then sent."""
+        return self.close_rcvd_then_sent
+
+    fn set_close_rcvd_then_sent(mut self, value: Optional[Bool]) -> None:
+        """Set if the close frame was received then sent."""
+        self.close_rcvd_then_sent = value
+
+    fn get_eof_sent(self) -> Bool:
+        """Check if the EOF was sent."""
+        return self.eof_sent
+
+    fn set_eof_sent(mut self, value: Bool) -> None:
+        """Set if the EOF was sent."""
+        self.eof_sent = value
 
 
 fn test_client_receives_unmasked_frame() raises:
