@@ -20,7 +20,18 @@ from . import CONNECTING, Protocol, Event
 
 
 fn receive_data[T: Protocol](mut protocol: T, data: Bytes, mask: Bool = False) raises -> Tuple[Event, Optional[Error]]:
-    """Feed data and receive frames."""
+    """Feed data and receive frames.
+    Args:
+        protocol: Protocol instance.
+        data: Data to feed.
+        mask: Whether the frame is masked.
+
+    Parameters:
+        T: Protocol.
+
+    Returns:
+        Tuple containing the parsed event and any error that occurred.
+    """
     # See https://github.com/python-websockets/websockets/blob/59d4dcf779fe7d2b0302083b072d8b03adce2f61/src/websockets/protocol.py#L254
     reader = protocol.get_reader()
     reader.feed_data(data)
@@ -38,7 +49,22 @@ fn receive_data[T: Protocol](mut protocol: T, data: Bytes, mask: Bool = False) r
 
 
 fn parse[T: Protocol](mut protocol: T, data: Bytes, mask: Bool = False) raises -> Event:
-    """Parse a frame from a bytestring."""
+    """Parse a frame from a bytestring.
+
+    Args:
+        protocol: Protocol instance.
+        data: Data to parse.
+        mask: Whether the frame is masked.
+
+    Parameters:
+        T: Protocol.
+
+    Returns:
+        Event: Either an HTTPRequest during connection handshake or a Frame during normal operation.
+
+    Raises:
+        Error: If parsing fails.
+    """
     # See https://github.com/python-websockets/websockets/blob/59d4dcf779fe7d2b0302083b072d8b03adce2f61/src/websockets/server.py#L549
     if protocol.get_state() == CONNECTING:
         response = HTTPRequest.from_bytes(
@@ -54,6 +80,20 @@ fn parse[T: Protocol](mut protocol: T, data: Bytes, mask: Bool = False) raises -
 fn parse_frame[T: Protocol](mut protocol: T, data: Bytes, mask: Bool) raises -> Frame:
     """
     Parse incoming data into frames.
+
+    Args:
+        protocol: Protocol instance.
+        data: Data to parse into frames.
+        mask: Whether the frame is masked.
+
+    Parameters:
+        T: Protocol.
+
+    Returns:
+        Frame: The parsed WebSocket frame.
+
+    Raises:
+        Error: If parsing fails.
     """
     reader = protocol.get_reader()
     reader.feed_data(data)
@@ -73,6 +113,12 @@ fn receive_frame[
     Args:
         protocol: Protocol instance.
         frame: Frame to process.
+
+    Parameters:
+        T: Protocol.
+
+    Raises:
+        Error: If the frame is invalid
     """
     if frame.opcode == OP_TEXT or frame.opcode == OP_BINARY:
         if protocol.get_curr_size():
@@ -247,6 +293,12 @@ fn send_eof[T: Protocol](mut protocol: T) raises -> None:
 
     Args:
         protocol: Protocol instance.
+
+    Parameters:
+        T: Protocol.
+
+    Raises:
+        ProtocolError: If EOF was already sent.
     """
     if protocol.get_eof_sent():
         raise Error("ProtocolError: EOF already sent")
@@ -306,6 +358,10 @@ fn send_close[
         protocol: Protocol instance.
         code: Close code.
         reason: Close reason.
+
+    Parameters:
+        T: Protocol.
+        gen_mask_func: Function to generate a mask.
 
     Raises:
         ProtocolError: If the code isn't valid or if a reason is provided
