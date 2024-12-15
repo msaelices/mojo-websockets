@@ -77,13 +77,11 @@ struct ServerProtocol(Protocol):
     fn receive_data(mut self, data: Bytes) raises:
         """Feed data and receive frames."""
         # See https://github.com/python-websockets/websockets/blob/59d4dcf779fe7d2b0302083b072d8b03adce2f61/src/websockets/protocol.py#L254
-        response = receive_data(self.reader, self.get_state(), data, mask=self.is_masked())
+        response = receive_data(self, self.get_state(), data, mask=self.is_masked())
         event = response[0]
-        error = response[1]
-        if not error and event.isa[Frame]():
-            receive_frame(self, event[Frame])
+        optional_error = response[1]
         self.add_event(event)
-        self.parser_exc = error
+        self.parser_exc = optional_error
 
     fn write_data(mut self, data: Bytes) -> None:
         """Write data to the protocol."""

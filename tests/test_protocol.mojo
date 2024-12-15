@@ -73,7 +73,7 @@ struct DummyProtocol[masked: Bool](Protocol):
 
     fn receive_data(mut self, data: Bytes) raises -> None:
         """Receive data from the protocol."""
-        res = receive_data(self.reader, self.get_state(), data, mask=self.is_masked())
+        res = receive_data(self, self.get_state(), data, mask=self.is_masked())
         event = res[0]
         self.add_event(event)
         self.parser_exc = res[1]
