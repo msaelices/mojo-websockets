@@ -1,3 +1,4 @@
+from collections import Optional
 from utils import Variant
 
 from websockets.aliases import Bytes
@@ -78,3 +79,12 @@ trait Protocol:
     fn is_masked(self) -> Bool:
         """Check if the protocol is masked."""
         ...
+
+    fn get_curr_size(self) -> Optional[Int]:
+        """Get the current size of the protocol."""
+        ...
+
+    fn set_curr_size(mut self, size: Optional[Int]) -> None:
+        """Set the current size of the protocol."""
+        ...
+

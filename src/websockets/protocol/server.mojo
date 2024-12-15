@@ -19,6 +19,7 @@ struct ServerProtocol(Protocol):
     var state: Int
     var expect_cont_frame: Bool
     var parser_exc: Optional[Error]
+    var curr_size: Optional[Int]
 
     fn __init__(out self):
         self.reader = StreamReader()
@@ -144,3 +145,10 @@ struct ServerProtocol(Protocol):
         """Set the expectation of a continuation frame."""
         self.expect_cont_frame = value
 
+    fn get_curr_size(self) -> Optional[Int]:
+        """Get the current size of the protocol."""
+        return self.curr_size
+
+    fn set_curr_size(mut self, size: Optional[Int]) -> None:
+        """Set the current size of the protocol."""
+        self.curr_size = size
