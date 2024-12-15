@@ -3,10 +3,18 @@ from collections import Optional
 
 from testutils import enforce_mask
 from websockets.aliases import Bytes
-from websockets.frames import Close, Frame, CLOSE_CODE_PROTOCOL_ERROR, OP_TEXT, OP_CLOSE
+from websockets.frames import (
+    Close,
+    Frame,
+    CLOSE_CODE_GOING_AWAY,
+    CLOSE_CODE_PROTOCOL_ERROR,
+    OP_TEXT,
+    OP_CLOSE,
+)
 from websockets.protocol import Event, CLIENT, SERVER, OPEN
 from websockets.protocol.base import (
     receive_data, 
+    send_close,
     send_continuation,
     send_text, 
     Protocol,
@@ -209,38 +217,31 @@ fn test_client_receives_unexpected_continuation() raises:
     client = DummyProtocol[False](OPEN, StreamReader(), Bytes(), List[Event]())
     client.receive_data(Bytes(0, 0))
     events = client.events_received()
+    assert_equal(client.parser_exc.value()._message(), "ProtocolError: unexpected continuation frame")
     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: unexpected continuation frame").serialize(), fin=True))
 
-# def test_client_receives_unexpected_continuation(self):
-#     client = Protocol(CLIENT)
-#     client.receive_data(b"\x00\x00")
-#     self.assertIsInstance(client.parser_exc, ProtocolError)
-#     self.assertEqual(str(client.parser_exc), "unexpected continuation frame")
-#     self.assertConnectionFailing(
-#         client, CloseCode.PROTOCOL_ERROR, "unexpected continuation frame"
-#     )
-#
-# def test_server_receives_unexpected_continuation(self):
-#     server = Protocol(SERVER)
-#     server.receive_data(b"\x00\x80\x00\x00\x00\x00")
-#     self.assertIsInstance(server.parser_exc, ProtocolError)
-#     self.assertEqual(str(server.parser_exc), "unexpected continuation frame")
-#     self.assertConnectionFailing(
-#         server, CloseCode.PROTOCOL_ERROR, "unexpected continuation frame"
-#     )
-#
-# def test_client_sends_continuation_after_sending_close(self):
-#     client = Protocol(CLIENT)
-#     # Since it isn't possible to send a close frame in a fragmented
-#     # message (see test_client_send_close_in_fragmented_message), in fact,
-#     # this is the same test as test_client_sends_unexpected_continuation.
-#     with self.enforce_mask(b"\x00\x00\x00\x00"):
-#         client.send_close(CloseCode.GOING_AWAY)
-#     self.assertEqual(client.data_to_send(), [b"\x88\x82\x00\x00\x00\x00\x03\xe9"])
-#     with self.assertRaises(ProtocolError) as raised:
-#         client.send_continuation(b"", fin=False)
-#     self.assertEqual(str(raised.exception), "unexpected continuation frame")
-#
+
+fn test_server_receives_unexpected_continuation() raises:
+    server = DummyProtocol[True](OPEN, StreamReader(), Bytes(), List[Event]())
+    server.receive_data(Bytes(0, 128, 0, 0, 0, 0))
+    events = server.events_received()
+    assert_equal(server.parser_exc.value()._message(), "ProtocolError: unexpected continuation frame")
+    assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: unexpected continuation frame").serialize(), fin=True))
+
+
+fn test_client_sends_continuation_after_sending_close() raises:
+    client = DummyProtocol[True](OPEN, StreamReader(), Bytes(), List[Event]())
+    # Since it isn't possible to send a close frame in a fragmented
+    # message (see test_client_send_close_in_fragmented_message), in fact,
+    # this is the same test as test_client_sends_unexpected_continuation.
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 0, 0, 0)
+    send_close[gen_mask_func=gen_mask](client, CLOSE_CODE_GOING_AWAY)
+    assert_equal(client.data_to_send(), Bytes(136, 130, 0, 0, 0, 0, 3, 233))
+    with assert_raises(contains='ProtocolError: unexpected continuation frame'):
+        send_continuation(client, str_to_bytes(""), fin=False)
+
+
 # def test_server_sends_continuation_after_sending_close(self):
 #     # Since it isn't possible to send a close frame in a fragmented
 #     # message (see test_server_send_close_in_fragmented_message), in fact,

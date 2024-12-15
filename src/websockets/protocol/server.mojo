@@ -143,7 +143,7 @@ struct ServerProtocol(Protocol):
         Tell if the TCP connection is expected to close soon.
 
         Call this method immediately after any of the ``receive_*()``,
-        ``send_close()``, or :meth:`fail` methods.
+        ``send_close()``, or `fail()` methods.
 
         If it returns :obj:`True`, schedule closing the TCP connection after a
         short timeout if the other side hasn't already closed it.

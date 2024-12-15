@@ -6,6 +6,7 @@ from websockets.frames import (
        Close,
        Frame,
        CLOSE_CODE_PROTOCOL_ERROR,
+       CLOSE_CODE_NO_STATUS_RCVD,
        OP_BINARY,
        OP_CLOSE,
        OP_CONT,
@@ -288,3 +289,45 @@ fn discard[T: Protocol](mut protocol: T) raises:
     # # Once the reader reaches EOF, its feed_data/eof() methods raise an
     # # error, so our receive_data/eof() methods don't step the generator.
     # raise AssertionError("discard() shouldn't step after EOF")
+
+
+fn send_close[
+    T: Protocol,
+    gen_mask_func: fn () -> Bytes = gen_mask,
+](mut protocol: T, code: Optional[Int] = None, reason: String = "") raises -> None:
+    """
+    Send a `Close frame`_.
+
+    .. _Close frame:
+        https://datatracker.ietf.org/doc/html/rfc6455#section-5.5.1
+
+    Args:
+        protocol: Protocol instance.
+        code: Close code.
+        reason: Close reason.
+
+    Raises:
+        ProtocolError: If the code isn't valid or if a reason is provided
+            without a code.
+    """
+    # While RFC 6455 doesn't rule out sending more than one close Frame,
+    # websockets is conservative in what it sends and doesn't allow that.
+    if protocol.get_state() != OPEN:
+        raise Error("InvalidState: connection is not open but {}".format(protocol.get_state()))
+    if not code:
+        if reason != "":
+            raise Error("ProtocolError: cannot send a reason without a code")
+        close = Close(CLOSE_CODE_NO_STATUS_RCVD, "")
+        data = Bytes()
+    else:
+        close = Close(code.value(), reason)
+        data = close.serialize()
+    # 7.1.3. The WebSocket Closing Handshake is Started
+    send_frame[gen_mask_func=gen_mask_func](protocol, Frame(OP_CLOSE, data))
+    # Since the state is OPEN, no close frame was received yet.
+    # As a consequence, protocol.close_rcvd_then_sent remains None.
+    if protocol.get_close_rcvd():
+        raise Error("Close frame received before sending one")
+
+    protocol.set_close_sent(close)
+    protocol.set_state(CLOSING)
