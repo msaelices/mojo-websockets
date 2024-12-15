@@ -21,6 +21,7 @@ alias Event = Variant[HTTPRequest, HTTPResponse, Frame]
 
 
 trait Protocol:
+    alias side: Int
 
     fn get_reader(self) -> StreamReader:
         """Get the reader of the protocol."""
@@ -93,10 +94,6 @@ trait Protocol:
 
     fn is_masked(self) -> Bool:
         """Check if the protocol is masked."""
-        ...
-
-    fn get_side(self) -> Int:
-        """Get the side of the protocol."""
         ...
 
     fn get_curr_size(self) -> Optional[Int]:

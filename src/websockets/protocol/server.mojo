@@ -13,6 +13,8 @@ struct ServerProtocol(Protocol):
     """
     Sans-I/O implementation of a WebSocket server connection.
     """
+    alias side = SERVER
+
     var reader: StreamReader
     var events: List[Event]
     var writes: Bytes
@@ -70,14 +72,10 @@ struct ServerProtocol(Protocol):
         """
         return True  # Server connections are always masked
 
-    fn get_side(self) -> Int:
-        """Get the side of the protocol."""
-        return SERVER
-
     fn receive_data(mut self, data: Bytes) raises:
         """Feed data and receive frames."""
         # See https://github.com/python-websockets/websockets/blob/59d4dcf779fe7d2b0302083b072d8b03adce2f61/src/websockets/protocol.py#L254
-        response = receive_data(self, data, mask=self.is_masked())
+        response = receive_data(self, data)
         event = response[0]
         optional_error = response[1]
         self.add_event(event)

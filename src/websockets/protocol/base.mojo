@@ -19,7 +19,7 @@ from websockets.utils.bytes import gen_mask
 from . import CONNECTING, Protocol, Event
 
 
-fn receive_data[T: Protocol](mut protocol: T, data: Bytes, mask: Bool = False) raises -> Tuple[Event, Optional[Error]]:
+fn receive_data[T: Protocol](mut protocol: T, data: Bytes) raises -> Tuple[Event, Optional[Error]]:
     """Feed data and receive frames.
     Args:
         protocol: Protocol instance.
@@ -37,7 +37,7 @@ fn receive_data[T: Protocol](mut protocol: T, data: Bytes, mask: Bool = False) r
     reader.feed_data(data)
     var err: Optional[Error] = None
     try:
-        event = parse(protocol, data, mask)
+        event = parse(protocol, data)
         if event.isa[Frame]():
             receive_frame(protocol, event[Frame])
         err = None
@@ -48,13 +48,12 @@ fn receive_data[T: Protocol](mut protocol: T, data: Bytes, mask: Bool = False) r
     return event, err
 
 
-fn parse[T: Protocol](mut protocol: T, data: Bytes, mask: Bool = False) raises -> Event:
+fn parse[T: Protocol](mut protocol: T, data: Bytes) raises -> Event:
     """Parse a frame from a bytestring.
 
     Args:
         protocol: Protocol instance.
         data: Data to parse.
-        mask: Whether the frame is masked.
 
     Parameters:
         T: Protocol.
@@ -74,17 +73,16 @@ fn parse[T: Protocol](mut protocol: T, data: Bytes, mask: Bool = False) raises -
         )
         return response
     else:
-        return parse_frame(protocol, data, mask=mask)
+        return parse_frame(protocol, data)
 
 
-fn parse_frame[T: Protocol](mut protocol: T, data: Bytes, mask: Bool) raises -> Frame:
+fn parse_frame[T: Protocol](mut protocol: T, data: Bytes) raises -> Frame:
     """
     Parse incoming data into frames.
 
     Args:
         protocol: Protocol instance.
         data: Data to parse into frames.
-        mask: Whether the frame is masked.
 
     Parameters:
         T: Protocol.
@@ -99,7 +97,7 @@ fn parse_frame[T: Protocol](mut protocol: T, data: Bytes, mask: Bool) raises -> 
     reader.feed_data(data)
     reader.feed_eof()
     frame = Frame.parse(
-        reader, mask=mask,
+        reader, mask=protocol.is_masked(),
     )
     return frame
 
@@ -180,7 +178,8 @@ fn receive_frame[
 
         # A server closes the TCP connection immediately, while a client
         # waits for the server to close the TCP connection.
-        if protocol.get_side() == SERVER:
+        @parameter
+        if T.side == SERVER:
             send_eof(protocol)
 
         # 1.4. Closing Handshake: "after receiving a control frame
@@ -323,7 +322,7 @@ fn discard[T: Protocol](mut protocol: T) raises:
     # connection in the same circumstances where discard() replaces parse().
     # The client closes it when it receives EOF from the server or times
     # out. (The latter case cannot be handled in this Sans-I/O layer.)
-    if (protocol.get_state() == CONNECTING or protocol.get_side() == SERVER) != (protocol.get_eof_sent()):
+    if (protocol.get_state() == CONNECTING or T.side == SERVER) != (protocol.get_eof_sent()):
         raise Error("ProtocolError: EOF not sent when it should or sent when it shouldn't")
 
     while not protocol.get_reader().at_eof():
@@ -332,8 +331,10 @@ fn discard[T: Protocol](mut protocol: T) raises:
 
     # A server closes the TCP connection immediately, while a client
     # waits for the server to close the TCP connection.
-    if protocol.get_state() != CONNECTING and protocol.get_side() == CLIENT:
-        send_eof(protocol)
+    @parameter
+    if T.side == CLIENT:
+        if protocol.get_state() != CONNECTING:
+            send_eof(protocol)
     protocol.set_state(CLOSED)
 
     # TODO: Implement the equivalent of the following Python code:
