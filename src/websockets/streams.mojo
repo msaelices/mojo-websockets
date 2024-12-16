@@ -213,11 +213,11 @@ struct StreamReader(Streamable):
             return True
         # When all data was read but the stream hasn't ended, we can't
         # tell if until either feed_data() or feed_eof() is called.
-        # TODO: This should be a generator so it woulr yield nothing
+        # TODO: This should be a generator so it would yield nothing
         # So the equivalent python code would be:
         # yield
         # See https://github.com/python-websockets/websockets/blob/d852df7dd6324eaee17fc848f029ada371678cbe/src/websockets/streams.py#L113
-        return True
+        return False
 
     fn discard(mut self) -> None:
         """

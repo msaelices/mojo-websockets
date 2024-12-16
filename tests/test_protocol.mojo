@@ -283,12 +283,15 @@ fn test_client_receives_continuation_after_receiving_close() raises:
     events = client.events_received()
     assert_equal(len(events), 0)
     assert_equal(client.data_to_send(), Bytes())
-
-
-# def test_server_receives_continuation_after_receiving_close(self):
-#     server = Protocol(SERVER)
-#     server.receive_data(b"\x88\x82\x00\x00\x00\x00\x03\xe9")
-#     self.assertConnectionClosing(server, CloseCode.GOING_AWAY)
-#     server.receive_data(b"\x00\x80\x00\xff\x00\xff")
-#     self.assertFrameReceived(server, None)
-#     self.assertFrameSent(server, None)
+#
+#
+# fn test_server_receives_continuation_after_receiving_close() raises:
+#     server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+#     server.receive_data(Bytes(136, 130, 0, 0, 0, 0, 3, 233))
+#     close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_GOING_AWAY, "").serialize(), fin=True)
+#     events = server.events_received()
+#     assert_equal(events[0][Frame], close_frame)
+#     # self.assertConnectionClosing(server, CLOSE_CODE_GOING_AWAY)
+#     # server.receive_data(b"\x00\x80\x00\xff\x00\xff")
+#     # self.assertFrameReceived(server, None)
+#     # self.assertFrameSent(server, None)

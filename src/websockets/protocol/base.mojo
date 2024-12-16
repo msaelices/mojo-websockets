@@ -327,8 +327,10 @@ fn discard[T: Protocol](mut protocol: T) raises:
 
     reader = protocol.get_reader()
     reader.discard()
-    while not reader.at_eof():
-        reader.discard()
+    # The following code is commented as reader is not a generator (not supported in Mojo)
+    # TODO: Implement the equivalent of the following Python code:
+    # while not reader.at_eof():
+    #     reader.discard()
     protocol.set_discard_sent(True)
 
     # A server closes the TCP connection immediately, while a client
