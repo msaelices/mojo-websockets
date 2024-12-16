@@ -1,5 +1,6 @@
 from testing import assert_equal, assert_raises, assert_true
 from collections import Optional
+from memory import UnsafePointer
 
 from testutils import enforce_mask
 from websockets.aliases import Bytes
@@ -7,6 +8,7 @@ from websockets.frames import (
     Close,
     Frame,
     CLOSE_CODE_GOING_AWAY,
+    CLOSE_CODE_NORMAL_CLOSURE,
     CLOSE_CODE_PROTOCOL_ERROR,
     OP_TEXT,
     OP_CLOSE,
@@ -79,9 +81,12 @@ struct DummyProtocol[masked: Bool, side_param: Int](Protocol):
     fn receive_data(mut self, data: Bytes) raises -> None:
         """Receive data from the protocol."""
         res = receive_data(self, data)
-        event = res[0]
+        if not res:
+            return
+        event_and_error = res.value()
+        event = event_and_error[0]
         self.add_event(event)
-        self.parser_exc = res[1]
+        self.parser_exc = event_and_error[1]
 
     fn add_event(mut self, event: Event) -> None:
         """Add an event to the protocol."""
@@ -89,7 +94,9 @@ struct DummyProtocol[masked: Bool, side_param: Int](Protocol):
 
     fn data_to_send(mut self) -> Bytes:
         """Get data to send to the protocol."""
-        return self.writes
+        writes = self.writes^
+        self.writes = Bytes()
+        return writes
 
     fn expect_continuation_frame(self) -> Bool:
         """Check if a continuation frame is expected."""
@@ -103,7 +110,9 @@ struct DummyProtocol[masked: Bool, side_param: Int](Protocol):
         """
         Fetch events generated from data received from the network.
         """
-        return self.events
+        events = self.events^
+        self.events = List[Event]()
+        return events
 
     fn get_curr_size(self) -> Optional[Int]:
         """Get the current size of the protocol."""
@@ -239,25 +248,34 @@ fn test_client_sends_continuation_after_sending_close() raises:
         send_continuation(client, str_to_bytes(""), fin=False)
 
 
-# def test_server_sends_continuation_after_sending_close(self):
-#     # Since it isn't possible to send a close frame in a fragmented
-#     # message (see test_server_send_close_in_fragmented_message), in fact,
-#     # this is the same test as test_server_sends_unexpected_continuation.
-#     server = Protocol(SERVER)
-#     server.send_close(CloseCode.NORMAL_CLOSURE)
-#     self.assertEqual(server.data_to_send(), [b"\x88\x02\x03\xe8"])
-#     with self.assertRaises(ProtocolError) as raised:
-#         server.send_continuation(b"", fin=False)
-#     self.assertEqual(str(raised.exception), "unexpected continuation frame")
-#
-# def test_client_receives_continuation_after_receiving_close(self):
-#     client = Protocol(CLIENT)
-#     client.receive_data(b"\x88\x02\x03\xe8")
-#     self.assertConnectionClosing(client, CloseCode.NORMAL_CLOSURE)
-#     client.receive_data(b"\x00\x00")
-#     self.assertFrameReceived(client, None)
-#     self.assertFrameSent(client, None)
-#
+fn test_server_sends_continuation_after_sending_close() raises:
+    # Since it isn't possible to send a close frame in a fragmented
+    # message (see test_server_send_close_in_fragmented_message), in fact,
+    # this is the same test as test_server_sends_unexpected_continuation.
+    server = DummyProtocol[False, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    send_close(server, CLOSE_CODE_NORMAL_CLOSURE)
+    assert_equal(server.data_to_send(), Bytes(136, 2, 3, 232))
+    with assert_raises(contains='ProtocolError: unexpected continuation frame'):
+        send_continuation(server, Bytes(), fin=False)
+
+
+fn test_client_receives_continuation_after_receiving_close() raises:
+    client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    client.receive_data(Bytes(136, 2, 3, 232))
+    events = client.events_received()
+    assert_equal(len(events), 1)
+    close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_NORMAL_CLOSURE, "").serialize(), fin=True)
+    assert_equal(events[0][Frame], close_frame)
+    assert_equal(client.data_to_send(), close_frame.serialize(mask=client.is_masked()))
+
+    client.receive_data(Bytes(0, 0))
+
+    # TODO: Fix this test
+    events = client.events_received()
+    assert_equal(len(events), 0)
+    assert_equal(client.data_to_send(), Bytes())
+
+
 # def test_server_receives_continuation_after_receiving_close(self):
 #     server = Protocol(SERVER)
 #     server.receive_data(b"\x88\x82\x00\x00\x00\x00\x03\xe9")
