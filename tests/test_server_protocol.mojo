@@ -5,6 +5,7 @@ from websockets.http import Header, Headers
 from websockets.frames import OP_TEXT, Frame
 from websockets.http import HTTPRequest, HTTPResponse
 from websockets.protocol import CONNECTING, OPEN, Event
+from websockets.protocol.base import receive_data
 from websockets.protocol.server import ServerProtocol
 from websockets.utils.bytes import str_to_bytes
 
@@ -29,7 +30,8 @@ fn make_request() -> HTTPRequest:
 fn test_receive_request() raises:
     """Server receives a handshake request."""
     server = ServerProtocol()
-    server.receive_data(
+    receive_data(
+        server,
         str_to_bytes(
             "GET /test HTTP/1.1\r\n"
             "Host: example.com\r\n"
