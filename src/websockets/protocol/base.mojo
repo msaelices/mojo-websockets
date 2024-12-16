@@ -19,7 +19,7 @@ from websockets.utils.bytes import gen_mask
 from . import CONNECTING, Protocol, Event
 
 
-fn receive_data[T: Protocol](mut protocol: T, data: Bytes) raises -> Tuple[Event, Optional[Error]]:
+fn receive_data[T: Protocol](mut protocol: T, data: Bytes) raises -> Optional[Tuple[Event, Optional[Error]]]:
     """Feed data and receive frames.
     Args:
         protocol: Protocol instance.
@@ -34,6 +34,9 @@ fn receive_data[T: Protocol](mut protocol: T, data: Bytes) raises -> Tuple[Event
     # See https://github.com/python-websockets/websockets/blob/59d4dcf779fe7d2b0302083b072d8b03adce2f61/src/websockets/protocol.py#L254
     reader = protocol.get_reader()
     reader.feed_data(data)
+    if reader.discarded:
+        return None
+
     var err: Optional[Error] = None
     try:
         event = parse(protocol, data)
@@ -192,8 +195,6 @@ fn receive_frame[
         # This can't happen because Frame.parse() validates opcodes.
         raise Error("AssertionError: unexpected opcode: {}".format(frame.opcode))
 
-    protocol.add_event(frame)
-
 
 fn send_text[
     T: Protocol,
@@ -324,8 +325,9 @@ fn discard[T: Protocol](mut protocol: T) raises:
     if (protocol.get_state() == CONNECTING or T.side == SERVER) != (protocol.get_eof_sent()):
         raise Error("ProtocolError: EOF not sent when it should or sent when it shouldn't")
 
-    while not protocol.get_reader().at_eof():
-        reader = protocol.get_reader()
+    reader = protocol.get_reader()
+    reader.discard()
+    while not reader.at_eof():
         reader.discard()
 
     # A server closes the TCP connection immediately, while a client

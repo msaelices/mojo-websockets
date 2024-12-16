@@ -86,11 +86,13 @@ struct StreamReader(Streamable):
     var buffer: Bytes
     var eof: Bool
     var offset: Int
+    var discarded: Bool
 
     fn __init__(out self):
         self.buffer = Bytes(capacity=DEFAULT_BUFFER_SIZE)
         self.offset = 0
         self.eof = False
+        self.discarded = False
 
     fn feed_data(mut self, data: Bytes) raises -> None:
         """
@@ -108,6 +110,9 @@ struct StreamReader(Streamable):
         if self.eof:
             raise Error("EOFError: stream ended")
         self.buffer += data
+
+        if self.discarded:
+            self.discard()
 
     fn feed_eof(mut self) raises -> None:
         """
@@ -211,12 +216,18 @@ struct StreamReader(Streamable):
             return False
         if self.eof:
             return True
-        return False
+        # When all data was read but the stream hasn't ended, we can't
+        # tell if until either feed_data() or feed_eof() is called.
+        # TODO: This should be a generator so it woulr yield nothing
+        # So the equivalent python code would be:
+        # yield
+        # See https://github.com/python-websockets/websockets/blob/d852df7dd6324eaee17fc848f029ada371678cbe/src/websockets/streams.py#L113
+        return True
 
     fn discard(mut self) -> None:
         """
         Discard all buffered data, but don't end the stream.
-    
         """
+        self.discarded = True
         self.offset = len(self.buffer)
 
