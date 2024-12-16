@@ -9,11 +9,11 @@ from . import CONNECTING, SERVER, Protocol, Event
 from .base import receive_data, receive_frame
 
 
-struct ServerProtocol(Protocol):
+struct ServerProtocol[side_param: Int = SERVER](Protocol):
     """
     Sans-I/O implementation of a WebSocket server connection.
     """
-    alias side = SERVER
+    alias side = side_param
 
     var reader: StreamReader
     var events: List[Event]
@@ -74,10 +74,10 @@ struct ServerProtocol(Protocol):
         """
         return True  # Server connections are always masked
 
-    fn receive_data(mut self, data: Bytes) raises:
-        """Feed data and receive frames."""
-        # See https://github.com/python-websockets/websockets/blob/59d4dcf779fe7d2b0302083b072d8b03adce2f61/src/websockets/protocol.py#L254
+    fn receive_data(mut self, data: Bytes) raises -> None:
+        """Receive data from the protocol."""
         res = receive_data(self, data)
+        # See https://github.com/python-websockets/websockets/blob/59d4dcf779fe7d2b0302083b072d8b03adce2f61/src/websockets/protocol.py#L254
         if not res:
             return
         event_and_error = res.value()
