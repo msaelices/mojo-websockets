@@ -22,7 +22,7 @@ from websockets.protocol.base import (
     Protocol,
 )
 from websockets.streams import StreamReader
-from websockets.utils.bytes import str_to_bytes
+from websockets.utils.bytes import str_to_bytes, gen_mask
 
 # 129 is 0x81, 4 is the length of the payload, 83 is 'S', 112 is 'p', 97 is 'a', 109 is 'm'
 alias unmasked_text_frame_data = Bytes(129, 4, 83, 112, 97, 109)  
@@ -80,9 +80,9 @@ struct DummyProtocol[masked: Bool, side_param: Int](Protocol):
         """Write data to the protocol."""
         self.writes += data
 
-    fn receive_data(mut self, data: Bytes) raises -> None:
+    fn receive_data[gen_mask_func: fn () -> Bytes = gen_mask](mut self, data: Bytes) raises -> None:
         """Receive data from the protocol."""
-        res = receive_data(self, data)
+        res = receive_data[gen_mask_func=gen_mask_func](self, data)
         if not res:
             return
         event_and_error = res.value()
@@ -276,22 +276,26 @@ fn test_client_receives_continuation_after_receiving_close() raises:
     assert_equal(len(events), 1)
     close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_NORMAL_CLOSURE, "").serialize(), fin=True)
     assert_equal(events[0][Frame], close_frame)
-    assert_equal(client.data_to_send(), close_frame.serialize(mask=client.is_masked()))
+    assert_equal(client.data_to_send(), close_frame.serialize[gen_mask_func=gen_mask](mask=client.is_masked()))
 
     client.receive_data(Bytes(0, 0))
 
     events = client.events_received()
     assert_equal(len(events), 0)
     assert_equal(client.data_to_send(), Bytes())
-#
-#
-# fn test_server_receives_continuation_after_receiving_close() raises:
-#     server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
-#     server.receive_data(Bytes(136, 130, 0, 0, 0, 0, 3, 233))
-#     close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_GOING_AWAY, "").serialize(), fin=True)
-#     events = server.events_received()
-#     assert_equal(events[0][Frame], close_frame)
-#     # self.assertConnectionClosing(server, CLOSE_CODE_GOING_AWAY)
-#     # server.receive_data(b"\x00\x80\x00\xff\x00\xff")
-#     # self.assertFrameReceived(server, None)
-#     # self.assertFrameSent(server, None)
+
+
+fn test_server_receives_continuation_after_receiving_close() raises:
+    server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 0, 0, 0)
+    server.receive_data[gen_mask_func=gen_mask](Bytes(136, 130, 0, 0, 0, 0, 3, 233))
+    events = server.events_received()
+    close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_GOING_AWAY, "").serialize(), fin=True)
+    assert_equal(events[0][Frame], close_frame)
+    assert_equal(server.data_to_send(), close_frame.serialize[gen_mask_func=gen_mask](mask=server.is_masked()))
+    server.receive_data(Bytes(0, 128, 0, 255, 0, 255))
+
+    events = server.events_received()
+    assert_equal(len(events), 0)
+    assert_equal(server.data_to_send(), Bytes())
