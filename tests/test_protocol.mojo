@@ -80,16 +80,6 @@ struct DummyProtocol[masked: Bool, side_param: Int](Protocol):
         """Write data to the protocol."""
         self.writes += data
 
-    fn receive_data[gen_mask_func: fn () -> Bytes = gen_mask](mut self, data: Bytes) raises -> None:
-        """Receive data from the protocol."""
-        res = receive_data[gen_mask_func=gen_mask_func](self, data)
-        if not res:
-            return
-        event_and_error = res.value()
-        event = event_and_error[0]
-        self.add_event(event)
-        self.parser_exc = event_and_error[1]
-
     fn add_event(mut self, event: Event) -> None:
         """Add an event to the protocol."""
         self.events.append(event)
@@ -164,6 +154,14 @@ struct DummyProtocol[masked: Bool, side_param: Int](Protocol):
         """Set the flag of discarding received data."""
         self.discard_sent = value
 
+    fn get_parser_exc(self) -> Optional[Error]:
+        """Get the parser exception."""
+        return self.parser_exc
+
+    fn set_parser_exc(mut self, exc: Optional[Error]) -> None:
+        """Set the parser exception."""
+        self.parser_exc = exc
+
 
 fn test_client_receives_unmasked_frame() raises:
     reader = StreamReader()
@@ -174,7 +172,7 @@ fn test_client_receives_unmasked_frame() raises:
     assert_equal(client.is_masked(), False)
 
     s = Bytes(129, 4) + str_to_bytes("Spam")
-    client.receive_data(s)
+    receive_data(client, s)
 
     events = client.events_received()
     assert_true(events[0].isa[Frame]())
@@ -197,7 +195,7 @@ fn test_server_sends_unmasked_frame() raises:
 
 fn test_server_receives_masked_frame() raises:
     server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
-    server.receive_data(masked_text_frame_data)
+    receive_data(server, masked_text_frame_data)
     events = server.events_received()
     assert_true(events[0].isa[Frame]())
     assert_equal(events[0][Frame].data, Frame(OP_TEXT, str_to_bytes("Spam")).data)
@@ -205,14 +203,14 @@ fn test_server_receives_masked_frame() raises:
 
 fn test_client_receives_masked_frame() raises:
     client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
-    client.receive_data(masked_text_frame_data)
+    receive_data(client, masked_text_frame_data)
     events = client.events_received()
     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: incorrect masking").serialize(), fin=True))
 
 
 fn test_server_receives_unmasked_frame() raises:
     server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
-    server.receive_data(unmasked_text_frame_data)
+    receive_data(server, unmasked_text_frame_data)
     events = server.events_received()
     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: incorrect masking").serialize(), fin=True))
 
@@ -231,7 +229,7 @@ fn test_server_sends_unexpected_continuation() raises:
 
 fn test_client_receives_unexpected_continuation() raises:
     client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
-    client.receive_data(Bytes(0, 0))
+    receive_data(client, Bytes(0, 0))
     events = client.events_received()
     assert_equal(client.parser_exc.value()._message(), "ProtocolError: unexpected continuation frame")
     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: unexpected continuation frame").serialize(), fin=True))
@@ -239,7 +237,7 @@ fn test_client_receives_unexpected_continuation() raises:
 
 fn test_server_receives_unexpected_continuation() raises:
     server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
-    server.receive_data(Bytes(0, 128, 0, 0, 0, 0))
+    receive_data(server, Bytes(0, 128, 0, 0, 0, 0))
     events = server.events_received()
     assert_equal(server.parser_exc.value()._message(), "ProtocolError: unexpected continuation frame")
     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: unexpected continuation frame").serialize(), fin=True))
@@ -271,14 +269,14 @@ fn test_server_sends_continuation_after_sending_close() raises:
 
 fn test_client_receives_continuation_after_receiving_close() raises:
     client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
-    client.receive_data(Bytes(136, 2, 3, 232))
+    receive_data(client, Bytes(136, 2, 3, 232))
     events = client.events_received()
     assert_equal(len(events), 1)
     close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_NORMAL_CLOSURE, "").serialize(), fin=True)
     assert_equal(events[0][Frame], close_frame)
     assert_equal(client.data_to_send(), close_frame.serialize[gen_mask_func=gen_mask](mask=client.is_masked()))
 
-    client.receive_data(Bytes(0, 0))
+    receive_data(client, Bytes(0, 0))
 
     events = client.events_received()
     assert_equal(len(events), 0)
@@ -289,12 +287,12 @@ fn test_server_receives_continuation_after_receiving_close() raises:
     server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
     fn gen_mask() -> Bytes:
         return Bytes(0, 0, 0, 0)
-    server.receive_data[gen_mask_func=gen_mask](Bytes(136, 130, 0, 0, 0, 0, 3, 233))
+    receive_data[gen_mask_func=gen_mask](server, Bytes(136, 130, 0, 0, 0, 0, 3, 233))
     events = server.events_received()
     close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_GOING_AWAY, "").serialize(), fin=True)
     assert_equal(events[0][Frame], close_frame)
     assert_equal(server.data_to_send(), close_frame.serialize[gen_mask_func=gen_mask](mask=server.is_masked()))
-    server.receive_data(Bytes(0, 128, 0, 255, 0, 255))
+    receive_data(server, Bytes(0, 128, 0, 255, 0, 255))
 
     events = server.events_received()
     assert_equal(len(events), 0)

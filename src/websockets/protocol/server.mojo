@@ -75,17 +75,6 @@ struct ServerProtocol[side_param: Int = SERVER](Protocol):
         """
         return True  # Server connections are always masked
 
-    fn receive_data[gen_mask_func: fn () -> Bytes = gen_mask](mut self, data: Bytes) raises -> None:
-        """Receive data from the protocol."""
-        res = receive_data(self, data)
-        # See https://github.com/python-websockets/websockets/blob/59d4dcf779fe7d2b0302083b072d8b03adce2f61/src/websockets/protocol.py#L254
-        if not res:
-            return
-        event_and_error = res.value()
-        event = event_and_error[0]
-        self.add_event(event)
-        self.parser_exc = event_and_error[1]
-
     fn write_data(mut self, data: Bytes) -> None:
         """Write data to the protocol."""
         self.writes += data
@@ -223,3 +212,11 @@ struct ServerProtocol[side_param: Int = SERVER](Protocol):
     fn set_discard_sent(mut self, value: Bool) -> None:
         """Set the flag of discarding received data."""
         self.discard_sent = value
+
+    fn get_parser_exc(self) -> Optional[Error]:
+        """Get the parser exception."""
+        return self.parser_exc
+
+    fn set_parser_exc(mut self, exc: Optional[Error]) -> None:
+        """Set the parser exception."""
+        self.parser_exc = exc

@@ -39,10 +39,6 @@ trait Protocol:
         """
         ...
 
-    fn receive_data(mut self, data: Bytes) raises:
-        """Feed data and receive frames."""
-        ...
-
     fn write_data(mut self, data: Bytes) -> None:
         """Write data to the protocol."""
         ...
@@ -142,4 +138,12 @@ trait Protocol:
 
     fn set_discard_sent(mut self, value: Bool) -> None:
         """Set the flag of discarding received data."""
+        ...
+
+    fn get_parser_exc(self) -> Optional[Error]:
+        """Get the parser exception."""
+        ...
+
+    fn set_parser_exc(mut self, exc: Optional[Error]) -> None:
+        """Set the parser exception."""
         ...

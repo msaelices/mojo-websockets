@@ -22,7 +22,7 @@ from . import CONNECTING, Protocol, Event
 fn receive_data[
     T: Protocol,
     gen_mask_func: fn () -> Bytes = gen_mask,
-](mut protocol: T, data: Bytes) raises -> Optional[Tuple[Event, Optional[Error]]]:
+](mut protocol: T, data: Bytes) raises:
     """Feed data and receive frames.
     Args:
         protocol: Protocol instance.
@@ -51,7 +51,9 @@ fn receive_data[
         err = error
         # TODO: Differentiate between protocol errors, connection and other kind of errors
         event = Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, str(error._message())).serialize(), fin=True)  # Close the connection on error
-    return event, err
+
+    protocol.add_event(event)
+    protocol.set_parser_exc(err)
 
 
 fn parse[T: Protocol](mut protocol: T, data: Bytes) raises -> Event:
