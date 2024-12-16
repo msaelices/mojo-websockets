@@ -171,7 +171,7 @@ fn apply_mask(data: Bytes, mask: Bytes) raises -> Bytes:
 
     """
     if len(mask) != 4:
-        raise Error("ValueError: mask must contain 4 bytes")
+        raise Error("ValueError: mask must contain 4 bytes and not {}".format(len(mask)))
 
     # TODO: Use SIMD instructions to apply the mask.
     mask_repeated = mask * (len(data) // 4) + mask[: len(data) % 4]
