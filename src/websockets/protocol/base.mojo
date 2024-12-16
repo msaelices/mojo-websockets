@@ -118,7 +118,7 @@ fn receive_frame[
         T: Protocol.
 
     Raises:
-        Error: If the frame is invalid
+        Error: If the frame is invalid.
     """
     if frame.opcode == OP_TEXT or frame.opcode == OP_BINARY:
         if protocol.get_curr_size():

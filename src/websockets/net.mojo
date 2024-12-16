@@ -470,7 +470,7 @@ struct addrinfo_macos(AddrInfo):
             host: String - The host to get the IP from.
 
         Returns:
-            in_addr - The IP address.
+            The IP address.
         """
         var host_ptr = host.unsafe_cstr_ptr()
         var servinfo = Pointer.address_of(Self())

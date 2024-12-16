@@ -27,6 +27,7 @@ struct ServerProtocol(Protocol):
     var close_sent: Optional[Close]
     var close_rcvd_then_sent: Optional[Bool]
     var eof_sent: Bool
+    var discard_sent: Bool
 
     fn __init__(out self):
         self.reader = StreamReader()
@@ -41,6 +42,7 @@ struct ServerProtocol(Protocol):
         self.close_sent = None
         self.close_rcvd_then_sent = None
         self.eof_sent = False
+        self.discard_sent = False
 
     fn get_reader(self) -> StreamReader:
         """Get the reader of the protocol."""
@@ -212,3 +214,11 @@ struct ServerProtocol(Protocol):
     fn set_eof_sent(mut self, value: Bool) -> None:
         """Set if the EOF was sent."""
         self.eof_sent = value
+
+    fn get_discard_sent(self) -> Bool:
+        """Get the flag of discarding received data."""
+        return self.discard_sent
+
+    fn set_discard_sent(mut self, value: Bool) -> None:
+        """Set the flag of discarding received data."""
+        self.discard_sent = value
