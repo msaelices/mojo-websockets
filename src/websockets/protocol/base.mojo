@@ -19,7 +19,10 @@ from websockets.utils.bytes import gen_mask
 from . import CONNECTING, Protocol, Event
 
 
-fn receive_data[T: Protocol](mut protocol: T, data: Bytes) raises -> Optional[Tuple[Event, Optional[Error]]]:
+fn receive_data[
+    T: Protocol,
+    gen_mask_func: fn () -> Bytes = gen_mask,
+](mut protocol: T, data: Bytes) raises -> Optional[Tuple[Event, Optional[Error]]]:
     """Feed data and receive frames.
     Args:
         protocol: Protocol instance.
@@ -27,6 +30,7 @@ fn receive_data[T: Protocol](mut protocol: T, data: Bytes) raises -> Optional[Tu
 
     Parameters:
         T: Protocol.
+        gen_mask_func: Function to generate a mask.
 
     Returns:
         Tuple containing the parsed event and any error that occurred.
@@ -41,7 +45,7 @@ fn receive_data[T: Protocol](mut protocol: T, data: Bytes) raises -> Optional[Tu
     try:
         event = parse(protocol, data)
         if event.isa[Frame]():
-            receive_frame(protocol, event[Frame])
+            receive_frame[gen_mask_func=gen_mask_func](protocol, event[Frame])
         err = None
     except error:
         err = error
@@ -106,6 +110,7 @@ fn parse_frame[T: Protocol](mut protocol: T, data: Bytes) raises -> Frame:
 
 fn receive_frame[
     T: Protocol,
+    gen_mask_func: fn () -> Bytes = gen_mask,
 ](mut protocol: T, frame: Frame) raises -> None:
     """
     Process an incoming frame.
@@ -116,6 +121,7 @@ fn receive_frame[
 
     Parameters:
         T: Protocol.
+        gen_mask_func: Function to generate a mask.
 
     Raises:
         Error: If the frame is invalid.
@@ -140,7 +146,7 @@ fn receive_frame[
         # 5.5.2. Ping: "Upon receipt of a Ping frame, an endpoint MUST
         # send a Pong frame in response"
         pong_frame = Frame(OP_PONG, frame.data)
-        send_frame(protocol, pong_frame)
+        send_frame[gen_mask_func=gen_mask_func](protocol, pong_frame)
 
     elif frame.opcode == OP_PONG:
         # 5.5.3 Pong: "A response to an unsolicited Pong frame is not
@@ -169,7 +175,7 @@ fn receive_frame[
             # Close.serialize() because that fails when the close frame
             # is empty and Close.parse() synthesizes a 1005 close code.
             # The rest is identical to send_close().
-            send_frame(protocol, Frame(OP_CLOSE, frame.data))
+            send_frame[gen_mask_func=gen_mask_func](protocol, Frame(OP_CLOSE, frame.data))
             protocol.set_close_sent(protocol.get_close_rcvd())
             protocol.set_close_rcvd_then_sent(True)
             protocol.set_state(CLOSING)

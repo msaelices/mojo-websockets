@@ -4,6 +4,7 @@ from websockets.aliases import Bytes, DEFAULT_MAX_REQUEST_BODY_SIZE, DEFAULT_BUF
 from websockets.http import HTTPRequest
 from websockets.frames import Frame, Close
 from websockets.streams import StreamReader
+from websockets.utils.bytes import gen_mask
 
 from . import CONNECTING, SERVER, Protocol, Event
 from .base import receive_data, receive_frame
@@ -74,7 +75,7 @@ struct ServerProtocol[side_param: Int = SERVER](Protocol):
         """
         return True  # Server connections are always masked
 
-    fn receive_data(mut self, data: Bytes) raises -> None:
+    fn receive_data[gen_mask_func: fn () -> Bytes = gen_mask](mut self, data: Bytes) raises -> None:
         """Receive data from the protocol."""
         res = receive_data(self, data)
         # See https://github.com/python-websockets/websockets/blob/59d4dcf779fe7d2b0302083b072d8b03adce2f61/src/websockets/protocol.py#L254

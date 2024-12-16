@@ -304,7 +304,6 @@ fn str_to_bytes(s: String) -> Bytes:
 fn gen_mask() -> Bytes:
     """
     Generate a random mask.
-
     """
     mask = Bytes(4)
     randint[Byte.type](mask.unsafe_ptr(), 4, 0, 255)
