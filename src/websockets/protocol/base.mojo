@@ -34,7 +34,7 @@ fn receive_data[T: Protocol](mut protocol: T, data: Bytes) raises -> Optional[Tu
     # See https://github.com/python-websockets/websockets/blob/59d4dcf779fe7d2b0302083b072d8b03adce2f61/src/websockets/protocol.py#L254
     reader = protocol.get_reader()
     reader.feed_data(data)
-    if reader.discarded:
+    if protocol.get_discard_sent():
         return None
 
     var err: Optional[Error] = None
@@ -329,6 +329,7 @@ fn discard[T: Protocol](mut protocol: T) raises:
     reader.discard()
     while not reader.at_eof():
         reader.discard()
+    protocol.set_discard_sent(True)
 
     # A server closes the TCP connection immediately, while a client
     # waits for the server to close the TCP connection.

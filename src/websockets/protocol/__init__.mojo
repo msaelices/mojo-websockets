@@ -135,3 +135,11 @@ trait Protocol:
     fn set_eof_sent(mut self, value: Bool) -> None:
         """Set if the EOF was sent."""
         ...
+
+    fn get_discard_sent(self) -> Bool:
+        """Get the flag of discarding received data."""
+        ...
+
+    fn set_discard_sent(mut self, value: Bool) -> None:
+        """Set the flag of discarding received data."""
+        ...
