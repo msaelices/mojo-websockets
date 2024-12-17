@@ -8,6 +8,7 @@ from websockets.frames import (
     Close,
     Frame,
     CLOSE_CODE_GOING_AWAY,
+    # CLOSE_CODE_MESSAGE_TOO_BIG,
     CLOSE_CODE_NORMAL_CLOSURE,
     CLOSE_CODE_PROTOCOL_ERROR,
     OP_TEXT,
@@ -342,41 +343,29 @@ fn test_server_receives_text() raises:
     events = server.events_received()
     assert_equal(events[0][Frame], expected_frame)
 
-    #
-    # def test_client_receives_text_over_size_limit(self):
-    #     client = Protocol(CLIENT, max_size=3)
-    #     client.receive_data(b"\x81\x04\xf0\x9f\x98\x80")
-    #     self.assertIsInstance(client.parser_exc, PayloadTooBig)
-    #     self.assertEqual(str(client.parser_exc), "over size limit (4 > 3 bytes)")
-    #     self.assertConnectionFailing(
-    #         client, CloseCode.MESSAGE_TOO_BIG, "over size limit (4 > 3 bytes)"
-    #     )
-    #
-    # def test_server_receives_text_over_size_limit(self):
-    #     server = Protocol(SERVER, max_size=3)
-    #     server.receive_data(b"\x81\x84\x00\x00\x00\x00\xf0\x9f\x98\x80")
-    #     self.assertIsInstance(server.parser_exc, PayloadTooBig)
-    #     self.assertEqual(str(server.parser_exc), "over size limit (4 > 3 bytes)")
-    #     self.assertConnectionFailing(
-    #         server, CloseCode.MESSAGE_TOO_BIG, "over size limit (4 > 3 bytes)"
-    #     )
-    #
-    # def test_client_receives_text_without_size_limit(self):
-    #     client = Protocol(CLIENT, max_size=None)
-    #     client.receive_data(b"\x81\x04\xf0\x9f\x98\x80")
-    #     self.assertFrameReceived(
-    #         client,
-    #         Frame(OP_TEXT, "😀".encode()),
-    #     )
-    #
-    # def test_server_receives_text_without_size_limit(self):
-    #     server = Protocol(SERVER, max_size=None)
-    #     server.receive_data(b"\x81\x84\x00\x00\x00\x00\xf0\x9f\x98\x80")
-    #     self.assertFrameReceived(
-    #         server,
-    #         Frame(OP_TEXT, "😀".encode()),
-    #     )
-    #
+
+# TODO: Implement the max_size in the protocol
+# fn test_client_receives_text_over_size_limit() raises:
+#     client = DummyProtocol[False, CLIENT, max_size=3](OPEN, StreamReader(), Bytes(), List[Event]())
+#     
+#     # Send a 4-byte text frame containing '😀' (240, 159, 152, 128)
+#     receive_data(client, Bytes(129, 4, 240, 159, 152, 128))
+#     
+#     events = client.events_received()
+#     assert_equal(client.parser_exc.value()._message(), "PayloadTooBig: over size limit (4 > 3 bytes)")
+#     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_MESSAGE_TOO_BIG, "over size limit (4 > 3 bytes)").serialize(), fin=True))
+
+# TODO: Implement the max_size in the protocol
+# fn test_server_receives_text_over_size_limit() raises:
+#     server = DummyProtocol[True, SERVER, max_size=3](OPEN, StreamReader(), Bytes(), List[Event]())
+#     
+#     # Send a 4-byte text frame containing '😀' (240, 159, 152, 128)
+#     receive_data(server, Bytes(129, 132, 0, 0, 0, 0, 240, 159, 152, 128))
+#     
+#     events = server.events_received()
+#     assert_equal(server.parser_exc.value()._message(), "PayloadTooBig: over size limit (4 > 3 bytes)")
+#     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_MESSAGE_TOO_BIG, "over size limit (4 > 3 bytes)").serialize(), fin=True))
+
     # def test_client_sends_fragmented_text(self):
     #     client = Protocol(CLIENT)
     #     with self.enforce_mask(b"\x00\x00\x00\x00"):
