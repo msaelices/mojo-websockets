@@ -265,6 +265,7 @@ fn send_frame[
 
 fn send_continuation[
     T: Protocol,
+    gen_mask_func: fn () -> Bytes = gen_mask,
 ](mut protocol: T, data: Bytes, fin: Bool) raises -> None:
     """
     Send a `Continuation frame`_.
@@ -274,6 +275,7 @@ fn send_continuation[
 
     Parameters:
         T: Protocol.
+        gen_mask_func: Function to generate a mask.
 
     Args:
         protocol: Protocol instance.
@@ -291,7 +293,7 @@ fn send_continuation[
     if protocol.get_state() != OPEN:
         raise Error("InvalidState: connection is not open")
     protocol.set_expect_continuation_frame(not fin)
-    send_frame(protocol, Frame(OP_CONT, data, fin))
+    send_frame[gen_mask_func=gen_mask_func](protocol, Frame(OP_CONT, data, fin))
 
 
 fn send_eof[T: Protocol](mut protocol: T) raises -> None:
