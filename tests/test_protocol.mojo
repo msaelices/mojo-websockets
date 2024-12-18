@@ -11,6 +11,7 @@ from websockets.frames import (
     # CLOSE_CODE_MESSAGE_TOO_BIG,
     CLOSE_CODE_NORMAL_CLOSURE,
     CLOSE_CODE_PROTOCOL_ERROR,
+    OP_CONT,
     OP_TEXT,
     OP_CLOSE,
 )
@@ -53,6 +54,7 @@ struct DummyProtocol[masked: Bool, side_param: Int](Protocol):
     var close_rcvd_then_sent: Optional[Bool]
     var eof_sent: Bool
     var discard_sent: Bool
+    var expect_cont_frame: Bool
 
     fn __init__(out self, state: Int, reader: StreamReader, writes: Bytes, events: List[Event]):
         self.state = state
@@ -66,6 +68,7 @@ struct DummyProtocol[masked: Bool, side_param: Int](Protocol):
         self.close_rcvd_then_sent = None
         self.eof_sent = False
         self.discard_sent = False
+        self.expect_cont_frame = False
 
     fn get_reader(self) -> StreamReader:
         """Get the reader of the protocol."""
@@ -99,11 +102,11 @@ struct DummyProtocol[masked: Bool, side_param: Int](Protocol):
 
     fn expect_continuation_frame(self) -> Bool:
         """Check if a continuation frame is expected."""
-        return False
+        return self.expect_cont_frame
 
     fn set_expect_continuation_frame(mut self, value: Bool) -> None:
         """Set the expectation of a continuation frame."""
-        pass
+        self.expect_cont_frame = value
 
     fn events_received(mut self) -> List[Event]:
         """
@@ -366,200 +369,195 @@ fn test_server_receives_text() raises:
 #     assert_equal(server.parser_exc.value()._message(), "PayloadTooBig: over size limit (4 > 3 bytes)")
 #     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_MESSAGE_TOO_BIG, "over size limit (4 > 3 bytes)").serialize(), fin=True))
 
-    # def test_client_sends_fragmented_text(self):
-    #     client = Protocol(CLIENT)
-    #     with self.enforce_mask(b"\x00\x00\x00\x00"):
-    #         client.send_text("😀".encode()[:2], fin=False)
-    #     self.assertEqual(client.data_to_send(), [b"\x01\x82\x00\x00\x00\x00\xf0\x9f"])
-    #     with self.enforce_mask(b"\x00\x00\x00\x00"):
-    #         client.send_continuation("😀😀".encode()[2:6], fin=False)
-    #     self.assertEqual(
-    #         client.data_to_send(), [b"\x00\x84\x00\x00\x00\x00\x98\x80\xf0\x9f"]
-    #     )
-    #     with self.enforce_mask(b"\x00\x00\x00\x00"):
-    #         client.send_continuation("😀".encode()[2:], fin=True)
-    #     self.assertEqual(client.data_to_send(), [b"\x80\x82\x00\x00\x00\x00\x98\x80"])
-    #
-    # def test_server_sends_fragmented_text(self):
-    #     server = Protocol(SERVER)
-    #     server.send_text("😀".encode()[:2], fin=False)
-    #     self.assertEqual(server.data_to_send(), [b"\x01\x02\xf0\x9f"])
-    #     server.send_continuation("😀😀".encode()[2:6], fin=False)
-    #     self.assertEqual(server.data_to_send(), [b"\x00\x04\x98\x80\xf0\x9f"])
-    #     server.send_continuation("😀".encode()[2:], fin=True)
-    #     self.assertEqual(server.data_to_send(), [b"\x80\x02\x98\x80"])
-    #
-    # def test_client_receives_fragmented_text(self):
-    #     client = Protocol(CLIENT)
-    #     client.receive_data(b"\x01\x02\xf0\x9f")
-    #     self.assertFrameReceived(
-    #         client,
-    #         Frame(OP_TEXT, "😀".encode()[:2], fin=False),
-    #     )
-    #     client.receive_data(b"\x00\x04\x98\x80\xf0\x9f")
-    #     self.assertFrameReceived(
-    #         client,
-    #         Frame(OP_CONT, "😀😀".encode()[2:6], fin=False),
-    #     )
-    #     client.receive_data(b"\x80\x02\x98\x80")
-    #     self.assertFrameReceived(
-    #         client,
-    #         Frame(OP_CONT, "😀".encode()[2:]),
-    #     )
-    #
-    # def test_server_receives_fragmented_text(self):
-    #     server = Protocol(SERVER)
-    #     server.receive_data(b"\x01\x82\x00\x00\x00\x00\xf0\x9f")
-    #     self.assertFrameReceived(
-    #         server,
-    #         Frame(OP_TEXT, "😀".encode()[:2], fin=False),
-    #     )
-    #     server.receive_data(b"\x00\x84\x00\x00\x00\x00\x98\x80\xf0\x9f")
-    #     self.assertFrameReceived(
-    #         server,
-    #         Frame(OP_CONT, "😀😀".encode()[2:6], fin=False),
-    #     )
-    #     server.receive_data(b"\x80\x82\x00\x00\x00\x00\x98\x80")
-    #     self.assertFrameReceived(
-    #         server,
-    #         Frame(OP_CONT, "😀".encode()[2:]),
-    #     )
-    #
-    # def test_client_receives_fragmented_text_over_size_limit(self):
-    #     client = Protocol(CLIENT, max_size=3)
-    #     client.receive_data(b"\x01\x02\xf0\x9f")
-    #     self.assertFrameReceived(
-    #         client,
-    #         Frame(OP_TEXT, "😀".encode()[:2], fin=False),
-    #     )
-    #     client.receive_data(b"\x80\x02\x98\x80")
-    #     self.assertIsInstance(client.parser_exc, PayloadTooBig)
-    #     self.assertEqual(str(client.parser_exc), "over size limit (2 > 1 bytes)")
-    #     self.assertConnectionFailing(
-    #         client, CloseCode.MESSAGE_TOO_BIG, "over size limit (2 > 1 bytes)"
-    #     )
-    #
-    # def test_server_receives_fragmented_text_over_size_limit(self):
-    #     server = Protocol(SERVER, max_size=3)
-    #     server.receive_data(b"\x01\x82\x00\x00\x00\x00\xf0\x9f")
-    #     self.assertFrameReceived(
-    #         server,
-    #         Frame(OP_TEXT, "😀".encode()[:2], fin=False),
-    #     )
-    #     server.receive_data(b"\x80\x82\x00\x00\x00\x00\x98\x80")
-    #     self.assertIsInstance(server.parser_exc, PayloadTooBig)
-    #     self.assertEqual(str(server.parser_exc), "over size limit (2 > 1 bytes)")
-    #     self.assertConnectionFailing(
-    #         server, CloseCode.MESSAGE_TOO_BIG, "over size limit (2 > 1 bytes)"
-    #     )
-    #
-    # def test_client_receives_fragmented_text_without_size_limit(self):
-    #     client = Protocol(CLIENT, max_size=None)
-    #     client.receive_data(b"\x01\x02\xf0\x9f")
-    #     self.assertFrameReceived(
-    #         client,
-    #         Frame(OP_TEXT, "😀".encode()[:2], fin=False),
-    #     )
-    #     client.receive_data(b"\x00\x04\x98\x80\xf0\x9f")
-    #     self.assertFrameReceived(
-    #         client,
-    #         Frame(OP_CONT, "😀😀".encode()[2:6], fin=False),
-    #     )
-    #     client.receive_data(b"\x80\x02\x98\x80")
-    #     self.assertFrameReceived(
-    #         client,
-    #         Frame(OP_CONT, "😀".encode()[2:]),
-    #     )
-    #
-    # def test_server_receives_fragmented_text_without_size_limit(self):
-    #     server = Protocol(SERVER, max_size=None)
-    #     server.receive_data(b"\x01\x82\x00\x00\x00\x00\xf0\x9f")
-    #     self.assertFrameReceived(
-    #         server,
-    #         Frame(OP_TEXT, "😀".encode()[:2], fin=False),
-    #     )
-    #     server.receive_data(b"\x00\x84\x00\x00\x00\x00\x98\x80\xf0\x9f")
-    #     self.assertFrameReceived(
-    #         server,
-    #         Frame(OP_CONT, "😀😀".encode()[2:6], fin=False),
-    #     )
-    #     server.receive_data(b"\x80\x82\x00\x00\x00\x00\x98\x80")
-    #     self.assertFrameReceived(
-    #         server,
-    #         Frame(OP_CONT, "😀".encode()[2:]),
-    #     )
-    #
-    # def test_client_sends_unexpected_text(self):
-    #     client = Protocol(CLIENT)
-    #     client.send_text(b"", fin=False)
-    #     with self.assertRaises(ProtocolError) as raised:
-    #         client.send_text(b"", fin=False)
-    #     self.assertEqual(str(raised.exception), "expected a continuation frame")
-    #
-    # def test_server_sends_unexpected_text(self):
-    #     server = Protocol(SERVER)
-    #     server.send_text(b"", fin=False)
-    #     with self.assertRaises(ProtocolError) as raised:
-    #         server.send_text(b"", fin=False)
-    #     self.assertEqual(str(raised.exception), "expected a continuation frame")
-    #
-    # def test_client_receives_unexpected_text(self):
-    #     client = Protocol(CLIENT)
-    #     client.receive_data(b"\x01\x00")
-    #     self.assertFrameReceived(
-    #         client,
-    #         Frame(OP_TEXT, b"", fin=False),
-    #     )
-    #     client.receive_data(b"\x01\x00")
-    #     self.assertIsInstance(client.parser_exc, ProtocolError)
-    #     self.assertEqual(str(client.parser_exc), "expected a continuation frame")
-    #     self.assertConnectionFailing(
-    #         client, CloseCode.PROTOCOL_ERROR, "expected a continuation frame"
-    #     )
-    #
-    # def test_server_receives_unexpected_text(self):
-    #     server = Protocol(SERVER)
-    #     server.receive_data(b"\x01\x80\x00\x00\x00\x00")
-    #     self.assertFrameReceived(
-    #         server,
-    #         Frame(OP_TEXT, b"", fin=False),
-    #     )
-    #     server.receive_data(b"\x01\x80\x00\x00\x00\x00")
-    #     self.assertIsInstance(server.parser_exc, ProtocolError)
-    #     self.assertEqual(str(server.parser_exc), "expected a continuation frame")
-    #     self.assertConnectionFailing(
-    #         server, CloseCode.PROTOCOL_ERROR, "expected a continuation frame"
-    #     )
-    #
-    # def test_client_sends_text_after_sending_close(self):
-    #     client = Protocol(CLIENT)
-    #     with self.enforce_mask(b"\x00\x00\x00\x00"):
-    #         client.send_close(CloseCode.GOING_AWAY)
-    #     self.assertEqual(client.data_to_send(), [b"\x88\x82\x00\x00\x00\x00\x03\xe9"])
-    #     with self.assertRaises(InvalidState) as raised:
-    #         client.send_text(b"")
-    #     self.assertEqual(str(raised.exception), "connection is closing")
-    #
-    # def test_server_sends_text_after_sending_close(self):
-    #     server = Protocol(SERVER)
-    #     server.send_close(CloseCode.NORMAL_CLOSURE)
-    #     self.assertEqual(server.data_to_send(), [b"\x88\x02\x03\xe8"])
-    #     with self.assertRaises(InvalidState) as raised:
-    #         server.send_text(b"")
-    #     self.assertEqual(str(raised.exception), "connection is closing")
-    #
-    # def test_client_receives_text_after_receiving_close(self):
-    #     client = Protocol(CLIENT)
-    #     client.receive_data(b"\x88\x02\x03\xe8")
-    #     self.assertConnectionClosing(client, CloseCode.NORMAL_CLOSURE)
-    #     client.receive_data(b"\x81\x00")
-    #     self.assertFrameReceived(client, None)
-    #     self.assertFrameSent(client, None)
-    #
-    # def test_server_receives_text_after_receiving_close(self):
-    #     server = Protocol(SERVER)
-    #     server.receive_data(b"\x88\x82\x00\x00\x00\x00\x03\xe9")
-    #     self.assertConnectionClosing(server, CloseCode.GOING_AWAY)
-    #     server.receive_data(b"\x81\x80\x00\xff\x00\xff")
-    #     self.assertFrameReceived(server, None)
-    #     self.assertFrameSent(server, None)
+fn test_client_sends_fragmented_text() raises:
+    """The test verifies that a client can properly fragment and send a text message containing emoji data across multiple frames with proper masking."""
+    client = DummyProtocol[True, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 0, 0, 0)
+    
+    # First fragment
+    send_text[gen_mask_func=gen_mask](client, smiley_data[:2], fin=False)
+    assert_equal(client.data_to_send(), Bytes(1, 130, 0, 0, 0, 0, 240, 159))
+    
+    # Second fragment
+    send_continuation[gen_mask_func=gen_mask](client, smiley_data[2:] + smiley_data[:2], fin=False)
+    assert_equal(client.data_to_send(), Bytes(0, 132, 0, 0, 0, 0, 152, 128, 240, 159))
+    
+    # Final fragment
+    send_continuation[gen_mask_func=gen_mask](client, smiley_data[2:], fin=True)
+    assert_equal(client.data_to_send(), Bytes(128, 130, 0, 0, 0, 0, 152, 128))
+
+
+fn test_server_sends_fragmented_text() raises:
+    """The test verifies that a server can properly fragment and send a text message containing emoji data across multiple frames."""
+    server = DummyProtocol[False, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    
+    # First fragment
+    send_text(server, smiley_data[:2], fin=False)
+    assert_equal(server.data_to_send(), Bytes(1, 2, 240, 159))
+    
+    # Second fragment 
+    send_continuation(server, smiley_data[2:] + smiley_data[:2], fin=False)
+    assert_equal(server.data_to_send(), Bytes(0, 4, 152, 128, 240, 159))
+    
+    # Final fragment
+    send_continuation(server, smiley_data[2:], fin=True)
+    assert_equal(server.data_to_send(), Bytes(128, 2, 152, 128))
+
+
+fn test_client_receives_fragmented_text() raises:
+    """The test verifies that a client can properly receive fragmented text messages containing emoji data."""
+    client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    
+    # First fragment
+    receive_data(client, Bytes(1, 2, 240, 159))
+    events = client.events_received()
+    assert_equal(events[0][Frame], Frame(OP_TEXT, smiley_data[:2], fin=False))
+    
+    # Second fragment
+    receive_data(client, Bytes(0, 4, 152, 128, 240, 159))
+    events = client.events_received()
+    assert_equal(events[0][Frame], Frame(OP_CONT, smiley_data[2:] + smiley_data[:2], fin=False))
+    
+    # Final fragment
+    receive_data(client, Bytes(128, 2, 152, 128))
+    events = client.events_received()
+    assert_equal(events[0][Frame], Frame(OP_CONT, smiley_data[2:]))
+
+
+fn test_server_receives_fragmented_text() raises:
+    """The test verifies that a server can properly receive fragmented text messages containing emoji data."""
+    server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    
+    # First fragment
+    receive_data(server, Bytes(1, 130, 0, 0, 0, 0, 240, 159))
+    events = server.events_received()
+    assert_equal(events[0][Frame], Frame(OP_TEXT, smiley_data[:2], fin=False))
+    
+    # Second fragment
+    receive_data(server, Bytes(0, 132, 0, 0, 0, 0, 152, 128, 240, 159))
+    events = server.events_received()
+    assert_equal(events[0][Frame], Frame(OP_CONT, smiley_data[2:] + smiley_data[:2], fin=False))
+    
+    # Final fragment
+    receive_data(server, Bytes(128, 130, 0, 0, 0, 0, 152, 128))
+    events = server.events_received()
+    assert_equal(events[0][Frame], Frame(OP_CONT, smiley_data[2:]))
+
+# TODO: Implement the max_size in the protocol
+# fn test_client_receives_fragmented_text_over_size_limit() raises:
+#     """The test verifies that a client properly handles fragmented text messages that exceed the size limit."""
+#     client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+#     
+#     # First fragment
+#     receive_data(client, Bytes(1, 2, 240, 159))
+#     events = client.events_received()
+#     assert_equal(events[0][Frame], Frame(OP_TEXT, smiley_data[:2], fin=False))
+#     
+#     # Second fragment exceeds size limit
+#     receive_data(client, Bytes(128, 2, 152, 128))
+#     events = client.events_received()
+#     assert_equal(client.parser_exc.value()._message(), "PayloadTooBig: over size limit (2 > 1 bytes)")
+#     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_MESSAGE_TOO_BIG, "over size limit (2 > 1 bytes)").serialize(), fin=True))
+
+# TODO: Implement the max_size in the protocol
+# fn test_server_receives_fragmented_text_over_size_limit() raises:
+#     """The test verifies that a server properly handles fragmented text messages that exceed the size limit."""
+#     server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+#     
+#     # First fragment
+#     receive_data(server, Bytes(1, 130, 0, 0, 0, 0, 240, 159))
+#     events = server.events_received()
+#     assert_equal(events[0][Frame], Frame(OP_TEXT, smiley_data[:2], fin=False))
+#     
+#     # Second fragment exceeds size limit
+#     receive_data(server, Bytes(128, 130, 0, 0, 0, 0, 152, 128))
+#     events = server.events_received()
+#     assert_equal(server.parser_exc.value()._message(), "PayloadTooBig: over size limit (2 > 1 bytes)")
+#     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_MESSAGE_TOO_BIG, "over size limit (2 > 1 bytes)").serialize(), fin=True))
+
+
+fn test_client_sends_unexpected_text() raises:
+    """The test verifies that a client cannot send a text frame after sending a text frame without the FIN bit set."""
+    client = DummyProtocol[True, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 0, 0, 0)
+    send_text[gen_mask_func=gen_mask](client, Bytes(), fin=False)
+    with assert_raises(contains="ProtocolError: expected a continuation frame"):
+        send_text[gen_mask_func=gen_mask](client, Bytes(), fin=False)
+
+
+fn test_server_sends_unexpected_text() raises:
+    """The test verifies that a server cannot send a text frame after sending a text frame without the FIN bit set."""
+    server = DummyProtocol[False, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    send_text(server, Bytes(), fin=False)
+    with assert_raises(contains="ProtocolError: expected a continuation frame"):
+        send_text(server, Bytes(), fin=False)
+
+
+fn test_client_receives_unexpected_text() raises:
+    """The test verifies that a client properly handles receiving an unexpected text frame."""
+    client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    
+    # First text frame without FIN bit
+    receive_data(client, Bytes(1, 0))
+    events = client.events_received()
+    assert_equal(events[0][Frame], Frame(OP_TEXT, Bytes(), fin=False))
+    
+    # Second unexpected text frame
+    receive_data(client, Bytes(1, 0))
+    events = client.events_received()
+    assert_equal(client.parser_exc.value()._message(), "ProtocolError: expected a continuation frame")
+    assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: expected a continuation frame").serialize(), fin=True))
+
+fn test_server_receives_unexpected_text() raises:
+    """The test verifies that a server properly handles receiving an unexpected text frame."""
+    server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    
+    # First text frame without FIN bit
+    receive_data(server, Bytes(1, 128, 0, 0, 0, 0))
+    events = server.events_received()
+    assert_equal(events[0][Frame], Frame(OP_TEXT, Bytes(), fin=False))
+    
+    # Second unexpected text frame
+    receive_data(server, Bytes(1, 128, 0, 0, 0, 0))
+    events = server.events_received()
+    assert_equal(server.parser_exc.value()._message(), "ProtocolError: expected a continuation frame")
+    assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: expected a continuation frame").serialize(), fin=True))
+
+
+fn test_client_sends_text_after_sending_close() raises:
+    """The test verifies that a client cannot send text frames after sending a close frame."""
+    client = DummyProtocol[True, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 0, 0, 0)
+    send_close[gen_mask_func=gen_mask](client, CLOSE_CODE_GOING_AWAY)
+    assert_equal(client.data_to_send(), Bytes(136, 130, 0, 0, 0, 0, 3, 233))
+    with assert_raises(contains="InvalidState: connection is 2"):
+        send_text[gen_mask_func=gen_mask](client, Bytes())
+
+
+fn test_server_sends_text_after_sending_close() raises:
+    """The test verifies that a server cannot send text frames after sending a close frame."""
+    server = DummyProtocol[False, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    send_close(server, CLOSE_CODE_NORMAL_CLOSURE)
+    assert_equal(server.data_to_send(), Bytes(136, 2, 3, 232))
+    with assert_raises(contains="InvalidState: connection is 2"):
+        send_text(server, Bytes())
+
+
+# def test_client_receives_text_after_receiving_close(self):
+#     client = Protocol(CLIENT)
+#     client.receive_data(b"\x88\x02\x03\xe8")
+#     self.assertConnectionClosing(client, CloseCode.NORMAL_CLOSURE)
+#     client.receive_data(b"\x81\x00")
+#     self.assertFrameReceived(client, None)
+#     self.assertFrameSent(client, None)
+#
+# def test_server_receives_text_after_receiving_close(self):
+#     server = Protocol(SERVER)
+#     server.receive_data(b"\x88\x82\x00\x00\x00\x00\x03\xe9")
+#     self.assertConnectionClosing(server, CloseCode.GOING_AWAY)
+#     server.receive_data(b"\x81\x80\x00\xff\x00\xff")
+#     self.assertFrameReceived(server, None)
+#     self.assertFrameSent(server, None)
