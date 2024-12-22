@@ -871,3 +871,304 @@ fn test_server_receives_binary_after_receiving_close() raises:
     events = server.events_received()
     assert_equal(len(events), 0)
     assert_equal(server.data_to_send(), Bytes())
+
+
+# ===-------------------------------------------------------------------===#
+# Test close frames.
+# ===-------------------------------------------------------------------===#
+
+
+fn test_close_code() raises:
+    """Test that close code is properly received and parsed."""
+    client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    receive_data(client, Bytes(136, 4, 3, 232, 79, 75))  # \x88\x04\x03\xe8OK
+    events = client.events_received()
+    assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_NORMAL_CLOSURE, "OK").serialize(), fin=True))
+
+
+fn test_close_reason() raises:
+    """Test that close reason is properly received and parsed."""
+    server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 0, 0, 0)
+    receive_data[gen_mask_func=gen_mask](server, Bytes(136, 132, 0, 0, 0, 0, 3, 232, 79, 75))  # \x88\x84\x00\x00\x00\x00\x03\xe8OK
+    events = server.events_received()
+    assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_NORMAL_CLOSURE, "OK").serialize(), fin=True))
+
+
+fn test_close_code_not_provided() raises:
+    """Test handling when no close code is provided."""
+    server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 0, 0, 0)
+    receive_data[gen_mask_func=gen_mask](server, Bytes(136, 128, 0, 0, 0, 0))  # \x88\x80\x00\x00\x00\x00
+    events = server.events_received()
+    assert_equal(events[0][Frame], Frame(OP_CLOSE, Bytes(), fin=True))
+
+
+fn test_close_reason_not_provided() raises:
+    """Test handling when no close reason is provided."""
+    client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    receive_data(client, Bytes(136, 0))  # \x88\x00
+    events = client.events_received()
+    assert_equal(events[0][Frame], Frame(OP_CLOSE, Bytes(), fin=True))
+
+
+fn test_close_code_not_available() raises:
+    """Test that close code is ABNORMAL_CLOSURE when connection is closed without a code."""
+    client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    client.set_eof_sent(True)
+    assert_equal(bool(client.get_close_rcvd()), False)
+
+
+fn test_close_reason_not_available() raises:
+    """Test that close reason is empty when connection is closed without a reason."""
+    server = DummyProtocol[False, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    server.set_eof_sent(True)
+    assert_equal(bool(server.get_close_rcvd()), False)
+
+
+fn test_close_code_not_available_yet() raises:
+    """Test that close code is None before connection is closed."""
+    server = DummyProtocol[False, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    assert_equal(bool(server.get_close_rcvd()), False)
+
+
+fn test_close_reason_not_available_yet() raises:
+    """Test that close reason is None before connection is closed."""
+    client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    assert_equal(bool(client.get_close_rcvd()), False)
+
+
+fn test_client_sends_close() raises:
+    """Test that client properly sends a close frame."""
+    client = DummyProtocol[True, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    fn gen_mask() -> Bytes:
+        return Bytes(60, 60, 60, 60)  # \x3c\x3c\x3c\x3c
+    send_close[gen_mask_func=gen_mask](client)
+    assert_equal(client.data_to_send(), Bytes(136, 128, 60, 60, 60, 60))  # \x88\x80\x3c\x3c\x3c\x3c
+    assert_equal(client.get_state(), 2)  # CLOSING
+
+
+fn test_server_sends_close() raises:
+    """Test that server properly sends a close frame."""
+    server = DummyProtocol[False, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    send_close(server)
+    assert_equal(server.data_to_send(), Bytes(136, 0))  # \x88\x00
+    assert_equal(server.get_state(), 2)  # CLOSING
+
+#
+# def test_client_receives_close(self):
+#     client = Protocol(CLIENT)
+#     with self.enforce_mask(b"\x3c\x3c\x3c\x3c"):
+#         client.receive_data(b"\x88\x00")
+#     self.assertEqual(client.events_received(), [Frame(OP_CLOSE, b"")])
+#     self.assertEqual(client.data_to_send(), [b"\x88\x80\x3c\x3c\x3c\x3c"])
+#     self.assertIs(client.state, CLOSING)
+#
+# def test_server_receives_close(self):
+#     server = Protocol(SERVER)
+#     server.receive_data(b"\x88\x80\x3c\x3c\x3c\x3c")
+#     self.assertEqual(server.events_received(), [Frame(OP_CLOSE, b"")])
+#     self.assertEqual(server.data_to_send(), [b"\x88\x00", b""])
+#     self.assertIs(server.state, CLOSING)
+#
+# def test_client_sends_close_then_receives_close(self):
+#     # Client-initiated close handshake on the client side.
+#     client = Protocol(CLIENT)
+#
+#     client.send_close()
+#     self.assertFrameReceived(client, None)
+#     self.assertFrameSent(client, Frame(OP_CLOSE, b""))
+#
+#     client.receive_data(b"\x88\x00")
+#     self.assertFrameReceived(client, Frame(OP_CLOSE, b""))
+#     self.assertFrameSent(client, None)
+#
+#     client.receive_eof()
+#     self.assertFrameReceived(client, None)
+#     self.assertFrameSent(client, None, eof=True)
+#
+# def test_server_sends_close_then_receives_close(self):
+#     # Server-initiated close handshake on the server side.
+#     server = Protocol(SERVER)
+#
+#     server.send_close()
+#     self.assertFrameReceived(server, None)
+#     self.assertFrameSent(server, Frame(OP_CLOSE, b""))
+#
+#     server.receive_data(b"\x88\x80\x3c\x3c\x3c\x3c")
+#     self.assertFrameReceived(server, Frame(OP_CLOSE, b""))
+#     self.assertFrameSent(server, None, eof=True)
+#
+#     server.receive_eof()
+#     self.assertFrameReceived(server, None)
+#     self.assertFrameSent(server, None)
+#
+# def test_client_receives_close_then_sends_close(self):
+#     # Server-initiated close handshake on the client side.
+#     client = Protocol(CLIENT)
+#
+#     client.receive_data(b"\x88\x00")
+#     self.assertFrameReceived(client, Frame(OP_CLOSE, b""))
+#     self.assertFrameSent(client, Frame(OP_CLOSE, b""))
+#
+#     client.receive_eof()
+#     self.assertFrameReceived(client, None)
+#     self.assertFrameSent(client, None, eof=True)
+#
+# def test_server_receives_close_then_sends_close(self):
+#     # Client-initiated close handshake on the server side.
+#     server = Protocol(SERVER)
+#
+#     server.receive_data(b"\x88\x80\x3c\x3c\x3c\x3c")
+#     self.assertFrameReceived(server, Frame(OP_CLOSE, b""))
+#     self.assertFrameSent(server, Frame(OP_CLOSE, b""), eof=True)
+#
+#     server.receive_eof()
+#     self.assertFrameReceived(server, None)
+#     self.assertFrameSent(server, None)
+#
+# def test_client_sends_close_with_code(self):
+#     client = Protocol(CLIENT)
+#     with self.enforce_mask(b"\x00\x00\x00\x00"):
+#         client.send_close(CloseCode.GOING_AWAY)
+#     self.assertEqual(client.data_to_send(), [b"\x88\x82\x00\x00\x00\x00\x03\xe9"])
+#     self.assertIs(client.state, CLOSING)
+#
+# def test_server_sends_close_with_code(self):
+#     server = Protocol(SERVER)
+#     server.send_close(CloseCode.NORMAL_CLOSURE)
+#     self.assertEqual(server.data_to_send(), [b"\x88\x02\x03\xe8"])
+#     self.assertIs(server.state, CLOSING)
+#
+# def test_client_receives_close_with_code(self):
+#     client = Protocol(CLIENT)
+#     client.receive_data(b"\x88\x02\x03\xe8")
+#     self.assertConnectionClosing(client, CloseCode.NORMAL_CLOSURE, "")
+#     self.assertIs(client.state, CLOSING)
+#
+# def test_server_receives_close_with_code(self):
+#     server = Protocol(SERVER)
+#     server.receive_data(b"\x88\x82\x00\x00\x00\x00\x03\xe9")
+#     self.assertConnectionClosing(server, CloseCode.GOING_AWAY, "")
+#     self.assertIs(server.state, CLOSING)
+#
+# def test_client_sends_close_with_code_and_reason(self):
+#     client = Protocol(CLIENT)
+#     with self.enforce_mask(b"\x00\x00\x00\x00"):
+#         client.send_close(CloseCode.GOING_AWAY, "going away")
+#     self.assertEqual(
+#         client.data_to_send(), [b"\x88\x8c\x00\x00\x00\x00\x03\xe9going away"]
+#     )
+#     self.assertIs(client.state, CLOSING)
+#
+# def test_server_sends_close_with_code_and_reason(self):
+#     server = Protocol(SERVER)
+#     server.send_close(CloseCode.NORMAL_CLOSURE, "OK")
+#     self.assertEqual(server.data_to_send(), [b"\x88\x04\x03\xe8OK"])
+#     self.assertIs(server.state, CLOSING)
+#
+# def test_client_receives_close_with_code_and_reason(self):
+#     client = Protocol(CLIENT)
+#     client.receive_data(b"\x88\x04\x03\xe8OK")
+#     self.assertConnectionClosing(client, CloseCode.NORMAL_CLOSURE, "OK")
+#     self.assertIs(client.state, CLOSING)
+#
+# def test_server_receives_close_with_code_and_reason(self):
+#     server = Protocol(SERVER)
+#     server.receive_data(b"\x88\x8c\x00\x00\x00\x00\x03\xe9going away")
+#     self.assertConnectionClosing(server, CloseCode.GOING_AWAY, "going away")
+#     self.assertIs(server.state, CLOSING)
+#
+# def test_client_sends_close_with_reason_only(self):
+#     client = Protocol(CLIENT)
+#     with self.assertRaises(ProtocolError) as raised:
+#         client.send_close(reason="going away")
+#     self.assertEqual(str(raised.exception), "cannot send a reason without a code")
+#
+# def test_server_sends_close_with_reason_only(self):
+#     server = Protocol(SERVER)
+#     with self.assertRaises(ProtocolError) as raised:
+#         server.send_close(reason="OK")
+#     self.assertEqual(str(raised.exception), "cannot send a reason without a code")
+#
+# def test_client_receives_close_with_truncated_code(self):
+#     client = Protocol(CLIENT)
+#     client.receive_data(b"\x88\x01\x03")
+#     self.assertIsInstance(client.parser_exc, ProtocolError)
+#     self.assertEqual(str(client.parser_exc), "close frame too short")
+#     self.assertConnectionFailing(
+#         client, CloseCode.PROTOCOL_ERROR, "close frame too short"
+#     )
+#     self.assertIs(client.state, CLOSING)
+#
+# def test_server_receives_close_with_truncated_code(self):
+#     server = Protocol(SERVER)
+#     server.receive_data(b"\x88\x81\x00\x00\x00\x00\x03")
+#     self.assertIsInstance(server.parser_exc, ProtocolError)
+#     self.assertEqual(str(server.parser_exc), "close frame too short")
+#     self.assertConnectionFailing(
+#         server, CloseCode.PROTOCOL_ERROR, "close frame too short"
+#     )
+#     self.assertIs(server.state, CLOSING)
+#
+# def test_client_receives_close_with_non_utf8_reason(self):
+#     client = Protocol(CLIENT)
+#
+#     client.receive_data(b"\x88\x04\x03\xe8\xff\xff")
+#     self.assertIsInstance(client.parser_exc, UnicodeDecodeError)
+#     self.assertEqual(
+#         str(client.parser_exc),
+#         "'utf-8' codec can't decode byte 0xff in position 0: invalid start byte",
+#     )
+#     self.assertConnectionFailing(
+#         client, CloseCode.INVALID_DATA, "invalid start byte at position 0"
+#     )
+#     self.assertIs(client.state, CLOSING)
+#
+# def test_server_receives_close_with_non_utf8_reason(self):
+#     server = Protocol(SERVER)
+#
+#     server.receive_data(b"\x88\x84\x00\x00\x00\x00\x03\xe9\xff\xff")
+#     self.assertIsInstance(server.parser_exc, UnicodeDecodeError)
+#     self.assertEqual(
+#         str(server.parser_exc),
+#         "'utf-8' codec can't decode byte 0xff in position 0: invalid start byte",
+#     )
+#     self.assertConnectionFailing(
+#         server, CloseCode.INVALID_DATA, "invalid start byte at position 0"
+#     )
+#     self.assertIs(server.state, CLOSING)
+#
+# def test_client_sends_close_twice(self):
+#     client = Protocol(CLIENT)
+#     with self.enforce_mask(b"\x00\x00\x00\x00"):
+#         client.send_close(CloseCode.GOING_AWAY)
+#     self.assertEqual(client.data_to_send(), [b"\x88\x82\x00\x00\x00\x00\x03\xe9"])
+#     with self.assertRaises(InvalidState) as raised:
+#         client.send_close(CloseCode.GOING_AWAY)
+#     self.assertEqual(str(raised.exception), "connection is closing")
+#
+# def test_server_sends_close_twice(self):
+#     server = Protocol(SERVER)
+#     server.send_close(CloseCode.NORMAL_CLOSURE)
+#     self.assertEqual(server.data_to_send(), [b"\x88\x02\x03\xe8"])
+#     with self.assertRaises(InvalidState) as raised:
+#         server.send_close(CloseCode.NORMAL_CLOSURE)
+#     self.assertEqual(str(raised.exception), "connection is closing")
+#
+# def test_client_sends_close_after_connection_is_closed(self):
+#     client = Protocol(CLIENT)
+#     client.receive_eof()
+#     with self.assertRaises(InvalidState) as raised:
+#         client.send_close(CloseCode.GOING_AWAY)
+#     self.assertEqual(str(raised.exception), "connection is closed")
+#
+# def test_server_sends_close_after_connection_is_closed(self):
+#     server = Protocol(SERVER)
+#     server.receive_eof()
+#     with self.assertRaises(InvalidState) as raised:
+#         server.send_close(CloseCode.NORMAL_CLOSURE)
+#     self.assertEqual(str(raised.exception), "connection is closed")
+#
