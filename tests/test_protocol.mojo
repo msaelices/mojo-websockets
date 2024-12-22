@@ -11,6 +11,7 @@ from websockets.frames import (
     # CLOSE_CODE_MESSAGE_TOO_BIG,
     CLOSE_CODE_NORMAL_CLOSURE,
     CLOSE_CODE_PROTOCOL_ERROR,
+    OP_BINARY,
     OP_CONT,
     OP_TEXT,
     OP_CLOSE,
@@ -614,204 +615,259 @@ fn test_client_sends_binary() raises:
     assert_equal(client.data_to_send(), Bytes(130, 132, 0, 0, 0, 0, 1, 2, 254, 255))
 
 
+fn test_server_sends_binary() raises:
+    """The test verifies that a server can properly send binary data without masking."""
+    server = DummyProtocol[False, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    send_binary(server, Bytes(1, 2, 254, 255))
+    assert_equal(server.data_to_send(), Bytes(130, 4, 1, 2, 254, 255))
+
+
+fn test_client_receives_binary() raises:
+    """The test verifies that a client can properly receive binary data."""
+    client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    receive_data(client, Bytes(130, 4, 1, 2, 254, 255))
+    events = client.events_received()
+    assert_equal(events[0][Frame], Frame(OP_BINARY, Bytes(1, 2, 254, 255)))
+
+
+fn test_server_receives_binary() raises:
+    """The test verifies that a server can properly receive binary data."""
+    server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    receive_data(server, Bytes(130, 132, 0, 0, 0, 0, 1, 2, 254, 255))
+    events = server.events_received()
+    assert_equal(events[0][Frame], Frame(OP_BINARY, Bytes(1, 2, 254, 255)))
+
+
+# TODO: Implement the max_size in the protocol
+# fn test_client_receives_binary_over_size_limit() raises:
+#     """The test verifies that a client properly handles binary data exceeding size limits."""
+#     client = DummyProtocol[False, CLIENT, max_size=3](OPEN, StreamReader(), Bytes(), List[Event]())
+#     receive_data(client, Bytes(130, 4, 1, 2, 254, 255))
+#     assert_equal(client.parser_exc.value()._message(), "PayloadTooBig: over size limit (4 > 3 bytes)")
+#     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_MESSAGE_TOO_BIG, "over size limit (4 > 3 bytes)").serialize(), fin=True))
+
+# TODO: Implement the max_size in the protocol
+# fn test_server_receives_binary_over_size_limit() raises:
+#     """The test verifies that a server properly handles binary data exceeding size limits."""
+#     server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+#     receive_data(server, Bytes(130, 132, 0, 0, 0, 0, 1, 2, 254, 255))
+#     events = server.events_received()
+#     assert_equal(server.parser_exc.value()._message(), "PayloadTooBig: over size limit (4 > 3 bytes)")
+#     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_MESSAGE_TOO_BIG, "over size limit (4 > 3 bytes)").serialize(), fin=True))
+
+
+fn test_client_sends_fragmented_binary() raises:
+    """The test verifies that a client can properly fragment and send binary data with masking."""
+    client = DummyProtocol[True, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 0, 0, 0)
+    
+    # First fragment
+    send_binary[gen_mask_func=gen_mask](client, Bytes(1, 2), fin=False)
+    assert_equal(client.data_to_send(), Bytes(2, 130, 0, 0, 0, 0, 1, 2))
+    
+    # Second fragment
+    send_continuation[gen_mask_func=gen_mask](client, Bytes(238, 255, 1, 2), fin=False)
+    assert_equal(client.data_to_send(), Bytes(0, 132, 0, 0, 0, 0, 238, 255, 1, 2))
+    
+    # Final fragment
+    send_continuation[gen_mask_func=gen_mask](client, Bytes(238, 255), fin=True)
+    assert_equal(client.data_to_send(), Bytes(128, 130, 0, 0, 0, 0, 238, 255))
+
+
+fn test_server_sends_fragmented_binary() raises:
+    """The test verifies that a server can properly fragment and send binary data without masking."""
+    server = DummyProtocol[False, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    
+    # First fragment
+    send_binary(server, Bytes(1, 2), fin=False)
+    assert_equal(server.data_to_send(), Bytes(2, 2, 1, 2))
+    
+    # Second fragment
+    send_continuation(server, Bytes(238, 255, 1, 2), fin=False)
+    assert_equal(server.data_to_send(), Bytes(0, 4, 238, 255, 1, 2))
+    
+    # Final fragment
+    send_continuation(server, Bytes(238, 255), fin=True)
+    assert_equal(server.data_to_send(), Bytes(128, 2, 238, 255))
+
+
+fn test_client_receives_fragmented_binary() raises:
+    """The test verifies that a client can properly receive fragmented binary data."""
+    client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    
+    # First fragment
+    receive_data(client, Bytes(2, 2, 1, 2))
+    events = client.events_received()
+    assert_equal(events[0][Frame], Frame(OP_BINARY, Bytes(1, 2), fin=False))
+    
+    # Second fragment
+    receive_data(client, Bytes(0, 4, 254, 255, 1, 2))
+    events = client.events_received()
+    assert_equal(events[0][Frame], Frame(OP_CONT, Bytes(254, 255, 1, 2), fin=False))
+    
+    # Final fragment
+    receive_data(client, Bytes(128, 2, 254, 255))
+    events = client.events_received()
+    assert_equal(events[0][Frame], Frame(OP_CONT, Bytes(254, 255)))
+
+
+fn test_server_receives_fragmented_binary() raises:
+    """The test verifies that a server can properly receive fragmented binary data."""
+    server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    
+    # First fragment
+    receive_data(server, Bytes(2, 130, 0, 0, 0, 0, 1, 2))
+    events = server.events_received()
+    assert_equal(events[0][Frame], Frame(OP_BINARY, Bytes(1, 2), fin=False))
+    
+    # Second fragment
+    receive_data(server, Bytes(0, 132, 0, 0, 0, 0, 238, 255, 1, 2))
+    events = server.events_received()
+    assert_equal(events[0][Frame], Frame(OP_CONT, Bytes(238, 255, 1, 2), fin=False))
+    
+    # Final fragment
+    receive_data(server, Bytes(128, 130, 0, 0, 0, 0, 254, 255))
+    events = server.events_received()
+    assert_equal(events[0][Frame], Frame(OP_CONT, Bytes(254, 255)))
+
+
+# TODO: Implement the max_size in the protocol
+# fn test_client_receives_fragmented_binary_over_size_limit() raises:
+#     """The test verifies that a client properly handles fragmented binary data exceeding size limits."""
+#     client = DummyProtocol[False, CLIENT, max_size=3](OPEN, StreamReader(), Bytes(), List[Event]())
+#     
+#     # First fragment
+#     receive_data(client, Bytes(2, 2, 1, 2))
+#     events = client.events_received()
+#     assert_equal(events[0][Frame], Frame(OP_BINARY, Bytes(1, 2), fin=False))
+#     
+#     # Second fragment exceeds size limit
+#     receive_data(client, Bytes(128, 2, 254, 255))
+#     events = client.events_received()
+#     assert_equal(client.parser_exc.value()._message(), "PayloadTooBig: over size limit (2 > 1 bytes)")
+#     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_MESSAGE_TOO_BIG, "over size limit (2 > 1 bytes)").serialize(), fin=True))
+
+# TODO: Implement the max_size in the protocol
+# fn test_server_receives_fragmented_binary_over_size_limit() raises:
+#     """The test verifies that a server properly handles fragmented binary data exceeding size limits."""
+#     server = DummyProtocol[True, SERVER, max_size=3](OPEN, StreamReader(), Bytes(), List[Event]())
+#     
+#     # First fragment
+#     receive_data(server, Bytes(2, 130, 0, 0, 0, 0, 1, 2))
+#     events = server.events_received()
+#     assert_equal(events[0][Frame], Frame(OP_BINARY, Bytes(1, 2), fin=False))
+#     
+#     # Second fragment exceeds size limit
+#     receive_data(server, Bytes(128, 130, 0, 0, 0, 0, 254, 255))
+#     events = server.events_received()
+#     assert_equal(server.parser_exc.value()._message(), "PayloadTooBig: over size limit (2 > 1 bytes)")
+#     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_MESSAGE_TOO_BIG, "over size limit (2 > 1 bytes)").serialize(), fin=True))
 #
-# def test_server_sends_binary(self):
-#     server = Protocol(SERVER)
-#     server.send_binary(b"\x01\x02\xfe\xff")
-#     self.assertEqual(server.data_to_send(), [b"\x82\x04\x01\x02\xfe\xff"])
-#
-# def test_client_receives_binary(self):
-#     client = Protocol(CLIENT)
-#     client.receive_data(b"\x82\x04\x01\x02\xfe\xff")
-#     self.assertFrameReceived(
-#         client,
-#         Frame(OP_BINARY, b"\x01\x02\xfe\xff"),
-#     )
-#
-# def test_server_receives_binary(self):
-#     server = Protocol(SERVER)
-#     server.receive_data(b"\x82\x84\x00\x00\x00\x00\x01\x02\xfe\xff")
-#     self.assertFrameReceived(
-#         server,
-#         Frame(OP_BINARY, b"\x01\x02\xfe\xff"),
-#     )
-#
-# def test_client_receives_binary_over_size_limit(self):
-#     client = Protocol(CLIENT, max_size=3)
-#     client.receive_data(b"\x82\x04\x01\x02\xfe\xff")
-#     self.assertIsInstance(client.parser_exc, PayloadTooBig)
-#     self.assertEqual(str(client.parser_exc), "over size limit (4 > 3 bytes)")
-#     self.assertConnectionFailing(
-#         client, CloseCode.MESSAGE_TOO_BIG, "over size limit (4 > 3 bytes)"
-#     )
-#
-# def test_server_receives_binary_over_size_limit(self):
-#     server = Protocol(SERVER, max_size=3)
-#     server.receive_data(b"\x82\x84\x00\x00\x00\x00\x01\x02\xfe\xff")
-#     self.assertIsInstance(server.parser_exc, PayloadTooBig)
-#     self.assertEqual(str(server.parser_exc), "over size limit (4 > 3 bytes)")
-#     self.assertConnectionFailing(
-#         server, CloseCode.MESSAGE_TOO_BIG, "over size limit (4 > 3 bytes)"
-#     )
-#
-# def test_client_sends_fragmented_binary(self):
-#     client = Protocol(CLIENT)
-#     with self.enforce_mask(b"\x00\x00\x00\x00"):
-#         client.send_binary(b"\x01\x02", fin=False)
-#     self.assertEqual(client.data_to_send(), [b"\x02\x82\x00\x00\x00\x00\x01\x02"])
-#     with self.enforce_mask(b"\x00\x00\x00\x00"):
-#         client.send_continuation(b"\xee\xff\x01\x02", fin=False)
-#     self.assertEqual(
-#         client.data_to_send(), [b"\x00\x84\x00\x00\x00\x00\xee\xff\x01\x02"]
-#     )
-#     with self.enforce_mask(b"\x00\x00\x00\x00"):
-#         client.send_continuation(b"\xee\xff", fin=True)
-#     self.assertEqual(client.data_to_send(), [b"\x80\x82\x00\x00\x00\x00\xee\xff"])
-#
-# def test_server_sends_fragmented_binary(self):
-#     server = Protocol(SERVER)
-#     server.send_binary(b"\x01\x02", fin=False)
-#     self.assertEqual(server.data_to_send(), [b"\x02\x02\x01\x02"])
-#     server.send_continuation(b"\xee\xff\x01\x02", fin=False)
-#     self.assertEqual(server.data_to_send(), [b"\x00\x04\xee\xff\x01\x02"])
-#     server.send_continuation(b"\xee\xff", fin=True)
-#     self.assertEqual(server.data_to_send(), [b"\x80\x02\xee\xff"])
-#
-# def test_client_receives_fragmented_binary(self):
-#     client = Protocol(CLIENT)
-#     client.receive_data(b"\x02\x02\x01\x02")
-#     self.assertFrameReceived(
-#         client,
-#         Frame(OP_BINARY, b"\x01\x02", fin=False),
-#     )
-#     client.receive_data(b"\x00\x04\xfe\xff\x01\x02")
-#     self.assertFrameReceived(
-#         client,
-#         Frame(OP_CONT, b"\xfe\xff\x01\x02", fin=False),
-#     )
-#     client.receive_data(b"\x80\x02\xfe\xff")
-#     self.assertFrameReceived(
-#         client,
-#         Frame(OP_CONT, b"\xfe\xff"),
-#     )
-#
-# def test_server_receives_fragmented_binary(self):
-#     server = Protocol(SERVER)
-#     server.receive_data(b"\x02\x82\x00\x00\x00\x00\x01\x02")
-#     self.assertFrameReceived(
-#         server,
-#         Frame(OP_BINARY, b"\x01\x02", fin=False),
-#     )
-#     server.receive_data(b"\x00\x84\x00\x00\x00\x00\xee\xff\x01\x02")
-#     self.assertFrameReceived(
-#         server,
-#         Frame(OP_CONT, b"\xee\xff\x01\x02", fin=False),
-#     )
-#     server.receive_data(b"\x80\x82\x00\x00\x00\x00\xfe\xff")
-#     self.assertFrameReceived(
-#         server,
-#         Frame(OP_CONT, b"\xfe\xff"),
-#     )
-#
-# def test_client_receives_fragmented_binary_over_size_limit(self):
-#     client = Protocol(CLIENT, max_size=3)
-#     client.receive_data(b"\x02\x02\x01\x02")
-#     self.assertFrameReceived(
-#         client,
-#         Frame(OP_BINARY, b"\x01\x02", fin=False),
-#     )
-#     client.receive_data(b"\x80\x02\xfe\xff")
-#     self.assertIsInstance(client.parser_exc, PayloadTooBig)
-#     self.assertEqual(str(client.parser_exc), "over size limit (2 > 1 bytes)")
-#     self.assertConnectionFailing(
-#         client, CloseCode.MESSAGE_TOO_BIG, "over size limit (2 > 1 bytes)"
-#     )
-#
-# def test_server_receives_fragmented_binary_over_size_limit(self):
-#     server = Protocol(SERVER, max_size=3)
-#     server.receive_data(b"\x02\x82\x00\x00\x00\x00\x01\x02")
-#     self.assertFrameReceived(
-#         server,
-#         Frame(OP_BINARY, b"\x01\x02", fin=False),
-#     )
-#     server.receive_data(b"\x80\x82\x00\x00\x00\x00\xfe\xff")
-#     self.assertIsInstance(server.parser_exc, PayloadTooBig)
-#     self.assertEqual(str(server.parser_exc), "over size limit (2 > 1 bytes)")
-#     self.assertConnectionFailing(
-#         server, CloseCode.MESSAGE_TOO_BIG, "over size limit (2 > 1 bytes)"
-#     )
-#
-# def test_client_sends_unexpected_binary(self):
-#     client = Protocol(CLIENT)
-#     client.send_binary(b"", fin=False)
-#     with self.assertRaises(ProtocolError) as raised:
-#         client.send_binary(b"", fin=False)
-#     self.assertEqual(str(raised.exception), "expected a continuation frame")
-#
-# def test_server_sends_unexpected_binary(self):
-#     server = Protocol(SERVER)
-#     server.send_binary(b"", fin=False)
-#     with self.assertRaises(ProtocolError) as raised:
-#         server.send_binary(b"", fin=False)
-#     self.assertEqual(str(raised.exception), "expected a continuation frame")
-#
-# def test_client_receives_unexpected_binary(self):
-#     client = Protocol(CLIENT)
-#     client.receive_data(b"\x02\x00")
-#     self.assertFrameReceived(
-#         client,
-#         Frame(OP_BINARY, b"", fin=False),
-#     )
-#     client.receive_data(b"\x02\x00")
-#     self.assertIsInstance(client.parser_exc, ProtocolError)
-#     self.assertEqual(str(client.parser_exc), "expected a continuation frame")
-#     self.assertConnectionFailing(
-#         client, CloseCode.PROTOCOL_ERROR, "expected a continuation frame"
-#     )
-#
-# def test_server_receives_unexpected_binary(self):
-#     server = Protocol(SERVER)
-#     server.receive_data(b"\x02\x80\x00\x00\x00\x00")
-#     self.assertFrameReceived(
-#         server,
-#         Frame(OP_BINARY, b"", fin=False),
-#     )
-#     server.receive_data(b"\x02\x80\x00\x00\x00\x00")
-#     self.assertIsInstance(server.parser_exc, ProtocolError)
-#     self.assertEqual(str(server.parser_exc), "expected a continuation frame")
-#     self.assertConnectionFailing(
-#         server, CloseCode.PROTOCOL_ERROR, "expected a continuation frame"
-#     )
-#
-# def test_client_sends_binary_after_sending_close(self):
-#     client = Protocol(CLIENT)
-#     with self.enforce_mask(b"\x00\x00\x00\x00"):
-#         client.send_close(CloseCode.GOING_AWAY)
-#     self.assertEqual(client.data_to_send(), [b"\x88\x82\x00\x00\x00\x00\x03\xe9"])
-#     with self.assertRaises(InvalidState) as raised:
-#         client.send_binary(b"")
-#     self.assertEqual(str(raised.exception), "connection is closing")
-#
-# def test_server_sends_binary_after_sending_close(self):
-#     server = Protocol(SERVER)
-#     server.send_close(CloseCode.NORMAL_CLOSURE)
-#     self.assertEqual(server.data_to_send(), [b"\x88\x02\x03\xe8"])
-#     with self.assertRaises(InvalidState) as raised:
-#         server.send_binary(b"")
-#     self.assertEqual(str(raised.exception), "connection is closing")
-#
-# def test_client_receives_binary_after_receiving_close(self):
-#     client = Protocol(CLIENT)
-#     client.receive_data(b"\x88\x02\x03\xe8")
-#     self.assertConnectionClosing(client, CloseCode.NORMAL_CLOSURE)
-#     client.receive_data(b"\x82\x00")
-#     self.assertFrameReceived(client, None)
-#     self.assertFrameSent(client, None)
-#
-# def test_server_receives_binary_after_receiving_close(self):
-#     server = Protocol(SERVER)
-#     server.receive_data(b"\x88\x82\x00\x00\x00\x00\x03\xe9")
-#     self.assertConnectionClosing(server, CloseCode.GOING_AWAY)
-#     server.receive_data(b"\x82\x80\x00\xff\x00\xff")
-#     self.assertFrameReceived(server, None)
-#     self.assertFrameSent(server, None)
+
+fn test_client_sends_unexpected_binary() raises:
+    """The test verifies that a client cannot send a binary frame after sending a binary frame without the FIN bit set."""
+    client = DummyProtocol[True, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 0, 0, 0)
+    send_binary[gen_mask_func=gen_mask](client, Bytes(), fin=False)
+    with assert_raises(contains="ProtocolError: expected a continuation frame"):
+        send_binary[gen_mask_func=gen_mask](client, Bytes(), fin=False)
+
+
+fn test_server_sends_unexpected_binary() raises:
+    """The test verifies that a server cannot send a binary frame after sending a binary frame without the FIN bit set."""
+    server = DummyProtocol[False, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    send_binary(server, Bytes(), fin=False)
+    with assert_raises(contains="ProtocolError: expected a continuation frame"):
+        send_binary(server, Bytes(), fin=False)
+
+
+fn test_client_receives_unexpected_binary() raises:
+    """The test verifies that a client properly handles receiving an unexpected binary frame."""
+    client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    
+    # First binary frame without FIN bit
+    receive_data(client, Bytes(2, 0))
+    events = client.events_received()
+    assert_equal(events[0][Frame], Frame(OP_BINARY, Bytes(), fin=False))
+    
+    # Second unexpected binary frame
+    receive_data(client, Bytes(2, 0))
+    events = client.events_received()
+    assert_equal(client.parser_exc.value()._message(), "ProtocolError: expected a continuation frame")
+    assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: expected a continuation frame").serialize(), fin=True))
+
+
+fn test_server_receives_unexpected_binary() raises:
+    """The test verifies that a server properly handles receiving an unexpected binary frame."""
+    server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    
+    # First binary frame without FIN bit
+    receive_data(server, Bytes(2, 128, 0, 0, 0, 0))
+    events = server.events_received()
+    assert_equal(events[0][Frame], Frame(OP_BINARY, Bytes(), fin=False))
+    
+    # Second unexpected binary frame
+    receive_data(server, Bytes(2, 128, 0, 0, 0, 0))
+    events = server.events_received()
+    assert_equal(server.get_parser_exc().value()._message(), "ProtocolError: expected a continuation frame")
+    assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: expected a continuation frame").serialize(), fin=True))
+
+
+fn test_client_sends_binary_after_sending_close() raises:
+    """The test verifies that a client cannot send binary frames after sending a close frame."""
+    client = DummyProtocol[True, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 0, 0, 0)
+    send_close[gen_mask_func=gen_mask](client, CLOSE_CODE_GOING_AWAY)
+    assert_equal(client.data_to_send(), Bytes(136, 130, 0, 0, 0, 0, 3, 233))
+    with assert_raises(contains="InvalidState: connection is 2"):
+        send_binary[gen_mask_func=gen_mask](client, Bytes())
+
+
+fn test_server_sends_binary_after_sending_close() raises:
+    """The test verifies that a server cannot send binary frames after sending a close frame."""
+    server = DummyProtocol[False, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    send_close(server, CLOSE_CODE_NORMAL_CLOSURE)
+    assert_equal(server.data_to_send(), Bytes(136, 2, 3, 232))
+    with assert_raises(contains="InvalidState: connection is 2"):
+        send_binary(server, Bytes())
+
+
+fn test_client_receives_binary_after_receiving_close() raises:
+    """The test verifies that a client properly ignores binary frames after receiving a close frame."""
+    client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    
+    # Receive close frame
+    receive_data(client, Bytes(136, 2, 3, 232))
+    events = client.events_received()
+    close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_NORMAL_CLOSURE, "").serialize(), fin=True)
+    assert_equal(events[0][Frame], close_frame)
+    assert_equal(client.data_to_send(), close_frame.serialize[gen_mask_func=gen_mask](mask=client.is_masked()))
+    
+    # Receive binary frame after close
+    receive_data(client, Bytes(130, 0))
+    events = client.events_received()
+    assert_equal(len(events), 0)
+    assert_equal(client.data_to_send(), Bytes())
+
+
+fn test_server_receives_binary_after_receiving_close() raises:
+    """The test verifies that a server properly ignores binary frames after receiving a close frame."""
+    server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 0, 0, 0)
+    # Receive close frame
+    receive_data[gen_mask_func=gen_mask](server, Bytes(136, 130, 0, 0, 0, 0, 3, 233))
+    events = server.events_received()
+    close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_GOING_AWAY, "").serialize(), fin=True)
+    assert_equal(events[0][Frame], close_frame)
+    assert_equal(server.data_to_send(), close_frame.serialize[gen_mask_func=gen_mask](mask=server.is_masked()))
+    
+    # Receive binary frame after close
+    receive_data(server, Bytes(130, 128, 0, 255, 0, 255))
+    events = server.events_received()
+    assert_equal(len(events), 0)
+    assert_equal(server.data_to_send(), Bytes())
