@@ -40,7 +40,7 @@ alias smiley_masked_text_frame_data = Bytes(129, 132, 0, 0, 0, 0) + smiley_data
 
 @value
 struct DummyProtocol[masked: Bool, side_param: Int](Protocol):
-    """Protocol that does not mask frames."""
+    """Protocol struct for testing purposes."""
     alias side = side_param
     var state: Int
     var reader: StreamReader
@@ -173,6 +173,11 @@ struct DummyProtocol[masked: Bool, side_param: Int](Protocol):
         self.parser_exc = exc
 
 
+# ===-------------------------------------------------------------------===#
+# Test frame masking.
+# ===-------------------------------------------------------------------===#
+
+
 fn test_client_receives_unmasked_frame() raises:
     reader = StreamReader()
     writes = Bytes()
@@ -223,6 +228,11 @@ fn test_server_receives_unmasked_frame() raises:
     receive_data(server, unmasked_text_frame_data)
     events = server.events_received()
     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: incorrect masking").serialize(), fin=True))
+
+
+# ===-------------------------------------------------------------------===#
+# Test continuation frames without text or binary frames.
+# ===-------------------------------------------------------------------===#
 
 
 fn test_client_sends_unexpected_continuation() raises:
@@ -307,6 +317,11 @@ fn test_server_receives_continuation_after_receiving_close() raises:
     events = server.events_received()
     assert_equal(len(events), 0)
     assert_equal(server.data_to_send(), Bytes())
+
+
+# ===-------------------------------------------------------------------===#
+# Test text frames and continuation frames.
+# ===-------------------------------------------------------------------===#
 
 
 fn test_client_sends_text() raises:
@@ -582,3 +597,8 @@ fn test_server_receives_text_after_receiving_close() raises:
     events = server.events_received()
     assert_equal(len(events), 0)
     assert_equal(server.data_to_send(), Bytes())
+
+
+# ===-------------------------------------------------------------------===#
+# Test binary frames and continuation frames.
+# ===-------------------------------------------------------------------===#
