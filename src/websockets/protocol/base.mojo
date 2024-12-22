@@ -403,3 +403,35 @@ fn send_close[
 
     protocol.set_close_sent(close)
     protocol.set_state(CLOSING)
+
+
+fn send_binary[
+    T: Protocol,
+    gen_mask_func: fn () -> Bytes = gen_mask,
+](mut protocol: T, data: Bytes, fin: Bool = True) raises -> None:
+    """
+    Send a `Binary frame`_.
+
+    .. _Binary frame:
+        https://datatracker.ietf.org/doc/html/rfc6455#section-5.6
+
+    Parameters:
+        T: Protocol.
+        gen_mask_func: Function to generate a mask.
+
+    Args:
+        protocol: Protocol instance.
+        data: Payload containing arbitrary binary data.
+        fin: FIN bit; set it to :obj:`False` if this is the first frame of
+            a fragmented message.
+
+    Raises:
+        ProtocolError: If a fragmented message is in progress.
+    """
+    if protocol.expect_continuation_frame():
+        raise Error("ProtocolError: expected a continuation frame")
+    if protocol.get_state() != OPEN:
+        raise Error("InvalidState: connection is {}".format(protocol.get_state()))
+    protocol.set_expect_continuation_frame(not fin)
+    send_frame[gen_mask_func=gen_mask_func](protocol, Frame(OP_BINARY, data, fin))
+
