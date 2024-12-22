@@ -349,7 +349,8 @@ fn discard[T: Protocol](mut protocol: T) raises:
     if T.side == CLIENT:
         if protocol.get_state() != CONNECTING:
             send_eof(protocol)
-    protocol.set_state(CLOSED)
+    if reader.at_eof():
+        protocol.set_state(CLOSED)
 
     # TODO: Implement the equivalent of the following Python code:
     # # If discard() completes normally, execution ends here.
