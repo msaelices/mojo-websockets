@@ -546,18 +546,39 @@ fn test_server_sends_text_after_sending_close() raises:
         send_text(server, Bytes())
 
 
-# def test_client_receives_text_after_receiving_close(self):
-#     client = Protocol(CLIENT)
-#     client.receive_data(b"\x88\x02\x03\xe8")
-#     self.assertConnectionClosing(client, CloseCode.NORMAL_CLOSURE)
-#     client.receive_data(b"\x81\x00")
-#     self.assertFrameReceived(client, None)
-#     self.assertFrameSent(client, None)
-#
-# def test_server_receives_text_after_receiving_close(self):
-#     server = Protocol(SERVER)
-#     server.receive_data(b"\x88\x82\x00\x00\x00\x00\x03\xe9")
-#     self.assertConnectionClosing(server, CloseCode.GOING_AWAY)
-#     server.receive_data(b"\x81\x80\x00\xff\x00\xff")
-#     self.assertFrameReceived(server, None)
-#     self.assertFrameSent(server, None)
+fn test_client_receives_text_after_receiving_close() raises:
+    """The test verifies that a client properly ignores text frames after receiving a close frame."""
+    client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    
+    # Receive close frame
+    receive_data(client, Bytes(136, 2, 3, 232))
+    events = client.events_received()
+    close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_NORMAL_CLOSURE, "").serialize(), fin=True)
+    assert_equal(events[0][Frame], close_frame)
+    assert_equal(client.data_to_send(), close_frame.serialize[gen_mask_func=gen_mask](mask=client.is_masked()))
+    
+    # Receive text frame after close
+    receive_data(client, Bytes(129, 0))
+    events = client.events_received()
+    assert_equal(len(events), 0)
+    assert_equal(client.data_to_send(), Bytes())
+
+
+fn test_server_receives_text_after_receiving_close() raises:
+    """The test verifies that a server properly ignores text frames after receiving a close frame."""
+    server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 0, 0, 0)
+    # Receive close frame
+    receive_data[gen_mask_func=gen_mask](server, Bytes(136, 130, 0, 0, 0, 0, 3, 233))
+    events = server.events_received()
+    close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_GOING_AWAY, "").serialize(), fin=True)
+    assert_equal(events[0][Frame], close_frame)
+    assert_equal(server.data_to_send(), close_frame.serialize[gen_mask_func=gen_mask](mask=server.is_masked()))
+    
+    # Receive text frame after close
+    receive_data(server, Bytes(129, 128, 0, 255, 0, 255))
+    events = server.events_received()
+    assert_equal(len(events), 0)
+    assert_equal(server.data_to_send(), Bytes())
