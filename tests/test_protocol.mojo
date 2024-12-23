@@ -24,6 +24,7 @@ from websockets.protocol.base import (
     send_binary,
     send_close,
     send_continuation,
+    send_ping,
     send_text, 
     Protocol,
 )
@@ -1262,3 +1263,165 @@ fn test_server_sends_close_after_connection_is_closed() raises:
     with assert_raises(contains="InvalidState: connection is not open but 3"):
         send_close(server, CLOSE_CODE_NORMAL_CLOSURE)
 
+
+# ===-------------------------------------------------------------------===#
+# Test ping. See 5.5.2. Ping in RFC 6455.
+# ===-------------------------------------------------------------------===#
+
+
+fn test_client_sends_ping() raises:
+    """Test that client properly sends a ping frame."""
+    client = DummyProtocol[True, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 68, 136, 204)  # \x00\x44\x88\xcc
+    send_ping[gen_mask_func=gen_mask](client, Bytes())
+    assert_equal(client.data_to_send(), Bytes(137, 128, 0, 68, 136, 204))  # \x89\x80\x00\x44\x88\xcc
+
+
+fn test_server_sends_ping() raises:
+    """Test that server properly sends a ping frame."""
+    server = DummyProtocol[False, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    send_ping(server, Bytes())
+    assert_equal(server.data_to_send(), Bytes(137, 0))  # \x89\x00
+
+
+# def test_client_receives_ping(self):
+#     client = Protocol(CLIENT)
+#     client.receive_data(b"\x89\x00")
+#     self.assertFrameReceived(
+#         client,
+#         Frame(OP_PING, b""),
+#     )
+#     self.assertFrameSent(
+#         client,
+#         Frame(OP_PONG, b""),
+#     )
+
+# def test_server_receives_ping(self):
+#     server = Protocol(SERVER)
+#     server.receive_data(b"\x89\x80\x00\x44\x88\xcc")
+#     self.assertFrameReceived(
+#         server,
+#         Frame(OP_PING, b""),
+#     )
+#     self.assertFrameSent(
+#         server,
+#         Frame(OP_PONG, b""),
+#     )
+
+# def test_client_sends_ping_with_data(self):
+#     client = Protocol(CLIENT)
+#     with self.enforce_mask(b"\x00\x44\x88\xcc"):
+#         client.send_ping(b"\x22\x66\xaa\xee")
+#     self.assertEqual(
+#         client.data_to_send(), [b"\x89\x84\x00\x44\x88\xcc\x22\x22\x22\x22"]
+#     )
+
+# def test_server_sends_ping_with_data(self):
+#     server = Protocol(SERVER)
+#     server.send_ping(b"\x22\x66\xaa\xee")
+#     self.assertEqual(server.data_to_send(), [b"\x89\x04\x22\x66\xaa\xee"])
+
+# def test_client_receives_ping_with_data(self):
+#     client = Protocol(CLIENT)
+#     client.receive_data(b"\x89\x04\x22\x66\xaa\xee")
+#     self.assertFrameReceived(
+#         client,
+#         Frame(OP_PING, b"\x22\x66\xaa\xee"),
+#     )
+#     self.assertFrameSent(
+#         client,
+#         Frame(OP_PONG, b"\x22\x66\xaa\xee"),
+#     )
+
+# def test_server_receives_ping_with_data(self):
+#     server = Protocol(SERVER)
+#     server.receive_data(b"\x89\x84\x00\x44\x88\xcc\x22\x22\x22\x22")
+#     self.assertFrameReceived(
+#         server,
+#         Frame(OP_PING, b"\x22\x66\xaa\xee"),
+#     )
+#     self.assertFrameSent(
+#         server,
+#         Frame(OP_PONG, b"\x22\x66\xaa\xee"),
+#     )
+
+# def test_client_sends_fragmented_ping_frame(self):
+#     client = Protocol(CLIENT)
+#     # This is only possible through a private API.
+#     with self.assertRaises(ProtocolError) as raised:
+#         client.send_frame(Frame(OP_PING, b"", fin=False))
+#     self.assertEqual(str(raised.exception), "fragmented control frame")
+
+# def test_server_sends_fragmented_ping_frame(self):
+#     server = Protocol(SERVER)
+#     # This is only possible through a private API.
+#     with self.assertRaises(ProtocolError) as raised:
+#         server.send_frame(Frame(OP_PING, b"", fin=False))
+#     self.assertEqual(str(raised.exception), "fragmented control frame")
+
+# def test_client_receives_fragmented_ping_frame(self):
+#     client = Protocol(CLIENT)
+#     client.receive_data(b"\x09\x00")
+#     self.assertIsInstance(client.parser_exc, ProtocolError)
+#     self.assertEqual(str(client.parser_exc), "fragmented control frame")
+#     self.assertConnectionFailing(
+#         client, CloseCode.PROTOCOL_ERROR, "fragmented control frame"
+#     )
+
+# def test_server_receives_fragmented_ping_frame(self):
+#     server = Protocol(SERVER)
+#     server.receive_data(b"\x09\x80\x3c\x3c\x3c\x3c")
+#     self.assertIsInstance(server.parser_exc, ProtocolError)
+#     self.assertEqual(str(server.parser_exc), "fragmented control frame")
+#     self.assertConnectionFailing(
+#         server, CloseCode.PROTOCOL_ERROR, "fragmented control frame"
+#     )
+
+# def test_client_sends_ping_after_sending_close(self):
+#     client = Protocol(CLIENT)
+#     with self.enforce_mask(b"\x00\x00\x00\x00"):
+#         client.send_close(CloseCode.GOING_AWAY)
+#     self.assertEqual(client.data_to_send(), [b"\x88\x82\x00\x00\x00\x00\x03\xe9"])
+#     with self.enforce_mask(b"\x00\x44\x88\xcc"):
+#         client.send_ping(b"")
+#     self.assertEqual(client.data_to_send(), [b"\x89\x80\x00\x44\x88\xcc"])
+
+# def test_server_sends_ping_after_sending_close(self):
+#     server = Protocol(SERVER)
+#     server.send_close(CloseCode.NORMAL_CLOSURE)
+#     self.assertEqual(server.data_to_send(), [b"\x88\x02\x03\xe8"])
+#     server.send_ping(b"")
+#     self.assertEqual(server.data_to_send(), [b"\x89\x00"])
+
+# def test_client_receives_ping_after_receiving_close(self):
+#     client = Protocol(CLIENT)
+#     client.receive_data(b"\x88\x02\x03\xe8")
+#     self.assertConnectionClosing(client, CloseCode.NORMAL_CLOSURE)
+#     client.receive_data(b"\x89\x04\x22\x66\xaa\xee")
+#     # websockets ignores control frames after a close frame.
+#     self.assertFrameReceived(client, None)
+#     self.assertFrameSent(client, None)
+
+# def test_server_receives_ping_after_receiving_close(self):
+#     server = Protocol(SERVER)
+#     server.receive_data(b"\x88\x82\x00\x00\x00\x00\x03\xe9")
+#     self.assertConnectionClosing(server, CloseCode.GOING_AWAY)
+#     server.receive_data(b"\x89\x84\x00\x44\x88\xcc\x22\x22\x22\x22")
+#     # websockets ignores control frames after a close frame.
+#     self.assertFrameReceived(server, None)
+#     self.assertFrameSent(server, None)
+
+# def test_client_sends_ping_after_connection_is_closed(self):
+#     client = Protocol(CLIENT)
+#     client.receive_eof()
+#     with self.assertRaises(InvalidState) as raised:
+#         client.send_ping(b"")
+#     self.assertEqual(str(raised.exception), "connection is closed")
+
+# def test_server_sends_ping_after_connection_is_closed(self):
+#     server = Protocol(SERVER)
+#     server.receive_eof()
+#     with self.assertRaises(InvalidState) as raised:
+#         server.send_ping(b"")
+#     self.assertEqual(str(raised.exception), "connection is closed")

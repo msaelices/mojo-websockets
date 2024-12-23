@@ -515,3 +515,31 @@ fn receive_eof[T: Protocol](mut protocol: T) raises:
     protocol.set_eof_sent(True)
     protocol.set_state(CLOSED)
 
+
+fn send_ping[
+    T: Protocol,
+    gen_mask_func: fn () -> Bytes = gen_mask,
+](mut protocol: T, data: Bytes) raises -> None:
+    """
+    Send a `Ping frame`_.
+
+    .. _Ping frame:
+        https://datatracker.ietf.org/doc/html/rfc6455#section-5.5.2
+
+    Parameters:
+        T: Protocol.
+        gen_mask_func: Function to generate a mask.
+
+    Args:
+        protocol: Protocol instance.
+        data: Payload containing arbitrary binary data.
+
+    Raises:
+        InvalidState: If the connection is not open or closing.
+    """
+    # RFC 6455 allows control frames after starting the closing handshake.
+    state = protocol.get_state()
+    if state != OPEN and state != CLOSING:
+        raise Error("InvalidState: connection is {}".format(state))
+    send_frame[gen_mask_func=gen_mask_func](protocol, Frame(OP_PING, data))
+
