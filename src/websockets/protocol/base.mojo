@@ -5,6 +5,7 @@ from websockets.http import HTTPRequest
 from websockets.frames import (
        Close,
        Frame,
+       CLOSE_CODE_ABNORMAL_CLOSURE,
        CLOSE_CODE_PROTOCOL_ERROR,
        CLOSE_CODE_NO_STATUS_RCVD,
        OP_BINARY,
@@ -31,9 +32,6 @@ fn receive_data[
     Parameters:
         T: Protocol.
         gen_mask_func: Function to generate a mask.
-
-    Returns:
-        Tuple containing the parsed event and any error that occurred.
     """
     # See https://github.com/python-websockets/websockets/blob/59d4dcf779fe7d2b0302083b072d8b03adce2f61/src/websockets/protocol.py#L254
     reader = protocol.get_reader()
@@ -50,7 +48,13 @@ fn receive_data[
     except error:
         err = error
         # TODO: Differentiate between protocol errors, connection and other kind of errors
-        event = Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, str(error._message())).serialize(), fin=True)  # Close the connection on error
+        code = CLOSE_CODE_PROTOCOL_ERROR
+        reason = error._message()
+        event = Frame(OP_CLOSE, Close(code, reason).serialize(), fin=True)
+
+        # Fail the WebSocket Connection
+        fail[gen_mask_func=gen_mask_func](protocol, code, reason)
+
 
     protocol.add_event(event)
     protocol.set_parser_exc(err)
@@ -435,4 +439,59 @@ fn send_binary[
         raise Error("InvalidState: connection is {}".format(protocol.get_state()))
     protocol.set_expect_continuation_frame(not fin)
     send_frame[gen_mask_func=gen_mask_func](protocol, Frame(OP_BINARY, data, fin))
+
+
+fn fail[
+    T: Protocol, 
+    gen_mask_func: fn () -> Bytes = gen_mask
+](mut protocol: T, code: Int, reason: String) raises -> None:
+    """
+    `Fail the WebSocket connection`_.
+
+    .. _Fail the WebSocket connection:
+        https://datatracker.ietf.org/doc/html/rfc6455#section-7.1.7
+
+    Parameters:
+        T: Protocol.
+        gen_mask_func: Function to generate a mask.
+
+    Args:
+        protocol: Protocol instance.
+        code: Close code.
+        reason: Close reason.
+
+    Raises:
+        ProtocolError: If the code isn't valid.
+    """
+    # 7.1.7. Fail the WebSocket Connection
+
+    # Send a close frame when the state is OPEN (a close frame was already
+    # sent if it's CLOSING), except when failing the connection because
+    # of an error reading from or writing to the network.
+    if protocol.get_state() == OPEN:
+        if code != CLOSE_CODE_ABNORMAL_CLOSURE:
+            close = Close(code, reason)
+            data = close.serialize()
+            send_frame[gen_mask_func=gen_mask_func](protocol, Frame(OP_CLOSE, data))
+            protocol.set_close_sent(close)
+            # If recv_messages() raised an exception upon receiving a close
+            # frame but before echoing it, then close_rcvd is not None even
+            # though the state is OPEN. This happens when the connection is
+            # closed while receiving a fragmented message.
+            if protocol.get_close_rcvd():
+                protocol.set_close_rcvd_then_sent(True)
+            protocol.set_state(CLOSING)
+
+    # When failing the connection, a server closes the TCP connection
+    # without waiting for the client to complete the handshake, while a
+    # client waits for the server to close the TCP connection, possibly
+    # after sending a close frame that the client will ignore.
+    if T.side == SERVER and not protocol.get_eof_sent():
+        send_eof(protocol)
+
+    # 7.1.7. Fail the WebSocket Connection "An endpoint MUST NOT continue
+    # to attempt to process data(including a responding Close frame) from
+    # the remote endpoint after being instructed to _Fail the WebSocket
+    # Connection_."
+    discard(protocol)
 

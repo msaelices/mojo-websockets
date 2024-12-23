@@ -227,7 +227,9 @@ fn test_client_receives_masked_frame() raises:
 
 fn test_server_receives_unmasked_frame() raises:
     server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
-    receive_data(server, unmasked_text_frame_data)
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 0, 0, 0)
+    receive_data[gen_mask_func=gen_mask](server, unmasked_text_frame_data)
     events = server.events_received()
     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: incorrect masking").serialize(), fin=True))
 
@@ -259,7 +261,9 @@ fn test_client_receives_unexpected_continuation() raises:
 
 fn test_server_receives_unexpected_continuation() raises:
     server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
-    receive_data(server, Bytes(0, 128, 0, 0, 0, 0))
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 0, 0, 0)
+    receive_data[gen_mask_func=gen_mask](server, Bytes(0, 128, 0, 0, 0, 0))
     events = server.events_received()
     assert_equal(server.parser_exc.value()._message(), "ProtocolError: unexpected continuation frame")
     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: unexpected continuation frame").serialize(), fin=True))
@@ -531,13 +535,15 @@ fn test_server_receives_unexpected_text() raises:
     """The test verifies that a server properly handles receiving an unexpected text frame."""
     server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
     
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 0, 0, 0)
     # First text frame without FIN bit
-    receive_data(server, Bytes(1, 128, 0, 0, 0, 0))
+    receive_data[gen_mask_func=gen_mask](server, Bytes(1, 128, 0, 0, 0, 0))
     events = server.events_received()
     assert_equal(events[0][Frame], Frame(OP_TEXT, Bytes(), fin=False))
     
     # Second unexpected text frame
-    receive_data(server, Bytes(1, 128, 0, 0, 0, 0))
+    receive_data[gen_mask_func=gen_mask](server, Bytes(1, 128, 0, 0, 0, 0))
     events = server.events_received()
     assert_equal(server.parser_exc.value()._message(), "ProtocolError: expected a continuation frame")
     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: expected a continuation frame").serialize(), fin=True))
@@ -803,13 +809,15 @@ fn test_server_receives_unexpected_binary() raises:
     """The test verifies that a server properly handles receiving an unexpected binary frame."""
     server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
     
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 0, 0, 0)
     # First binary frame without FIN bit
-    receive_data(server, Bytes(2, 128, 0, 0, 0, 0))
+    receive_data[gen_mask_func=gen_mask](server, Bytes(2, 128, 0, 0, 0, 0))
     events = server.events_received()
     assert_equal(events[0][Frame], Frame(OP_BINARY, Bytes(), fin=False))
     
     # Second unexpected binary frame
-    receive_data(server, Bytes(2, 128, 0, 0, 0, 0))
+    receive_data[gen_mask_func=gen_mask](server, Bytes(2, 128, 0, 0, 0, 0))
     events = server.events_received()
     assert_equal(server.get_parser_exc().value()._message(), "ProtocolError: expected a continuation frame")
     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: expected a continuation frame").serialize(), fin=True))
@@ -1003,111 +1011,191 @@ fn test_client_sends_close_then_receives_close() raises:
     assert_equal(len(events), 0)
     assert_equal(client.data_to_send(), Bytes())
 
-#
-# def test_server_sends_close_then_receives_close(self):
-#     # Server-initiated close handshake on the server side.
-#     server = Protocol(SERVER)
-#
-#     server.send_close()
-#     self.assertFrameReceived(server, None)
-#     self.assertFrameSent(server, Frame(OP_CLOSE, b""))
-#
-#     server.receive_data(b"\x88\x80\x3c\x3c\x3c\x3c")
-#     self.assertFrameReceived(server, Frame(OP_CLOSE, b""))
-#     self.assertFrameSent(server, None, eof=True)
-#
-#     server.receive_eof()
-#     self.assertFrameReceived(server, None)
-#     self.assertFrameSent(server, None)
-#
-# def test_client_receives_close_then_sends_close(self):
-#     # Server-initiated close handshake on the client side.
-#     client = Protocol(CLIENT)
-#
-#     client.receive_data(b"\x88\x00")
-#     self.assertFrameReceived(client, Frame(OP_CLOSE, b""))
-#     self.assertFrameSent(client, Frame(OP_CLOSE, b""))
-#
-#     client.receive_eof()
-#     self.assertFrameReceived(client, None)
-#     self.assertFrameSent(client, None, eof=True)
-#
-# def test_server_receives_close_then_sends_close(self):
-#     # Client-initiated close handshake on the server side.
-#     server = Protocol(SERVER)
-#
-#     server.receive_data(b"\x88\x80\x3c\x3c\x3c\x3c")
-#     self.assertFrameReceived(server, Frame(OP_CLOSE, b""))
-#     self.assertFrameSent(server, Frame(OP_CLOSE, b""), eof=True)
-#
-#     server.receive_eof()
-#     self.assertFrameReceived(server, None)
-#     self.assertFrameSent(server, None)
-#
-# def test_client_sends_close_with_code(self):
-#     client = Protocol(CLIENT)
-#     with self.enforce_mask(b"\x00\x00\x00\x00"):
-#         client.send_close(CloseCode.GOING_AWAY)
-#     self.assertEqual(client.data_to_send(), [b"\x88\x82\x00\x00\x00\x00\x03\xe9"])
-#     self.assertIs(client.state, CLOSING)
-#
-# def test_server_sends_close_with_code(self):
-#     server = Protocol(SERVER)
-#     server.send_close(CloseCode.NORMAL_CLOSURE)
-#     self.assertEqual(server.data_to_send(), [b"\x88\x02\x03\xe8"])
-#     self.assertIs(server.state, CLOSING)
-#
-# def test_client_receives_close_with_code(self):
-#     client = Protocol(CLIENT)
-#     client.receive_data(b"\x88\x02\x03\xe8")
-#     self.assertConnectionClosing(client, CloseCode.NORMAL_CLOSURE, "")
-#     self.assertIs(client.state, CLOSING)
-#
-# def test_server_receives_close_with_code(self):
-#     server = Protocol(SERVER)
-#     server.receive_data(b"\x88\x82\x00\x00\x00\x00\x03\xe9")
-#     self.assertConnectionClosing(server, CloseCode.GOING_AWAY, "")
-#     self.assertIs(server.state, CLOSING)
-#
-# def test_client_sends_close_with_code_and_reason(self):
-#     client = Protocol(CLIENT)
-#     with self.enforce_mask(b"\x00\x00\x00\x00"):
-#         client.send_close(CloseCode.GOING_AWAY, "going away")
-#     self.assertEqual(
-#         client.data_to_send(), [b"\x88\x8c\x00\x00\x00\x00\x03\xe9going away"]
-#     )
-#     self.assertIs(client.state, CLOSING)
-#
-# def test_server_sends_close_with_code_and_reason(self):
-#     server = Protocol(SERVER)
-#     server.send_close(CloseCode.NORMAL_CLOSURE, "OK")
-#     self.assertEqual(server.data_to_send(), [b"\x88\x04\x03\xe8OK"])
-#     self.assertIs(server.state, CLOSING)
-#
-# def test_client_receives_close_with_code_and_reason(self):
-#     client = Protocol(CLIENT)
-#     client.receive_data(b"\x88\x04\x03\xe8OK")
-#     self.assertConnectionClosing(client, CloseCode.NORMAL_CLOSURE, "OK")
-#     self.assertIs(client.state, CLOSING)
-#
-# def test_server_receives_close_with_code_and_reason(self):
-#     server = Protocol(SERVER)
-#     server.receive_data(b"\x88\x8c\x00\x00\x00\x00\x03\xe9going away")
-#     self.assertConnectionClosing(server, CloseCode.GOING_AWAY, "going away")
-#     self.assertIs(server.state, CLOSING)
-#
-# def test_client_sends_close_with_reason_only(self):
-#     client = Protocol(CLIENT)
-#     with self.assertRaises(ProtocolError) as raised:
-#         client.send_close(reason="going away")
-#     self.assertEqual(str(raised.exception), "cannot send a reason without a code")
-#
-# def test_server_sends_close_with_reason_only(self):
-#     server = Protocol(SERVER)
-#     with self.assertRaises(ProtocolError) as raised:
-#         server.send_close(reason="OK")
-#     self.assertEqual(str(raised.exception), "cannot send a reason without a code")
-#
+
+fn test_server_sends_close_then_receives_close() raises:
+    """Test server-initiated close handshake on the server side."""
+    server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    
+    fn gen_mask() -> Bytes:
+        return Bytes(60, 60, 60, 60)  # \x3c\x3c\x3c\x3c
+    # Send close
+    send_close[gen_mask_func=gen_mask](server)
+    events = server.events_received()
+    assert_equal(len(events), 0)
+    assert_equal(server.data_to_send(), Frame(OP_CLOSE, Bytes(), fin=True).serialize[gen_mask_func=gen_mask](mask=True))
+    
+    # Receive close
+    receive_data[gen_mask_func=gen_mask](server, Bytes(136, 128, 60, 60, 60, 60))  # \x88\x80\x3c\x3c\x3c\x3c
+    events = server.events_received()
+    assert_equal(events[0][Frame], Frame(OP_CLOSE, Bytes(), fin=True))
+    assert_equal(server.data_to_send(), Bytes())
+    assert_equal(server.get_eof_sent(), True)
+    
+    # Receive EOF
+    server.set_eof_sent(True)
+    events = server.events_received()
+    assert_equal(len(events), 0)
+    assert_equal(server.data_to_send(), Bytes())
+
+
+fn test_client_receives_close_then_sends_close() raises:
+    """Test server-initiated close handshake on the client side."""
+    client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    
+    # Receive close
+    receive_data(client, Bytes(136, 0))  # \x88\x00
+    events = client.events_received()
+    assert_equal(events[0][Frame], Frame(OP_CLOSE, Bytes(), fin=True))
+    assert_equal(client.data_to_send(), Frame(OP_CLOSE, Bytes(), fin=True).serialize(mask=False))
+    
+    # Receive EOF
+    client.set_eof_sent(True)
+    events = client.events_received()
+    assert_equal(len(events), 0)
+    assert_equal(client.data_to_send(), Bytes())
+
+fn test_server_receives_close_then_sends_close() raises:
+    """Test client-initiated close handshake on the server side."""
+    server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    
+    # Receive close
+    fn gen_mask() -> Bytes:
+        return Bytes(60, 60, 60, 60)  # \x3c\x3c\x3c\x3c
+    receive_data[gen_mask_func=gen_mask](server, Bytes(136, 128, 60, 60, 60, 60))  # \x88\x80\x3c\x3c\x3c\x3c
+    events = server.events_received()
+    assert_equal(events[0][Frame], Frame(OP_CLOSE, Bytes(), fin=True))
+    assert_equal(server.data_to_send(), Frame(OP_CLOSE, Bytes(), fin=True).serialize[gen_mask_func=gen_mask](mask=True))
+    assert_equal(server.get_state(), 2)  # CLOSING
+    
+    # Receive EOF
+    server.set_eof_sent(True)
+    events = server.events_received()
+    assert_equal(len(events), 0)
+    assert_equal(server.data_to_send(), Bytes())
+
+
+fn test_client_sends_close_with_code() raises:
+    """Test that client properly sends a close frame with code."""
+    client = DummyProtocol[True, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 0, 0, 0)
+    send_close[gen_mask_func=gen_mask](client, CLOSE_CODE_GOING_AWAY)
+    assert_equal(client.data_to_send(), Bytes(136, 130, 0, 0, 0, 0, 3, 233))
+    assert_equal(client.get_state(), 2)  # CLOSING
+
+
+fn test_server_sends_close_with_code() raises:
+    """Test that server properly sends a close frame with code."""
+    server = DummyProtocol[False, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    send_close(server, CLOSE_CODE_NORMAL_CLOSURE)
+    assert_equal(server.data_to_send(), Bytes(136, 2, 3, 232))
+    assert_equal(server.get_state(), 2)  # CLOSING
+
+
+fn test_client_receives_close_with_code() raises:
+    """Test that client properly receives a close frame with code."""
+    client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    receive_data(client, Bytes(136, 2, 3, 232))  # \x88\x02\x03\xe8
+    events = client.events_received()
+    close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_NORMAL_CLOSURE, "").serialize(), fin=True)
+    assert_equal(events[0][Frame], close_frame)
+    assert_equal(client.data_to_send(), close_frame.serialize[gen_mask_func=gen_mask](mask=client.is_masked()))
+    assert_equal(client.get_state(), 2)  # CLOSING
+
+
+fn test_server_receives_close_with_code() raises:
+    """Test that server properly receives a close frame with code."""
+    server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 0, 0, 0)
+    receive_data[gen_mask_func=gen_mask](server, Bytes(136, 130, 0, 0, 0, 0, 3, 233))
+    events = server.events_received()
+    close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_GOING_AWAY, "").serialize(), fin=True)
+    assert_equal(events[0][Frame], close_frame)
+    assert_equal(server.data_to_send(), close_frame.serialize[gen_mask_func=gen_mask](mask=server.is_masked()))
+    assert_equal(server.get_state(), 2)  # CLOSING
+
+
+fn test_client_sends_close_with_code_and_reason() raises:
+    """Test that client properly sends a close frame with code and reason."""
+    client = DummyProtocol[True, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 0, 0, 0)
+    send_close[gen_mask_func=gen_mask](client, CLOSE_CODE_GOING_AWAY, "going away")
+    assert_equal(client.data_to_send(), Bytes(136, 140, 0, 0, 0, 0, 3, 233) + str_to_bytes("going away"))
+    assert_equal(client.get_state(), 2)  # CLOSING
+
+
+fn test_server_sends_close_with_code_and_reason() raises:
+    """Test that server properly sends a close frame with code and reason."""
+    server = DummyProtocol[False, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    send_close(server, CLOSE_CODE_NORMAL_CLOSURE, "OK")
+    assert_equal(server.data_to_send(), Bytes(136, 4, 3, 232) + str_to_bytes("OK"))
+    assert_equal(server.get_state(), 2)  # CLOSING
+
+
+fn test_client_receives_close_with_code_and_reason() raises:
+    """Test that client properly receives a close frame with code and reason."""
+    client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    receive_data(client, Bytes(136, 4, 3, 232) + str_to_bytes("OK"))
+    events = client.events_received()
+    close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_NORMAL_CLOSURE, "OK").serialize(), fin=True)
+    assert_equal(events[0][Frame], close_frame)
+    assert_equal(client.data_to_send(), close_frame.serialize[gen_mask_func=gen_mask](mask=client.is_masked()))
+    assert_equal(client.get_state(), 2)  # CLOSING
+
+
+fn test_server_receives_close_with_code_and_reason() raises:
+    """Test that server properly receives a close frame with code and reason."""
+    server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 0, 0, 0)
+    receive_data[gen_mask_func=gen_mask](server, Bytes(136, 140, 0, 0, 0, 0, 3, 233) + str_to_bytes("going away"))
+    events = server.events_received()
+    close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_GOING_AWAY, "going away").serialize(), fin=True)
+    assert_equal(events[0][Frame], close_frame)
+    assert_equal(server.data_to_send(), close_frame.serialize[gen_mask_func=gen_mask](mask=server.is_masked()))
+    assert_equal(server.get_state(), 2)  # CLOSING
+
+
+fn test_client_sends_close_with_reason_only() raises:
+    """Test that client cannot send a close frame with reason only."""
+    client = DummyProtocol[True, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 0, 0, 0)
+    with assert_raises(contains="ProtocolError: cannot send a reason without a code"):
+        send_close[gen_mask_func=gen_mask](client, reason="going away")
+
+
+fn test_server_sends_close_with_reason_only() raises:
+    """Test that server cannot send a close frame with reason only."""
+    server = DummyProtocol[False, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    with assert_raises(contains="ProtocolError: cannot send a reason without a code"):
+        send_close(server, reason="OK")
+
+
+fn test_client_receives_close_with_truncated_code() raises:
+    """Test that client properly handles receiving a close frame with truncated code."""
+    client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    receive_data(client, Bytes(136, 1, 3))  # \x88\x01\x03
+    events = client.events_received()
+    assert_equal(client.parser_exc.value()._message(), "ProtocolError: close frame too short")
+    assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: close frame too short").serialize(), fin=True))
+    assert_equal(client.get_state(), 2)  # CLOSING
+
+
+fn test_server_receives_close_with_truncated_code() raises:
+    """Test that server properly handles receiving a close frame with truncated code."""
+    server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 0, 0, 0)
+    receive_data[gen_mask_func=gen_mask](server, Bytes(136, 129, 0, 0, 0, 0, 3))  # \x88\x81\x00\x00\x00\x00\x03
+    events = server.events_received()
+    assert_equal(server.parser_exc.value()._message(), "ProtocolError: close frame too short")
+    assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: close frame too short").serialize(), fin=True))
+    assert_equal(server.get_state(), 2)  # CLOSING
+
+
 # def test_client_receives_close_with_truncated_code(self):
 #     client = Protocol(CLIENT)
 #     client.receive_data(b"\x88\x01\x03")
@@ -1117,7 +1205,7 @@ fn test_client_sends_close_then_receives_close() raises:
 #         client, CloseCode.PROTOCOL_ERROR, "close frame too short"
 #     )
 #     self.assertIs(client.state, CLOSING)
-#
+
 # def test_server_receives_close_with_truncated_code(self):
 #     server = Protocol(SERVER)
 #     server.receive_data(b"\x88\x81\x00\x00\x00\x00\x03")
@@ -1127,7 +1215,7 @@ fn test_client_sends_close_then_receives_close() raises:
 #         server, CloseCode.PROTOCOL_ERROR, "close frame too short"
 #     )
 #     self.assertIs(server.state, CLOSING)
-#
+
 # def test_client_receives_close_with_non_utf8_reason(self):
 #     client = Protocol(CLIENT)
 #
@@ -1141,7 +1229,7 @@ fn test_client_sends_close_then_receives_close() raises:
 #         client, CloseCode.INVALID_DATA, "invalid start byte at position 0"
 #     )
 #     self.assertIs(client.state, CLOSING)
-#
+
 # def test_server_receives_close_with_non_utf8_reason(self):
 #     server = Protocol(SERVER)
 #
@@ -1155,7 +1243,7 @@ fn test_client_sends_close_then_receives_close() raises:
 #         server, CloseCode.INVALID_DATA, "invalid start byte at position 0"
 #     )
 #     self.assertIs(server.state, CLOSING)
-#
+
 # def test_client_sends_close_twice(self):
 #     client = Protocol(CLIENT)
 #     with self.enforce_mask(b"\x00\x00\x00\x00"):
@@ -1164,7 +1252,7 @@ fn test_client_sends_close_then_receives_close() raises:
 #     with self.assertRaises(InvalidState) as raised:
 #         client.send_close(CloseCode.GOING_AWAY)
 #     self.assertEqual(str(raised.exception), "connection is closing")
-#
+
 # def test_server_sends_close_twice(self):
 #     server = Protocol(SERVER)
 #     server.send_close(CloseCode.NORMAL_CLOSURE)
@@ -1172,18 +1260,18 @@ fn test_client_sends_close_then_receives_close() raises:
 #     with self.assertRaises(InvalidState) as raised:
 #         server.send_close(CloseCode.NORMAL_CLOSURE)
 #     self.assertEqual(str(raised.exception), "connection is closing")
-#
+
 # def test_client_sends_close_after_connection_is_closed(self):
 #     client = Protocol(CLIENT)
 #     client.receive_eof()
 #     with self.assertRaises(InvalidState) as raised:
 #         client.send_close(CloseCode.GOING_AWAY)
 #     self.assertEqual(str(raised.exception), "connection is closed")
-#
+
 # def test_server_sends_close_after_connection_is_closed(self):
 #     server = Protocol(SERVER)
 #     server.receive_eof()
 #     with self.assertRaises(InvalidState) as raised:
 #         server.send_close(CloseCode.NORMAL_CLOSURE)
 #     self.assertEqual(str(raised.exception), "connection is closed")
-#
+
