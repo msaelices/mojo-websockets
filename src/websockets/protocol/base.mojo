@@ -496,7 +496,7 @@ fn fail[
     discard(protocol)
 
 
-fn receive_eof[T: Protocol](mut protocol: T) raises -> None:
+fn receive_eof[T: Protocol](mut protocol: T) raises:
     """
     Receive the end of the data stream from the network.
 
@@ -511,8 +511,7 @@ fn receive_eof[T: Protocol](mut protocol: T) raises -> None:
     """
     if protocol.get_eof_sent():
         return
-    reader = protocol.get_reader()
-    reader.feed_eof()
 
-    _ = parse_frame(protocol, Bytes())
+    protocol.set_eof_sent(True)
+    protocol.set_state(CLOSED)
 

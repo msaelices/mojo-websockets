@@ -1251,7 +1251,7 @@ fn test_client_sends_close_after_connection_is_closed() raises:
     fn gen_mask() -> Bytes:
         return Bytes(0, 0, 0, 0)
     receive_eof(client)
-    with assert_raises(contains="InvalidState: connection is closed"):
+    with assert_raises(contains="InvalidState: connection is not open but 3"):
         send_close[gen_mask_func=gen_mask](client, CLOSE_CODE_GOING_AWAY)
 
 
@@ -1259,20 +1259,6 @@ fn test_server_sends_close_after_connection_is_closed() raises:
     """Test that server cannot send close frame after connection is closed."""
     server = DummyProtocol[False, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
     receive_eof(server)
-    with assert_raises(contains="InvalidState: connection is closed"):
+    with assert_raises(contains="InvalidState: connection is not open but 3"):
         send_close(server, CLOSE_CODE_NORMAL_CLOSURE)
-
-# def test_client_sends_close_after_connection_is_closed(self):
-#     client = Protocol(CLIENT)
-#     client.receive_eof()
-#     with self.assertRaises(InvalidState) as raised:
-#         client.send_close(CloseCode.GOING_AWAY)
-#     self.assertEqual(str(raised.exception), "connection is closed")
-
-# def test_server_sends_close_after_connection_is_closed(self):
-#     server = Protocol(SERVER)
-#     server.receive_eof()
-#     with self.assertRaises(InvalidState) as raised:
-#         server.send_close(CloseCode.NORMAL_CLOSURE)
-#     self.assertEqual(str(raised.exception), "connection is closed")
 
