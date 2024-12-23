@@ -7,8 +7,9 @@ from websockets.aliases import Bytes
 from websockets.frames import (
     Close,
     Frame,
-    CLOSE_CODE_GOING_AWAY,
     # CLOSE_CODE_MESSAGE_TOO_BIG,
+    CLOSE_CODE_GOING_AWAY,
+    CLOSE_CODE_INVALID_DATA,
     CLOSE_CODE_NORMAL_CLOSURE,
     CLOSE_CODE_PROTOCOL_ERROR,
     OP_BINARY,
@@ -19,6 +20,7 @@ from websockets.frames import (
 from websockets.protocol import Event, CLIENT, SERVER, OPEN
 from websockets.protocol.base import (
     receive_data, 
+    receive_eof,
     send_binary,
     send_close,
     send_continuation,
@@ -1196,70 +1198,69 @@ fn test_server_receives_close_with_truncated_code() raises:
     assert_equal(server.get_state(), 2)  # CLOSING
 
 
-# def test_client_receives_close_with_truncated_code(self):
-#     client = Protocol(CLIENT)
-#     client.receive_data(b"\x88\x01\x03")
-#     self.assertIsInstance(client.parser_exc, ProtocolError)
-#     self.assertEqual(str(client.parser_exc), "close frame too short")
-#     self.assertConnectionFailing(
-#         client, CloseCode.PROTOCOL_ERROR, "close frame too short"
-#     )
-#     self.assertIs(client.state, CLOSING)
+# TODO: Implement when unicode is supported
+# fn test_client_receives_close_with_non_utf8_reason() raises:
+#     """Test that client properly handles receiving a close frame with non-UTF-8 reason."""
+#     client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+#     
+#     # Send close frame with invalid UTF-8 bytes
+#     receive_data(client, Bytes(136, 4, 3, 232, 255, 255))  # \x88\x04\x03\xe8\xff\xff
+#     events = client.events_received()
+#     assert_equal(client.parser_exc.value()._message(), "UnicodeDecodeError: invalid start byte at position 0")
+#     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_INVALID_DATA, "invalid start byte at position 0").serialize(), fin=True))
+#     assert_equal(client.get_state(), 2)  # CLOSING
 
-# def test_server_receives_close_with_truncated_code(self):
-#     server = Protocol(SERVER)
-#     server.receive_data(b"\x88\x81\x00\x00\x00\x00\x03")
-#     self.assertIsInstance(server.parser_exc, ProtocolError)
-#     self.assertEqual(str(server.parser_exc), "close frame too short")
-#     self.assertConnectionFailing(
-#         server, CloseCode.PROTOCOL_ERROR, "close frame too short"
-#     )
-#     self.assertIs(server.state, CLOSING)
 
-# def test_client_receives_close_with_non_utf8_reason(self):
-#     client = Protocol(CLIENT)
-#
-#     client.receive_data(b"\x88\x04\x03\xe8\xff\xff")
-#     self.assertIsInstance(client.parser_exc, UnicodeDecodeError)
-#     self.assertEqual(
-#         str(client.parser_exc),
-#         "'utf-8' codec can't decode byte 0xff in position 0: invalid start byte",
-#     )
-#     self.assertConnectionFailing(
-#         client, CloseCode.INVALID_DATA, "invalid start byte at position 0"
-#     )
-#     self.assertIs(client.state, CLOSING)
+# TODO: Implement when unicode is supported
+# fn test_server_receives_close_with_non_utf8_reason() raises:
+#     """Test that server properly handles receiving a close frame with non-UTF-8 reason."""
+#     server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+#     
+#     fn gen_mask() -> Bytes:
+#         return Bytes(0, 0, 0, 0)
+#     # Send close frame with invalid UTF-8 bytes
+#     receive_data[gen_mask_func=gen_mask](server, Bytes(136, 132, 0, 0, 0, 0, 3, 233, 255, 255))  # \x88\x84\x00\x00\x00\x00\x03\xe9\xff\xff
+#     events = server.events_received()
+#     assert_equal(server.parser_exc.value()._message(), "UnicodeDecodeError: invalid start byte at position 0")
+#     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_INVALID_DATA, "invalid start byte at position 0").serialize(), fin=True))
+#     assert_equal(server.get_state(), 2)  # CLOSING
 
-# def test_server_receives_close_with_non_utf8_reason(self):
-#     server = Protocol(SERVER)
-#
-#     server.receive_data(b"\x88\x84\x00\x00\x00\x00\x03\xe9\xff\xff")
-#     self.assertIsInstance(server.parser_exc, UnicodeDecodeError)
-#     self.assertEqual(
-#         str(server.parser_exc),
-#         "'utf-8' codec can't decode byte 0xff in position 0: invalid start byte",
-#     )
-#     self.assertConnectionFailing(
-#         server, CloseCode.INVALID_DATA, "invalid start byte at position 0"
-#     )
-#     self.assertIs(server.state, CLOSING)
+fn test_client_sends_close_twice() raises:
+    """Test that client cannot send close frame twice."""
+    client = DummyProtocol[True, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 0, 0, 0)
+    send_close[gen_mask_func=gen_mask](client, CLOSE_CODE_GOING_AWAY)
+    assert_equal(client.data_to_send(), Bytes(136, 130, 0, 0, 0, 0, 3, 233))
+    with assert_raises(contains="InvalidState: connection is not open but 2"):
+        send_close[gen_mask_func=gen_mask](client, CLOSE_CODE_GOING_AWAY)
 
-# def test_client_sends_close_twice(self):
-#     client = Protocol(CLIENT)
-#     with self.enforce_mask(b"\x00\x00\x00\x00"):
-#         client.send_close(CloseCode.GOING_AWAY)
-#     self.assertEqual(client.data_to_send(), [b"\x88\x82\x00\x00\x00\x00\x03\xe9"])
-#     with self.assertRaises(InvalidState) as raised:
-#         client.send_close(CloseCode.GOING_AWAY)
-#     self.assertEqual(str(raised.exception), "connection is closing")
 
-# def test_server_sends_close_twice(self):
-#     server = Protocol(SERVER)
-#     server.send_close(CloseCode.NORMAL_CLOSURE)
-#     self.assertEqual(server.data_to_send(), [b"\x88\x02\x03\xe8"])
-#     with self.assertRaises(InvalidState) as raised:
-#         server.send_close(CloseCode.NORMAL_CLOSURE)
-#     self.assertEqual(str(raised.exception), "connection is closing")
+fn test_server_sends_close_twice() raises:
+    """Test that server cannot send close frame twice."""
+    server = DummyProtocol[False, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    send_close(server, CLOSE_CODE_NORMAL_CLOSURE)
+    assert_equal(server.data_to_send(), Bytes(136, 2, 3, 232))
+    with assert_raises(contains="InvalidState: connection is not open but 2"):
+        send_close(server, CLOSE_CODE_NORMAL_CLOSURE)
+
+
+fn test_client_sends_close_after_connection_is_closed() raises:
+    """Test that client cannot send close frame after connection is closed."""
+    client = DummyProtocol[True, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 0, 0, 0)
+    receive_eof(client)
+    with assert_raises(contains="InvalidState: connection is closed"):
+        send_close[gen_mask_func=gen_mask](client, CLOSE_CODE_GOING_AWAY)
+
+
+fn test_server_sends_close_after_connection_is_closed() raises:
+    """Test that server cannot send close frame after connection is closed."""
+    server = DummyProtocol[False, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    receive_eof(server)
+    with assert_raises(contains="InvalidState: connection is closed"):
+        send_close(server, CLOSE_CODE_NORMAL_CLOSURE)
 
 # def test_client_sends_close_after_connection_is_closed(self):
 #     client = Protocol(CLIENT)

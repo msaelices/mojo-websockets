@@ -495,3 +495,24 @@ fn fail[
     # Connection_."
     discard(protocol)
 
+
+fn receive_eof[T: Protocol](mut protocol: T) raises -> None:
+    """
+    Receive the end of the data stream from the network.
+
+    After calling this method:
+
+    - You must call `data_to_send` and send this data to the network;
+      it will return `[b""]`, signaling the end of the stream, or `[]`.
+    - You aren't expected to call `events_received`; it won't return
+      any new events.
+
+    `receive_eof` is idempotent.
+    """
+    if protocol.get_eof_sent():
+        return
+    reader = protocol.get_reader()
+    reader.feed_eof()
+
+    _ = parse_frame(protocol, Bytes())
+
