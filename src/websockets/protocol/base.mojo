@@ -260,6 +260,8 @@ fn send_frame[
     Raises:
         ProtocolError: If a fragmented message is in progress.
     """
+    if protocol.get_eof_sent():
+        raise Error("ProtocolError: EOF already sent")
     protocol.write_data(
         frame.serialize[gen_mask_func=gen_mask_func](
             mask=protocol.is_masked(),
