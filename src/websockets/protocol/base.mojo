@@ -446,7 +446,7 @@ fn send_binary[
 fn fail[
     T: Protocol, 
     gen_mask_func: fn () -> Bytes = gen_mask
-](mut protocol: T, code: Int, reason: String) raises -> None:
+](mut protocol: T, code: Int, reason: String = '') raises -> None:
     """
     `Fail the WebSocket connection`_.
 

@@ -21,6 +21,7 @@ from websockets.frames import (
 )
 from websockets.protocol import Event, CLIENT, SERVER, OPEN
 from websockets.protocol.base import (
+    fail,
     receive_data, 
     receive_eof,
     send_binary,
@@ -1645,3 +1646,49 @@ fn test_server_sends_pong_after_connection_is_closed() raises:
     with assert_raises(contains="ProtocolError: EOF already sent"):
         send_frame(server, Frame(OP_PONG, Bytes()))
 
+
+# ===-------------------------------------------------------------------===#
+# Test failing the connection.
+# See 7.1.7. Fail the WebSocket Connection in RFC 6455.
+# ===-------------------------------------------------------------------===#
+
+
+fn test_client_stops_processing_frames_after_fail() raises:
+    """Test that client stops processing frames after connection failure."""
+    client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+
+    # Fail the connection with protocol error
+    fail(client, CLOSE_CODE_PROTOCOL_ERROR)
+    events = client.events_received()
+    assert_equal(len(events), 0)
+    data_to_send = client.data_to_send()
+    # assert_equal(client.parser_exc.value()._message(), "ProtocolError: invalid close code")
+    close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "").serialize(), fin=True)
+    assert_equal(data_to_send, close_frame.serialize(mask=client.is_masked()))
+
+    # Try to receive more data after failure - should be ignored
+    receive_data(client, Bytes(136, 2, 3, 234))  # \x88\x02\x03\xea
+    events = client.events_received()
+    assert_equal(len(events), 0)
+    assert_equal(client.data_to_send(), Bytes())
+
+
+fn test_server_stops_processing_frames_after_fail() raises:
+    """Test that server stops processing frames after connection failure."""
+    server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 0, 0, 0)
+    # Fail the connection with protocol error
+    fail[gen_mask_func=gen_mask](server, CLOSE_CODE_PROTOCOL_ERROR)
+    events = server.events_received()
+    assert_equal(len(events), 0)
+    data_to_send = server.data_to_send()
+    close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "").serialize(), fin=True)
+    assert_equal(data_to_send, close_frame.serialize[gen_mask_func=gen_mask](mask=server.is_masked()))
+
+    # Try to receive more data after failure - should be ignored
+    receive_data[gen_mask_func=gen_mask](server, Bytes(136, 130, 0, 0, 0, 0, 3, 234))  # \x88\x82\x00\x00\x00\x00\x03\xea
+    events = server.events_received()
+    assert_equal(len(events), 0)
+    assert_equal(server.data_to_send(), Bytes())
