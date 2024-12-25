@@ -1692,3 +1692,198 @@ fn test_server_stops_processing_frames_after_fail() raises:
     events = server.events_received()
     assert_equal(len(events), 0)
     assert_equal(server.data_to_send(), Bytes())
+
+
+# ===-------------------------------------------------------------------===#
+# Test message fragmentation.
+# See 5.4. Fragmentation in RFC 6455.
+# ===-------------------------------------------------------------------===#
+
+
+fn test_client_send_ping_pong_in_fragmented_message() raises:
+    """Test that client can send ping/pong frames within a fragmented message."""
+    client = DummyProtocol[True, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 0, 0, 0)
+    
+    # Send initial text frame
+    send_text[gen_mask_func=gen_mask](client, str_to_bytes("Spam"), fin=False)
+    assert_equal(client.data_to_send(), Bytes(1, 132, 0, 0, 0, 0) + str_to_bytes("Spam"))
+    
+    # Send ping frame
+    send_ping[gen_mask_func=gen_mask](client, str_to_bytes("Ping"))
+    assert_equal(client.data_to_send(), Bytes(137, 132, 0, 0, 0, 0) + str_to_bytes("Ping"))
+    
+    # Send continuation frame
+    send_continuation[gen_mask_func=gen_mask](client, str_to_bytes("Ham"), fin=False)
+    assert_equal(client.data_to_send(), Bytes(0, 131, 0, 0, 0, 0) + str_to_bytes("Ham"))
+    
+    # Send pong frame
+    send_frame[gen_mask_func=gen_mask](client, Frame(OP_PONG, str_to_bytes("Pong")))
+    assert_equal(client.data_to_send(), Bytes(138, 132, 0, 0, 0, 0) + str_to_bytes("Pong"))
+    
+    # Send final continuation frame
+    send_continuation[gen_mask_func=gen_mask](client, str_to_bytes("Eggs"), fin=True)
+    assert_equal(client.data_to_send(), Bytes(128, 132, 0, 0, 0, 0) + str_to_bytes("Eggs"))
+
+
+fn test_server_send_ping_pong_in_fragmented_message() raises:
+    """Test that server can send ping/pong frames within a fragmented message."""
+    server = DummyProtocol[False, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    
+    # Send initial text frame
+    send_text(server, str_to_bytes("Spam"), fin=False)
+    assert_equal(server.data_to_send(), Bytes(1, 4) + str_to_bytes("Spam"))
+    
+    # Send ping frame
+    send_ping(server, str_to_bytes("Ping"))
+    assert_equal(server.data_to_send(), Bytes(137, 4) + str_to_bytes("Ping"))
+    
+    # Send continuation frame
+    send_continuation(server, str_to_bytes("Ham"), fin=False)
+    assert_equal(server.data_to_send(), Bytes(0, 3) + str_to_bytes("Ham"))
+    
+    # Send pong frame
+    send_frame(server, Frame(OP_PONG, str_to_bytes("Pong")))
+    assert_equal(server.data_to_send(), Bytes(138, 4) + str_to_bytes("Pong"))
+    
+    # Send final continuation frame
+    send_continuation(server, str_to_bytes("Eggs"), fin=True)
+    assert_equal(server.data_to_send(), Bytes(128, 4) + str_to_bytes("Eggs"))
+
+
+fn test_client_receive_ping_pong_in_fragmented_message() raises:
+    """Test that client properly handles ping/pong frames within a fragmented message."""
+    client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    
+    # Receive initial text frame
+    receive_data(client, Bytes(1, 4) + str_to_bytes("Spam"))  # \x01\x04Spam
+    events = client.events_received()
+    assert_equal(events[0][Frame], Frame(OP_TEXT, str_to_bytes("Spam"), fin=False))
+    
+    # Receive ping frame
+    receive_data(client, Bytes(137, 4) + str_to_bytes("Ping"))  # \x89\x04Ping
+    events = client.events_received()
+    assert_equal(events[0][Frame], Frame(OP_PING, str_to_bytes("Ping")))
+    assert_equal(client.data_to_send(), Frame(OP_PONG, str_to_bytes("Ping")).serialize[gen_mask_func=gen_mask](mask=client.is_masked()))
+    
+    # Receive continuation frame
+    receive_data(client, Bytes(0, 3) + str_to_bytes("Ham"))  # \x00\x03Ham
+    events = client.events_received()
+    assert_equal(events[0][Frame], Frame(OP_CONT, str_to_bytes("Ham"), fin=False))
+    
+    # Receive pong frame
+    receive_data(client, Bytes(138, 4) + str_to_bytes("Pong"))  # \x8a\x04Pong
+    events = client.events_received()
+    assert_equal(events[0][Frame], Frame(OP_PONG, str_to_bytes("Pong")))
+    
+    # Receive final continuation frame
+    receive_data(client, Bytes(128, 4) + str_to_bytes("Eggs"))  # \x80\x04Eggs
+    events = client.events_received()
+    assert_equal(events[0][Frame], Frame(OP_CONT, str_to_bytes("Eggs")))
+
+
+fn test_server_receive_ping_pong_in_fragmented_message() raises:
+    """Test that server properly handles ping/pong frames within a fragmented message."""
+    server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 0, 0, 0)
+    # Receive initial text frame
+    receive_data[gen_mask_func=gen_mask](server, Bytes(1, 132, 0, 0, 0, 0) + str_to_bytes("Spam"))  # \x01\x84\x00\x00\x00\x00Spam
+    events = server.events_received()
+    assert_equal(events[0][Frame], Frame(OP_TEXT, str_to_bytes("Spam"), fin=False))
+    
+    # Receive ping frame
+    receive_data[gen_mask_func=gen_mask](server, Bytes(137, 132, 0, 0, 0, 0) + str_to_bytes("Ping"))  # \x89\x84\x00\x00\x00\x00Ping
+    events = server.events_received()
+    assert_equal(events[0][Frame], Frame(OP_PING, str_to_bytes("Ping")))
+    assert_equal(server.data_to_send(), Frame(OP_PONG, str_to_bytes("Ping")).serialize[gen_mask_func=gen_mask](mask=server.is_masked()))
+    
+    # Receive continuation frame
+    receive_data[gen_mask_func=gen_mask](server, Bytes(0, 131, 0, 0, 0, 0) + str_to_bytes("Ham"))  # \x00\x83\x00\x00\x00\x00Ham
+    events = server.events_received()
+    assert_equal(events[0][Frame], Frame(OP_CONT, str_to_bytes("Ham"), fin=False))
+    
+    # Receive pong frame
+    receive_data[gen_mask_func=gen_mask](server, Bytes(138, 132, 0, 0, 0, 0) + str_to_bytes("Pong"))  # \x8a\x84\x00\x00\x00\x00Pong
+    events = server.events_received()
+    assert_equal(events[0][Frame], Frame(OP_PONG, str_to_bytes("Pong")))
+    
+    # Receive final continuation frame
+    receive_data[gen_mask_func=gen_mask](server, Bytes(128, 132, 0, 0, 0, 0) + str_to_bytes("Eggs"))  # \x80\x84\x00\x00\x00\x00Eggs
+    events = server.events_received()
+    assert_equal(events[0][Frame], Frame(OP_CONT, str_to_bytes("Eggs")))
+
+
+fn test_client_send_close_in_fragmented_message() raises:
+    """Test that client cannot send close frame in a fragmented message."""
+    client = DummyProtocol[True, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    fn gen_mask() -> Bytes:
+        return Bytes(60, 60, 60, 60)  # \x3c\x3c\x3c\x3c
+    
+    # Send initial text frame
+    send_text[gen_mask_func=gen_mask](client, str_to_bytes("Spam"), fin=False)
+    assert_equal(client.data_to_send(), Bytes(1, 132, 60, 60, 60, 60, 111, 76, 93, 81))
+    
+    # Try to send close frame - should fail
+    send_close[gen_mask_func=gen_mask](client)
+    assert_equal(client.data_to_send(), Bytes(136, 128, 60, 60, 60, 60))
+    assert_equal(client.get_state(), 2)  # CLOSING
+    
+    # Try to send continuation frame - should fail
+    with assert_raises(contains="InvalidState: connection is not open"):
+        send_continuation[gen_mask_func=gen_mask](client, str_to_bytes("Eggs"), fin=True)
+
+
+fn test_server_send_close_in_fragmented_message() raises:
+    """Test that server cannot send close frame in a fragmented message."""
+    server = DummyProtocol[False, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    
+    # Send initial text frame
+    send_text(server, str_to_bytes("Spam"), fin=False)
+    assert_equal(server.data_to_send(), Bytes(1, 4) + str_to_bytes("Spam"))
+    
+    # Try to send close frame - should fail
+    send_close(server)
+    assert_equal(server.data_to_send(), Bytes(136, 0))
+    assert_equal(server.get_state(), 2)  # CLOSING
+    
+    # Try to send continuation frame - should fail
+    with assert_raises(contains="InvalidState: connection is not open"):
+        send_continuation(server, str_to_bytes("Eggs"), fin=True)
+
+
+fn test_client_receive_close_in_fragmented_message() raises:
+    """Test that client properly handles receiving close frame in a fragmented message."""
+    client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    
+    # Receive initial text frame
+    receive_data(client, Bytes(1, 4) + str_to_bytes("Spam"))  # \x01\x04Spam
+    events = client.events_received()
+    assert_equal(events[0][Frame], Frame(OP_TEXT, str_to_bytes("Spam"), fin=False))
+    
+    # Receive close frame
+    receive_data(client, Bytes(136, 2, 3, 232))  # \x88\x02\x03\xe8
+    events = client.events_received()
+    assert_equal(client.parser_exc.value()._message(), "ProtocolError: incomplete fragmented message")
+    assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: incomplete fragmented message").serialize(), fin=True))
+
+
+fn test_server_receive_close_in_fragmented_message() raises:
+    """Test that server properly handles receiving close frame in a fragmented message."""
+    server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 0, 0, 0)
+    # Receive initial text frame
+    receive_data[gen_mask_func=gen_mask](server, Bytes(1, 132, 0, 0, 0, 0) + str_to_bytes("Spam"))  # \x01\x84\x00\x00\x00\x00Spam
+    events = server.events_received()
+    assert_equal(events[0][Frame], Frame(OP_TEXT, str_to_bytes("Spam"), fin=False))
+    
+    # Receive close frame
+    receive_data[gen_mask_func=gen_mask](server, Bytes(136, 130, 0, 0, 0, 0, 3, 233))  # \x88\x82\x00\x00\x00\x00\x03\xe9
+    events = server.events_received()
+    assert_equal(server.parser_exc.value()._message(), "ProtocolError: incomplete fragmented message")
+    assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: incomplete fragmented message").serialize(), fin=True))
+
