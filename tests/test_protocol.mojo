@@ -1887,3 +1887,151 @@ fn test_server_receive_close_in_fragmented_message() raises:
     assert_equal(server.parser_exc.value()._message(), "ProtocolError: incomplete fragmented message")
     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: incomplete fragmented message").serialize(), fin=True))
 
+
+# ===-------------------------------------------------------------------===#
+# Test half-closes on connection termination.
+# ===-------------------------------------------------------------------===#
+
+fn test_client_receives_eof() raises:
+    """Test that client properly handles receiving EOF after close frame."""
+    client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    
+    # Receive close frame
+    receive_data(client, Bytes(136, 0))  # \x88\x00
+    events = client.events_received()
+    close_frame = Frame(OP_CLOSE, Bytes(), fin=True)
+    assert_equal(events[0][Frame], close_frame)
+    assert_equal(client.data_to_send(), close_frame.serialize[gen_mask_func=gen_mask](mask=client.is_masked()))
+    assert_equal(client.get_state(), 2)  # CLOSING
+    
+    # Receive EOF
+    receive_eof(client)
+    # TODO: See why this is still in closing state
+    assert_equal(client.get_state(), 3)  # CLOSED
+
+
+# def test_client_receives_eof(self):
+#     client = Protocol(CLIENT)
+#     client.receive_data(b"\x88\x00")
+#     self.assertConnectionClosing(client)
+#     client.receive_eof()
+#     self.assertIs(client.state, CLOSED)
+
+# def test_server_receives_eof(self):
+#     server = Protocol(SERVER)
+#     server.receive_data(b"\x88\x80\x3c\x3c\x3c\x3c")
+#     self.assertConnectionClosing(server)
+#     server.receive_eof()
+#     self.assertIs(server.state, CLOSED)
+
+# def test_client_receives_eof_between_frames(self):
+#     client = Protocol(CLIENT)
+#     client.receive_eof()
+#     self.assertIsInstance(client.parser_exc, EOFError)
+#     self.assertEqual(str(client.parser_exc), "unexpected end of stream")
+#     self.assertIs(client.state, CLOSED)
+
+# def test_server_receives_eof_between_frames(self):
+#     server = Protocol(SERVER)
+#     server.receive_eof()
+#     self.assertIsInstance(server.parser_exc, EOFError)
+#     self.assertEqual(str(server.parser_exc), "unexpected end of stream")
+#     self.assertIs(server.state, CLOSED)
+
+# def test_client_receives_eof_inside_frame(self):
+#     client = Protocol(CLIENT)
+#     client.receive_data(b"\x81")
+#     client.receive_eof()
+#     self.assertIsInstance(client.parser_exc, EOFError)
+#     self.assertEqual(
+#         str(client.parser_exc),
+#         "stream ends after 1 bytes, expected 2 bytes",
+#     )
+#     self.assertIs(client.state, CLOSED)
+
+# def test_server_receives_eof_inside_frame(self):
+#     server = Protocol(SERVER)
+#     server.receive_data(b"\x81")
+#     server.receive_eof()
+#     self.assertIsInstance(server.parser_exc, EOFError)
+#     self.assertEqual(
+#         str(server.parser_exc),
+#         "stream ends after 1 bytes, expected 2 bytes",
+#     )
+#     self.assertIs(server.state, CLOSED)
+
+# def test_client_receives_data_after_exception(self):
+#     client = Protocol(CLIENT)
+#     client.receive_data(b"\xff\xff")
+#     self.assertConnectionFailing(client, CloseCode.PROTOCOL_ERROR, "invalid opcode")
+#     client.receive_data(b"\x00\x00")
+#     self.assertFrameSent(client, None)
+
+# def test_server_receives_data_after_exception(self):
+#     server = Protocol(SERVER)
+#     server.receive_data(b"\xff\xff")
+#     self.assertConnectionFailing(server, CloseCode.PROTOCOL_ERROR, "invalid opcode")
+#     server.receive_data(b"\x00\x00")
+#     self.assertFrameSent(server, None)
+
+# def test_client_receives_eof_after_exception(self):
+#     client = Protocol(CLIENT)
+#     client.receive_data(b"\xff\xff")
+#     self.assertConnectionFailing(client, CloseCode.PROTOCOL_ERROR, "invalid opcode")
+#     client.receive_eof()
+#     self.assertFrameSent(client, None, eof=True)
+
+# def test_server_receives_eof_after_exception(self):
+#     server = Protocol(SERVER)
+#     server.receive_data(b"\xff\xff")
+#     self.assertConnectionFailing(server, CloseCode.PROTOCOL_ERROR, "invalid opcode")
+#     server.receive_eof()
+#     self.assertFrameSent(server, None)
+
+# def test_client_receives_data_and_eof_after_exception(self):
+#     client = Protocol(CLIENT)
+#     client.receive_data(b"\xff\xff")
+#     self.assertConnectionFailing(client, CloseCode.PROTOCOL_ERROR, "invalid opcode")
+#     client.receive_data(b"\x00\x00")
+#     client.receive_eof()
+#     self.assertFrameSent(client, None, eof=True)
+
+# def test_server_receives_data_and_eof_after_exception(self):
+#     server = Protocol(SERVER)
+#     server.receive_data(b"\xff\xff")
+#     self.assertConnectionFailing(server, CloseCode.PROTOCOL_ERROR, "invalid opcode")
+#     server.receive_data(b"\x00\x00")
+#     server.receive_eof()
+#     self.assertFrameSent(server, None)
+
+# def test_client_receives_data_after_eof(self):
+#     client = Protocol(CLIENT)
+#     client.receive_data(b"\x88\x00")
+#     self.assertConnectionClosing(client)
+#     client.receive_eof()
+#     with self.assertRaises(EOFError) as raised:
+#         client.receive_data(b"\x88\x00")
+#     self.assertEqual(str(raised.exception), "stream ended")
+
+# def test_server_receives_data_after_eof(self):
+#     server = Protocol(SERVER)
+#     server.receive_data(b"\x88\x80\x3c\x3c\x3c\x3c")
+#     self.assertConnectionClosing(server)
+#     server.receive_eof()
+#     with self.assertRaises(EOFError) as raised:
+#         server.receive_data(b"\x88\x80\x00\x00\x00\x00")
+#     self.assertEqual(str(raised.exception), "stream ended")
+
+# def test_client_receives_eof_after_eof(self):
+#     client = Protocol(CLIENT)
+#     client.receive_data(b"\x88\x00")
+#     self.assertConnectionClosing(client)
+#     client.receive_eof()
+#     client.receive_eof()  # this is idempotent
+
+# def test_server_receives_eof_after_eof(self):
+#     server = Protocol(SERVER)
+#     server.receive_data(b"\x88\x80\x3c\x3c\x3c\x3c")
+#     self.assertConnectionClosing(server)
+#     server.receive_eof()
+#     server.receive_eof()  # this is idempotent
