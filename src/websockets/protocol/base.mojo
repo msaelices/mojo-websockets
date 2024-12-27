@@ -511,7 +511,7 @@ fn receive_eof[T: Protocol](mut protocol: T) raises:
 
     `receive_eof` is idempotent.
     """
-    if protocol.get_eof_sent():
+    if protocol.get_eof_sent() and protocol.get_state() == CLOSED:
         return
 
     protocol.set_eof_sent(True)

@@ -1906,7 +1906,6 @@ fn test_client_receives_eof() raises:
     
     # Receive EOF
     receive_eof(client)
-    # TODO: See why this is still in closing state
     assert_equal(client.get_state(), 3)  # CLOSED
 
 
