@@ -47,7 +47,6 @@ alias smiley_data = Bytes(240, 159, 152, 128)
 alias smiley_masked_text_frame_data = Bytes(129, 132, 0, 0, 0, 0) + smiley_data
 
 
-@value
 struct DummyProtocol[masked: Bool, side_param: Int](Protocol):
     """Protocol struct for testing purposes."""
     alias side = side_param
@@ -65,9 +64,9 @@ struct DummyProtocol[masked: Bool, side_param: Int](Protocol):
     var discard_sent: Bool
     var expect_cont_frame: Bool
 
-    fn __init__(out self, state: Int, reader: StreamReader, writes: Bytes, events: List[Event]):
+    fn __init__(out self, state: Int, owned reader: StreamReader, writes: Bytes, events: List[Event]):
         self.state = state
-        self.reader = reader
+        self.reader = reader^
         self.writes = writes
         self.events = events
         self.parser_exc = None
@@ -79,9 +78,9 @@ struct DummyProtocol[masked: Bool, side_param: Int](Protocol):
         self.discard_sent = False
         self.expect_cont_frame = False
 
-    fn get_reader(self) -> StreamReader:
+    fn get_reader_ptr(self) -> UnsafePointer[StreamReader]:
         """Get the reader of the protocol."""
-        return self.reader
+        return UnsafePointer.address_of(self.reader)
 
     fn is_masked(self) -> Bool:
         """Check if the connection is masked."""
@@ -188,11 +187,7 @@ struct DummyProtocol[masked: Bool, side_param: Int](Protocol):
 
 
 fn test_client_receives_unmasked_frame() raises:
-    reader = StreamReader()
-    writes = Bytes()
-    events = List[Event]()
-
-    client = DummyProtocol[False, CLIENT](OPEN, reader, writes, events)
+    client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
     assert_equal(client.is_masked(), False)
 
     s = Bytes(129, 4) + str_to_bytes("Spam")

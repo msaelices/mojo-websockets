@@ -34,8 +34,8 @@ fn receive_data[
         gen_mask_func: Function to generate a mask.
     """
     # See https://github.com/python-websockets/websockets/blob/59d4dcf779fe7d2b0302083b072d8b03adce2f61/src/websockets/protocol.py#L254
-    reader = protocol.get_reader()
-    reader.feed_data(data)
+    reader_ptr = protocol.get_reader_ptr()
+    reader_ptr[].feed_data(data)
     if protocol.get_discard_sent():
         return None
 
@@ -105,11 +105,11 @@ fn parse_frame[T: Protocol](mut protocol: T, data: Bytes) raises -> Frame:
     Raises:
         Error: If parsing fails.
     """
-    reader = protocol.get_reader()
-    reader.feed_data(data)
-    reader.feed_eof()
+    reader_ptr = protocol.get_reader_ptr()
+    reader_ptr[].feed_data(data)
+    reader_ptr[].feed_eof()
     frame = Frame.parse(
-        reader, mask=protocol.is_masked(),
+        reader_ptr, mask=protocol.is_masked(),
     )
     return frame
 
@@ -341,8 +341,8 @@ fn discard[T: Protocol](mut protocol: T) raises:
     if (protocol.get_state() == CONNECTING or T.side == SERVER) != (protocol.get_eof_sent()):
         raise Error("ProtocolError: EOF not sent when it should or sent when it shouldn't")
 
-    reader = protocol.get_reader()
-    reader.discard()
+    reader_ptr = protocol.get_reader_ptr()
+    reader_ptr[].discard()
     # The following code is commented as reader is not a generator (not supported in Mojo)
     # TODO: Implement the equivalent of the following Python code:
     # while not reader.at_eof():
@@ -355,7 +355,7 @@ fn discard[T: Protocol](mut protocol: T) raises:
     if T.side == CLIENT:
         if protocol.get_state() != CONNECTING:
             send_eof(protocol)
-    if reader.at_eof():
+    if reader_ptr[].at_eof():
         protocol.set_state(CLOSED)
 
     # TODO: Implement the equivalent of the following Python code:

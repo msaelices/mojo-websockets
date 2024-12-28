@@ -78,7 +78,6 @@ trait Streamable:
         ...
 
 
-@value
 struct StreamReader(Streamable):
     """
     Stream reader.
@@ -91,6 +90,11 @@ struct StreamReader(Streamable):
         self.buffer = Bytes(capacity=DEFAULT_BUFFER_SIZE)
         self.offset = 0
         self.eof = False
+
+    fn __moveinit__(mut self, owned other: StreamReader):
+        self.buffer = other.buffer^
+        self.offset = other.offset
+        self.eof = other.eof
 
     fn feed_data(mut self, data: Bytes) raises -> None:
         """

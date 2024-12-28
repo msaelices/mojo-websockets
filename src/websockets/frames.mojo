@@ -308,7 +308,7 @@ struct Frame(Writable, Stringable, EqualityComparable):
 
     @staticmethod
     fn parse[T: Streamable](
-        inout stream: T,
+        stream_ptr: UnsafePointer[T],
         *,
         mask: Bool,
     ) raises -> Frame:
@@ -318,7 +318,7 @@ struct Frame(Writable, Stringable, EqualityComparable):
         This is a generator-based coroutine.
 
         Args:
-            stream: Stream to read from.
+            stream_ptr: Unsafe pointer to the stream to read from.
             mask: Whether the frame should be masked i.e. whether the read
                 happens on the server side.
 
@@ -333,7 +333,7 @@ struct Frame(Writable, Stringable, EqualityComparable):
 
         """
         # Read the header.
-        data = stream.read_exact(2).value()
+        data = stream_ptr[].read_exact(2).value()
         unpacked_data = unpack("!BB", data)
 
         head1 = unpacked_data[0]
@@ -353,18 +353,18 @@ struct Frame(Writable, Stringable, EqualityComparable):
 
         length = head2 & 0b01111111
         if length == 126:
-            data = stream.read_exact(2).value()
+            data = stream_ptr[].read_exact(2).value()
             length = unpack("!H", data)[0]
         elif length == 127:
-            data = stream.read_exact(8).value()
+            data = stream_ptr[].read_exact(8).value()
             length = unpack("!Q", data)[0]
         if mask:
-            mask_bytes = stream.read_exact(4).value()
-            data = stream.read_exact(length).value()
+            mask_bytes = stream_ptr[].read_exact(4).value()
+            data = stream_ptr[].read_exact(length).value()
             if mask:
                 data = apply_mask(data, mask_bytes)
         else:
-            data = stream.read_exact(length).value()
+            data = stream_ptr[].read_exact(length).value()
 
         frame = Frame(opcode, data, fin, rsv1, rsv2, rsv3)
         frame.check()

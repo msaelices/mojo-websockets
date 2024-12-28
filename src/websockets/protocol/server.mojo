@@ -1,4 +1,5 @@
 from collections import Optional
+from memory import UnsafePointer
 
 from websockets.aliases import Bytes, DEFAULT_MAX_REQUEST_BODY_SIZE, DEFAULT_BUFFER_SIZE
 from websockets.http import HTTPRequest
@@ -45,9 +46,9 @@ struct ServerProtocol[side_param: Int = SERVER](Protocol):
         self.eof_sent = False
         self.discard_sent = False
 
-    fn get_reader(self) -> StreamReader:
+    fn get_reader_ptr(self) -> UnsafePointer[StreamReader]:
         """Get the reader of the protocol."""
-        return self.reader
+        return UnsafePointer.address_of(self.reader)
 
     fn get_state(self) -> Int:
         """

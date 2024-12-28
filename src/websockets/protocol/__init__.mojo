@@ -1,4 +1,5 @@
 from collections import Optional
+from memory import UnsafePointer
 from utils import Variant
 
 from websockets.aliases import Bytes
@@ -23,8 +24,8 @@ alias Event = Variant[HTTPRequest, HTTPResponse, Frame]
 trait Protocol:
     alias side: Int
 
-    fn get_reader(self) -> StreamReader:
-        """Get the reader of the protocol."""
+    fn get_reader_ptr(self) -> UnsafePointer[StreamReader]:
+        """Get the pointer to the reader of the protocol."""
         ...
 
     fn get_state(self) -> Int:
