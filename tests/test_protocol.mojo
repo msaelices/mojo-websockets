@@ -1942,41 +1942,74 @@ fn test_server_receives_eof_between_frames() raises:
     assert_equal(server.parser_exc.value()._message(), "EOFError: unexpected end of stream")
     assert_equal(server.get_state(), 3)  # CLOSED
 
-# def test_client_receives_eof_inside_frame(self):
-#     client = Protocol(CLIENT)
-#     client.receive_data(b"\x81")
-#     client.receive_eof()
-#     self.assertIsInstance(client.parser_exc, EOFError)
-#     self.assertEqual(
-#         str(client.parser_exc),
-#         "stream ends after 1 bytes, expected 2 bytes",
-#     )
-#     self.assertIs(client.state, CLOSED)
 
-# def test_server_receives_eof_inside_frame(self):
-#     server = Protocol(SERVER)
-#     server.receive_data(b"\x81")
-#     server.receive_eof()
-#     self.assertIsInstance(server.parser_exc, EOFError)
-#     self.assertEqual(
-#         str(server.parser_exc),
-#         "stream ends after 1 bytes, expected 2 bytes",
-#     )
-#     self.assertIs(server.state, CLOSED)
+fn test_client_receives_eof_inside_frame() raises:
+    """Test that client properly handles receiving EOF inside a frame."""
+    client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    
+    # Receive partial frame
+    receive_data(client, Bytes(129))  # \x81
+    
+    # Receive EOF
+    receive_eof(client)
+    assert_equal(client.parser_exc.value()._message(), "EOFError: stream ends after 1 bytes, expected 2 bytes")
+    assert_equal(client.get_state(), 3)  # CLOSED
 
-# def test_client_receives_data_after_exception(self):
-#     client = Protocol(CLIENT)
-#     client.receive_data(b"\xff\xff")
-#     self.assertConnectionFailing(client, CloseCode.PROTOCOL_ERROR, "invalid opcode")
-#     client.receive_data(b"\x00\x00")
-#     self.assertFrameSent(client, None)
 
-# def test_server_receives_data_after_exception(self):
-#     server = Protocol(SERVER)
-#     server.receive_data(b"\xff\xff")
-#     self.assertConnectionFailing(server, CloseCode.PROTOCOL_ERROR, "invalid opcode")
-#     server.receive_data(b"\x00\x00")
-#     self.assertFrameSent(server, None)
+fn test_server_receives_eof_inside_frame() raises:
+    """Test that server properly handles receiving EOF inside a frame."""
+    server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    
+    # Receive partial frame
+    receive_data(server, Bytes(129))  # \x81
+    
+    # Receive EOF
+    receive_eof(server)
+    assert_equal(server.parser_exc.value()._message(), "EOFError: stream ends after 1 bytes, expected 2 bytes")
+    assert_equal(server.get_state(), 3)  # CLOSED
+
+
+fn test_client_receives_data_after_exception() raises:
+    """Test that client properly handles receiving data after an exception."""
+    client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    
+    # Receive invalid frame
+    receive_data(client, Bytes(255, 255))  # \xff\xff
+    events = client.events_received()
+    assert_equal(client.parser_exc.value()._message(), "ProtocolError: invalid opcode")
+    close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: invalid opcode").serialize(), fin=True)
+    assert_equal(events[0][Frame], close_frame)
+    data_to_send = client.data_to_send()
+    assert_equal(data_to_send, close_frame.serialize[gen_mask_func=gen_mask](mask=client.is_masked()))
+    
+    # Try to receive more data after exception
+    receive_data(client, Bytes(0, 0))  # \x00\x00
+    events = client.events_received()
+    assert_equal(len(events), 0)
+    assert_equal(client.data_to_send(), Bytes())
+
+
+fn test_server_receives_data_after_exception() raises:
+    """Test that server properly handles receiving data after an exception."""
+    server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 0, 0, 0)
+    # Receive invalid frame
+    receive_data[gen_mask_func=gen_mask](server, Bytes(255, 255))  # \xff\xff
+    events = server.events_received()
+    assert_equal(server.parser_exc.value()._message(), "ProtocolError: invalid opcode")
+    close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: invalid opcode").serialize(), fin=True)
+    assert_equal(events[0][Frame], close_frame)
+    data_to_send = server.data_to_send()
+    assert_equal(data_to_send, close_frame.serialize[gen_mask_func=gen_mask](mask=server.is_masked()))
+    
+    # Try to receive more data after exception
+    receive_data[gen_mask_func=gen_mask](server, Bytes(0, 0))  # \x00\x00
+    events = server.events_received()
+    assert_equal(len(events), 0)
+    assert_equal(server.data_to_send(), Bytes())
+
 
 # def test_client_receives_eof_after_exception(self):
 #     client = Protocol(CLIENT)
