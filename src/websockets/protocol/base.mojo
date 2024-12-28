@@ -508,6 +508,9 @@ fn receive_eof[T: Protocol](mut protocol: T) raises:
 
     `receive_eof` is idempotent.
     """
+    if protocol.get_state() == OPEN:
+        protocol.set_parser_exc(Error("EOFError: unexpected end of stream"))
+
     if protocol.get_eof_sent() and protocol.get_state() == CLOSED:
         return
 

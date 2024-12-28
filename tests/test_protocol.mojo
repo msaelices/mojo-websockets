@@ -1904,33 +1904,43 @@ fn test_client_receives_eof() raises:
     assert_equal(client.get_state(), 3)  # CLOSED
 
 
-# def test_client_receives_eof(self):
-#     client = Protocol(CLIENT)
-#     client.receive_data(b"\x88\x00")
-#     self.assertConnectionClosing(client)
-#     client.receive_eof()
-#     self.assertIs(client.state, CLOSED)
+fn test_server_receives_eof() raises:
+    """Test that server properly handles receiving EOF after close frame."""
+    server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    
+    fn gen_mask() -> Bytes:
+        return Bytes(60, 60, 60, 60)  # \x3c\x3c\x3c\x3c
+    # Receive close frame
+    receive_data[gen_mask_func=gen_mask](server, Bytes(136, 128, 60, 60, 60, 60))  # \x88\x80\x3c\x3c\x3c\x3c
+    events = server.events_received()
+    close_frame = Frame(OP_CLOSE, Bytes(), fin=True)
+    assert_equal(events[0][Frame], close_frame)
+    assert_equal(server.data_to_send(), close_frame.serialize[gen_mask_func=gen_mask](mask=server.is_masked()))
+    assert_equal(server.get_state(), 2)  # CLOSING
+    
+    # Receive EOF
+    receive_eof(server)
+    assert_equal(server.get_state(), 3)  # CLOSED
 
-# def test_server_receives_eof(self):
-#     server = Protocol(SERVER)
-#     server.receive_data(b"\x88\x80\x3c\x3c\x3c\x3c")
-#     self.assertConnectionClosing(server)
-#     server.receive_eof()
-#     self.assertIs(server.state, CLOSED)
 
-# def test_client_receives_eof_between_frames(self):
-#     client = Protocol(CLIENT)
-#     client.receive_eof()
-#     self.assertIsInstance(client.parser_exc, EOFError)
-#     self.assertEqual(str(client.parser_exc), "unexpected end of stream")
-#     self.assertIs(client.state, CLOSED)
+fn test_client_receives_eof_between_frames() raises:
+    """Test that client properly handles receiving EOF between frames."""
+    client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    
+    # Receive EOF between frames
+    receive_eof(client)
+    assert_equal(client.parser_exc.value()._message(), "EOFError: unexpected end of stream")
+    assert_equal(client.get_state(), 3)  # CLOSED
 
-# def test_server_receives_eof_between_frames(self):
-#     server = Protocol(SERVER)
-#     server.receive_eof()
-#     self.assertIsInstance(server.parser_exc, EOFError)
-#     self.assertEqual(str(server.parser_exc), "unexpected end of stream")
-#     self.assertIs(server.state, CLOSED)
+
+fn test_server_receives_eof_between_frames() raises:
+    """Test that server properly handles receiving EOF between frames."""
+    server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    
+    # Receive EOF between frames
+    receive_eof(server)
+    assert_equal(server.parser_exc.value()._message(), "EOFError: unexpected end of stream")
+    assert_equal(server.get_state(), 3)  # CLOSED
 
 # def test_client_receives_eof_inside_frame(self):
 #     client = Protocol(CLIENT)
