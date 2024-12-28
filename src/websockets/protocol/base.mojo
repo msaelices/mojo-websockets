@@ -34,8 +34,6 @@ fn receive_data[
         gen_mask_func: Function to generate a mask.
     """
     # See https://github.com/python-websockets/websockets/blob/59d4dcf779fe7d2b0302083b072d8b03adce2f61/src/websockets/protocol.py#L254
-    reader_ptr = protocol.get_reader_ptr()
-    reader_ptr[].feed_data(data)
     if protocol.get_discard_sent():
         return None
 
@@ -107,7 +105,6 @@ fn parse_frame[T: Protocol](mut protocol: T, data: Bytes) raises -> Frame:
     """
     reader_ptr = protocol.get_reader_ptr()
     reader_ptr[].feed_data(data)
-    reader_ptr[].feed_eof()
     frame = Frame.parse(
         reader_ptr, mask=protocol.is_masked(),
     )
