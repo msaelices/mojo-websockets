@@ -53,8 +53,8 @@ fn receive_data[
         # Fail the WebSocket Connection
         fail[gen_mask_func=gen_mask_func](protocol, code, reason)
 
-
-    protocol.add_event(event)
+    if not event.isa[NoneType]():
+        protocol.add_event(event)
     protocol.set_parser_exc(err)
 
 
@@ -83,10 +83,14 @@ fn parse[T: Protocol](mut protocol: T, data: Bytes) raises -> Event:
         )
         return response
     else:
-        return parse_frame(protocol, data)
+        optional_frame = parse_frame(protocol, data)
+        if not optional_frame:
+            # TODO: change to just return None when the Mojo compiler does not complain
+            return NoneType()
+        return optional_frame.value()
 
 
-fn parse_frame[T: Protocol](mut protocol: T, data: Bytes) raises -> Frame:
+fn parse_frame[T: Protocol](mut protocol: T, data: Bytes) raises -> Optional[Frame]:
     """
     Parse incoming data into frames.
 
@@ -109,7 +113,7 @@ fn parse_frame[T: Protocol](mut protocol: T, data: Bytes) raises -> Frame:
     return parse_buffer(protocol)
 
 
-fn parse_buffer[T: Protocol](mut protocol: T) raises -> Frame:
+fn parse_buffer[T: Protocol](mut protocol: T) raises -> Optional[Frame]:
     """
     Parse the buffer into a frame.
 
@@ -123,10 +127,10 @@ fn parse_buffer[T: Protocol](mut protocol: T) raises -> Frame:
         Frame: The parsed WebSocket frame.
     """
     reader_ptr = protocol.get_reader_ptr()
-    frame = Frame.parse(
+    optional_frame = Frame.parse(
         reader_ptr, mask=protocol.is_masked(),
     )
-    return frame
+    return optional_frame
 
 
 fn receive_frame[

@@ -1,3 +1,4 @@
+from collections import Optional
 from memory import UnsafePointer
 from testing import assert_equal, assert_true, assert_raises
 
@@ -35,7 +36,7 @@ fn test_close_serialize() raises:
     assert_equal(Close(1000, "OK").serialize(), bytes("\x03\xe8OK"))
 
 
-fn parse(data: Bytes, mask: Bool) raises -> Frame:
+fn parse(data: Bytes, mask: Bool) raises -> Optional[Frame]:
 
     """
     Parse a frame from a bytestring.
@@ -58,7 +59,7 @@ fn assert_frame_data(frame: Frame, data: Bytes, mask: Bool) raises:
     # Compare frames first, because test failures are easier to read,
     # especially when mask = True.
     parsed_frame = parse(data, mask=mask)
-    assert_equal(parsed_frame.data, frame.data)
+    assert_equal(parsed_frame.value().data, frame.data)
 
     # Make masking deterministic by reusing the same "random" mask.
     # This has an effect only when mask is True.

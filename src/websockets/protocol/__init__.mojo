@@ -18,7 +18,7 @@ alias CLOSED = 3
 alias SEND_EOF = Bytes()
 """Sentinel signaling that the TCP connection must be half-closed."""
 
-alias Event = Variant[HTTPRequest, HTTPResponse, Frame]
+alias Event = Variant[HTTPRequest, HTTPResponse, Frame, NoneType]
 
 
 trait Protocol:

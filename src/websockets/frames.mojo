@@ -311,7 +311,7 @@ struct Frame(Writable, Stringable, EqualityComparable):
         stream_ptr: UnsafePointer[T],
         *,
         mask: Bool,
-    ) raises -> Frame:
+    ) raises -> Optional[Frame]:
         """
         Parse a WebSocket frame.
 
@@ -335,7 +335,8 @@ struct Frame(Writable, Stringable, EqualityComparable):
         # Read the header.
         data_or_none = stream_ptr[].read_exact(2)
         if data_or_none is None:
-            raise Error("EOFError: stream expected to have at least 2 bytes to read the header")
+            # Return waiting for more data to be available
+            return None
         data = data_or_none.value()
         unpacked_data = unpack("!BB", data)
 

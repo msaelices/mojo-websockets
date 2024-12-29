@@ -1954,7 +1954,7 @@ fn test_client_receives_eof_inside_frame() raises:
     receive_eof(client)
 
     # This was the "EOFError: stream ends after 1 bytes, expected 2 bytes" error in Python
-    assert_equal(client.parser_exc.value()._message(), "EOFError: stream expected to have at least 2 bytes to read the header")
+    assert_equal(client.parser_exc.value()._message(), "EOFError: unexpected end of stream")
     assert_equal(client.get_state(), 3)  # CLOSED
 
 
@@ -1969,7 +1969,7 @@ fn test_server_receives_eof_inside_frame() raises:
     receive_eof(server)
 
     # This was the "EOFError: stream ends after 1 bytes, expected 2 bytes" error in Python
-    assert_equal(server.parser_exc.value()._message(), "EOFError: stream expected to have at least 2 bytes to read the header")
+    assert_equal(server.parser_exc.value()._message(), "EOFError: unexpected end of stream")
     assert_equal(server.get_state(), 3)  # CLOSED
 
 
