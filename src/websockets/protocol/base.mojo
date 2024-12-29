@@ -105,6 +105,24 @@ fn parse_frame[T: Protocol](mut protocol: T, data: Bytes) raises -> Frame:
     """
     reader_ptr = protocol.get_reader_ptr()
     reader_ptr[].feed_data(data)
+
+    return parse_buffer(protocol)
+
+
+fn parse_buffer[T: Protocol](mut protocol: T) raises -> Frame:
+    """
+    Parse the buffer into a frame.
+
+    Parameters:
+        T: Protocol.
+
+    Args:
+        protocol: Protocol instance.
+
+    Returns:
+        Frame: The parsed WebSocket frame.
+    """
+    reader_ptr = protocol.get_reader_ptr()
     frame = Frame.parse(
         reader_ptr, mask=protocol.is_masked(),
     )
