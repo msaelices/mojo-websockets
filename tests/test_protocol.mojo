@@ -1952,20 +1952,24 @@ fn test_client_receives_eof_inside_frame() raises:
     
     # Receive EOF
     receive_eof(client)
-    assert_equal(client.parser_exc.value()._message(), "EOFError: stream ends after 1 bytes, expected 2 bytes")
+
+    # This was the "EOFError: stream ends after 1 bytes, expected 2 bytes" error in Python
+    assert_equal(client.parser_exc.value()._message(), "EOFError: stream expected to have at least 2 bytes to read the header")
     assert_equal(client.get_state(), 3)  # CLOSED
 
 
 fn test_server_receives_eof_inside_frame() raises:
     """Test that server properly handles receiving EOF inside a frame."""
-    server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    server = DummyProtocol[False, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
     
     # Receive partial frame
     receive_data(server, Bytes(129))  # \x81
     
     # Receive EOF
     receive_eof(server)
-    assert_equal(server.parser_exc.value()._message(), "EOFError: stream ends after 1 bytes, expected 2 bytes")
+
+    # This was the "EOFError: stream ends after 1 bytes, expected 2 bytes" error in Python
+    assert_equal(server.parser_exc.value()._message(), "EOFError: stream expected to have at least 2 bytes to read the header")
     assert_equal(server.get_state(), 3)  # CLOSED
 
 

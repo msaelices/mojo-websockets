@@ -333,7 +333,10 @@ struct Frame(Writable, Stringable, EqualityComparable):
 
         """
         # Read the header.
-        data = stream_ptr[].read_exact(2).value()
+        data_or_none = stream_ptr[].read_exact(2)
+        if data_or_none is None:
+            raise Error("EOFError: stream expected to have at least 2 bytes to read the header")
+        data = data_or_none.value()
         unpacked_data = unpack("!BB", data)
 
         head1 = unpacked_data[0]

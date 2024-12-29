@@ -517,6 +517,11 @@ fn receive_eof[T: Protocol](mut protocol: T) raises:
     protocol.set_eof_sent(True)
     protocol.set_state(CLOSED)
 
+    # The following code is commented as reader is not a generator (not supported in Mojo)
+    # This starts a coroutine that reads the next frame from the stream.
+    # TODO: Implement the equivalent of the following Python code:
+    # next(protocol.parser)
+
 
 fn send_ping[
     T: Protocol,
