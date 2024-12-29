@@ -1,3 +1,4 @@
+from memory import UnsafePointer
 from testing import assert_equal, assert_true, assert_raises
 
 from websockets.aliases import Bytes
@@ -35,6 +36,7 @@ fn test_close_serialize() raises:
 
 
 fn parse(data: Bytes, mask: Bool) raises -> Frame:
+
     """
     Parse a frame from a bytestring.
     """
@@ -42,7 +44,7 @@ fn parse(data: Bytes, mask: Bool) raises -> Frame:
     reader.feed_data(data)
     reader.feed_eof()
     frame = Frame.parse(
-        reader, mask=mask,
+        UnsafePointer.address_of(reader), mask=mask,
     )
     return frame
 
