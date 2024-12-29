@@ -238,6 +238,8 @@ fn receive_frame[
         # However, that doesn't seem useful; websockets doesn't support it.
         discard(protocol)
 
+        # Parse for any remaining data in the buffer.
+        _ = parse_buffer(protocol)
     else:
         # This can't happen because Frame.parse() validates opcodes.
         raise Error("AssertionError: unexpected opcode: {}".format(frame.opcode))
@@ -532,6 +534,9 @@ fn fail[
     # Connection_."
     discard(protocol)
 
+    # Parse for any remaining data in the buffer.
+    _ = parse_buffer(protocol)
+
 
 fn receive_eof[T: Protocol](mut protocol: T) raises:
     """
@@ -555,10 +560,8 @@ fn receive_eof[T: Protocol](mut protocol: T) raises:
     protocol.set_eof_sent(True)
     protocol.set_state(CLOSED)
 
-    # The following code is commented as reader is not a generator (not supported in Mojo)
-    # This starts a coroutine that reads the next frame from the stream.
-    # TODO: Implement the equivalent of the following Python code:
-    # next(protocol.parser)
+    # Parse the buffer one last time to process the last frame.
+    _ = parse_buffer(protocol)
 
 
 fn send_ping[
