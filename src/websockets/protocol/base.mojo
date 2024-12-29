@@ -37,28 +37,14 @@ fn receive_data[
     if protocol.get_discard_sent():
         return None
 
-    var err: Optional[Error] = None
-    try:
-        event = parse(protocol, data)
-        if event.isa[Frame]():
-            receive_frame[gen_mask_func=gen_mask_func](protocol, event[Frame])
-        err = None
-    except error:
-        err = error
-        # TODO: Differentiate between protocol errors, connection and other kind of errors
-        code = CLOSE_CODE_PROTOCOL_ERROR
-        reason = error._message()
-        event = Frame(OP_CLOSE, Close(code, reason).serialize(), fin=True)
-
-        # Fail the WebSocket Connection
-        fail[gen_mask_func=gen_mask_func](protocol, code, reason)
-
-    if not event.isa[NoneType]():
-        protocol.add_event(event)
-    protocol.set_parser_exc(err)
+    _ = parse[gen_mask_func=gen_mask_func](protocol, data)
 
 
-fn parse[T: Protocol](mut protocol: T, data: Bytes) raises -> Event:
+
+fn parse[
+    T: Protocol,
+    gen_mask_func: fn () -> Bytes = gen_mask,
+](mut protocol: T, data: Bytes) raises -> Event:
     """Parse a frame from a bytestring.
 
     Args:
@@ -67,6 +53,7 @@ fn parse[T: Protocol](mut protocol: T, data: Bytes) raises -> Event:
 
     Parameters:
         T: Protocol.
+        gen_mask_func: Function to generate a mask.
 
     Returns:
         Event: Either an HTTPRequest during connection handshake or a Frame during normal operation.
@@ -83,14 +70,17 @@ fn parse[T: Protocol](mut protocol: T, data: Bytes) raises -> Event:
         )
         return response
     else:
-        optional_frame = parse_frame(protocol, data)
+        optional_frame = parse_frame[gen_mask_func=gen_mask_func](protocol, data)
         if not optional_frame:
             # TODO: change to just return None when the Mojo compiler does not complain
             return NoneType()
         return optional_frame.value()
 
 
-fn parse_frame[T: Protocol](mut protocol: T, data: Bytes) raises -> Optional[Frame]:
+fn parse_frame[
+    T: Protocol,
+    gen_mask_func: fn () -> Bytes = gen_mask,
+](mut protocol: T, data: Bytes) raises -> Optional[Frame]:
     """
     Parse incoming data into frames.
 
@@ -100,6 +90,7 @@ fn parse_frame[T: Protocol](mut protocol: T, data: Bytes) raises -> Optional[Fra
 
     Parameters:
         T: Protocol.
+        gen_mask_func: Function to generate a mask.
 
     Returns:
         Frame: The parsed WebSocket frame.
@@ -110,15 +101,19 @@ fn parse_frame[T: Protocol](mut protocol: T, data: Bytes) raises -> Optional[Fra
     reader_ptr = protocol.get_reader_ptr()
     reader_ptr[].feed_data(data)
 
-    return parse_buffer(protocol)
+    return parse_buffer[gen_mask_func=gen_mask_func](protocol)
 
 
-fn parse_buffer[T: Protocol](mut protocol: T) raises -> Optional[Frame]:
+fn parse_buffer[
+    T: Protocol,
+    gen_mask_func: fn () -> Bytes = gen_mask,
+](mut protocol: T) raises -> Optional[Frame]:
     """
     Parse the buffer into a frame.
 
     Parameters:
         T: Protocol.
+        gen_mask_func: Function to generate a mask.
 
     Args:
         protocol: Protocol instance.
@@ -126,11 +121,32 @@ fn parse_buffer[T: Protocol](mut protocol: T) raises -> Optional[Frame]:
     Returns:
         Frame: The parsed WebSocket frame.
     """
-    reader_ptr = protocol.get_reader_ptr()
-    optional_frame = Frame.parse(
-        reader_ptr, mask=protocol.is_masked(),
-    )
-    return optional_frame
+    var reader_ptr = protocol.get_reader_ptr()
+    var err: Optional[Error] = None
+    var optional_frame: Optional[Frame] = None
+    try:
+        optional_frame = Frame.parse(
+            reader_ptr, mask=protocol.is_masked(),
+        )
+        if optional_frame:
+            receive_frame[gen_mask_func=gen_mask_func](protocol, optional_frame.value())
+            protocol.add_event(optional_frame.value())
+        err = None
+        return optional_frame
+    except error:
+        err = error
+        # TODO: Differentiate between protocol errors, connection and other kind of errors
+        code = CLOSE_CODE_PROTOCOL_ERROR
+        reason = error._message()
+        event = Frame(OP_CLOSE, Close(code, reason).serialize(), fin=True)
+
+        # Fail the WebSocket Connection
+        fail[gen_mask_func=gen_mask_func](protocol, code, reason)
+        protocol.add_event(event)
+
+    protocol.set_parser_exc(err)
+
+    return None
 
 
 fn receive_frame[
