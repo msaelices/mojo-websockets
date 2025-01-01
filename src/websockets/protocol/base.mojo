@@ -592,3 +592,31 @@ fn send_ping[
         raise Error("InvalidState: connection is {}".format(state))
     send_frame[gen_mask_func=gen_mask_func](protocol, Frame(OP_PING, data))
 
+
+fn close_expected[T: Protocol](protocol: T) -> Bool:
+    """
+    Tell if the TCP connection is expected to close soon.
+
+    Call this method immediately after any of the ``receive_*()``,
+    ``send_close()``, or `fail()` methods.
+
+    If it returns :obj:`True`, schedule closing the TCP connection after a
+    short timeout if the other side hasn't already closed it.
+
+    Returns:
+        Whether the TCP connection is expected to close soon.
+
+    """
+    # We expect a TCP close if and only if we sent a close frame:
+    # * Normal closure: once we send a close frame, we expect a TCP close:
+    #   server waits for client to complete the TCP closing handshake;
+    #   client waits for server to initiate the TCP closing handshake.
+    # * Abnormal closure: we always send a close frame and the same logic
+    #   applies, except on EOFError where we don't send a close frame
+    #   because we already received the TCP close, so we don't expect it.
+    # We already got a TCP Close if and only if the state is CLOSED.
+    # See https://github.com/python-websockets/websockets/blob/59d4dcf779fe7d2b0302083b072d8b03adce2f61/src/websockets/protocol.py#L514
+
+    # TODO: Implement the handshake_exc logic
+    return protocol.get_state() == CLOSING  # or protocol.get_handshake_exc()
+

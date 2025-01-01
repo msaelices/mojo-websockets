@@ -131,33 +131,6 @@ struct ServerProtocol[side_param: Int = SERVER](Protocol):
         self.writes = Bytes()
         return writes
 
-    fn close_expected(self) -> Bool:
-        """
-        Tell if the TCP connection is expected to close soon.
-
-        Call this method immediately after any of the ``receive_*()``,
-        ``send_close()``, or `fail()` methods.
-
-        If it returns :obj:`True`, schedule closing the TCP connection after a
-        short timeout if the other side hasn't already closed it.
-
-        Returns:
-            Whether the TCP connection is expected to close soon.
-
-        """
-        # We expect a TCP close if and only if we sent a close frame:
-        # * Normal closure: once we send a close frame, we expect a TCP close:
-        #   server waits for client to complete the TCP closing handshake;
-        #   client waits for server to initiate the TCP closing handshake.
-        # * Abnormal closure: we always send a close frame and the same logic
-        #   applies, except on EOFError where we don't send a close frame
-        #   because we already received the TCP close, so we don't expect it.
-        # We already got a TCP Close if and only if the state is CLOSED.
-        # See https://github.com/python-websockets/websockets/blob/59d4dcf779fe7d2b0302083b072d8b03adce2f61/src/websockets/protocol.py#L514
-
-        # TODO: Implement the handshake_exc logic
-        return self.state == CLOSING  # or self.handshake_exc is not None
-
     fn expect_continuation_frame(self) -> Bool:
         """Check if a continuation frame is expected."""
         return self.expect_cont_frame

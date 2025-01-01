@@ -21,6 +21,7 @@ from websockets.frames import (
 )
 from websockets.protocol import Event, CLIENT, SERVER, OPEN
 from websockets.protocol.base import (
+    close_expected,
     fail,
     receive_data, 
     receive_eof,
@@ -2165,3 +2166,84 @@ fn test_server_receives_eof_after_eof() raises:
     # Receive EOF twice - should be idempotent
     receive_eof(server)
     receive_eof(server)  # This should not raise any error
+
+
+# ===-------------------------------------------------------------------===#
+# Test expectation of TCP close on connection termination.
+# ===-------------------------------------------------------------------===#
+
+fn test_client_default() raises:
+    """Test that client does not expect close by default."""
+    client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    assert_equal(close_expected(client), False)
+
+
+fn test_server_default() raises:
+    """Test that server does not expect close by default."""
+    server = DummyProtocol[False, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    assert_equal(close_expected(server), False)
+
+
+fn test_close_expected_if_client_sends_close() raises:
+    """Test that client expects close after sending close frame."""
+    client = DummyProtocol[True, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 0, 0, 0)
+    send_close[gen_mask_func=gen_mask](client)
+    assert_equal(close_expected(client), True)
+
+
+fn test_close_expected_if_server_sends_close() raises:
+    """Test that server expects close after sending close frame."""
+    server = DummyProtocol[False, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    send_close(server)
+    assert_equal(close_expected(server), True)
+
+
+fn test_close_expected_if_client_receives_close() raises:
+    """Test that client expects close after receiving close frame."""
+    client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    receive_data(client, Bytes(136, 0))  # \x88\x00
+    assert_equal(close_expected(client), True)
+
+
+fn test_close_expected_if_client_receives_close_then_eof() raises:
+    """Test that client does not expect close after receiving close frame and EOF."""
+    client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    receive_data(client, Bytes(136, 0))  # \x88\x00
+    receive_eof(client)
+    assert_equal(close_expected(client), False)
+
+
+fn test_close_expected_if_server_receives_close_then_eof() raises:
+    """Test that server does not expect close after receiving close frame and EOF."""
+    server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    fn gen_mask() -> Bytes:
+        return Bytes(60, 60, 60, 60)  # \x3c\x3c\x3c\x3c
+    receive_data[gen_mask_func=gen_mask](server, Bytes(136, 128, 60, 60, 60, 60))  # \x88\x80\x3c\x3c\x3c\x3c
+    receive_eof(server)
+    assert_equal(close_expected(server), False)
+
+
+fn test_close_expected_if_server_receives_close() raises:
+    """Test that server expects close after receiving close frame."""
+    server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    fn gen_mask() -> Bytes:
+        return Bytes(60, 60, 60, 60)  # \x3c\x3c\x3c\x3c
+    receive_data[gen_mask_func=gen_mask](server, Bytes(136, 128, 60, 60, 60, 60))  # \x88\x80\x3c\x3c\x3c\x3c
+    assert_equal(close_expected(server), True)
+
+
+fn test_close_expected_if_client_fails_connection() raises:
+    """Test that client expects close after failing the connection."""
+    client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    fail(client, CLOSE_CODE_PROTOCOL_ERROR)
+    assert_equal(close_expected(client), True)
+
+
+fn test_close_expected_if_server_fails_connection() raises:
+    """Test that server expects close after failing the connection."""
+    server = DummyProtocol[False, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    fail(server, CLOSE_CODE_PROTOCOL_ERROR)
+    assert_equal(close_expected(server), True)
+
