@@ -23,6 +23,7 @@ struct ServerProtocol[side_param: Int = SERVER](Protocol):
     var state: Int
     var expect_cont_frame: Bool
     var parser_exc: Optional[Error]
+    var handshake_exc: Optional[Error]
     var curr_size: Optional[Int]
     # Close code and reason, set when a close frame is sent or received.
     var close_rcvd: Optional[Close]
@@ -38,6 +39,7 @@ struct ServerProtocol[side_param: Int = SERVER](Protocol):
         self.state = CONNECTING
         self.expect_cont_frame = False
         self.parser_exc = None
+        self.handshake_exc = None
         self.curr_size = None
 
         self.close_rcvd = None
@@ -194,3 +196,12 @@ struct ServerProtocol[side_param: Int = SERVER](Protocol):
     fn set_parser_exc(mut self, exc: Optional[Error]) -> None:
         """Set the parser exception."""
         self.parser_exc = exc
+
+
+    fn get_handshake_exc(self) -> Optional[Error]:
+        """Get the handshake exception."""
+        return self.handshake_exc
+
+    fn set_handshake_exc(mut self, exc: Optional[Error]) -> None:
+        """Set the handshake exception."""
+        self.handshake_exc = exc

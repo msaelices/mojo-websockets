@@ -56,6 +56,7 @@ struct DummyProtocol[masked: Bool, side_param: Int](Protocol):
     var writes: Bytes
     var events: List[Event]
     var parser_exc: Optional[Error]
+    var handshake_exc: Optional[Error]
     var curr_size: Optional[Int]
     # Close code and reason, set when a close frame is sent or received.
     var close_rcvd: Optional[Close]
@@ -71,6 +72,7 @@ struct DummyProtocol[masked: Bool, side_param: Int](Protocol):
         self.writes = writes
         self.events = events
         self.parser_exc = None
+        self.handshake_exc = None
         self.curr_size = None
         self.close_rcvd = None
         self.close_sent = None
@@ -181,6 +183,13 @@ struct DummyProtocol[masked: Bool, side_param: Int](Protocol):
         """Set the parser exception."""
         self.parser_exc = exc
 
+    fn get_handshake_exc(self) -> Optional[Error]:
+        """Get the handshake exception."""
+        return self.handshake_exc
+
+    fn set_handshake_exc(mut self, exc: Optional[Error]) -> None:
+        """Set the handshake exception."""
+        self.handshake_exc = exc
 
 # ===-------------------------------------------------------------------===#
 # Test frame masking.

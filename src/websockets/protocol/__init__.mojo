@@ -148,3 +148,11 @@ trait Protocol:
     fn set_parser_exc(mut self, exc: Optional[Error]) -> None:
         """Set the parser exception."""
         ...
+
+    fn get_handshake_exc(self) -> Optional[Error]:
+        """Get the handshake exception."""
+        ...
+
+    fn set_handshake_exc(mut self, exc: Optional[Error]) -> None:
+        """Set the handshake exception."""
+        ...
