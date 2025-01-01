@@ -23,6 +23,7 @@ from websockets.protocol import Event, CLIENT, SERVER, OPEN
 from websockets.protocol.base import (
     close_expected,
     fail,
+    get_close_exc,
     receive_data, 
     receive_eof,
     send_binary,
@@ -2255,4 +2256,123 @@ fn test_close_expected_if_server_fails_connection() raises:
     server = DummyProtocol[False, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
     fail(server, CLOSE_CODE_PROTOCOL_ERROR)
     assert_equal(close_expected(server), True)
+
+
+# ===-------------------------------------------------------------------===#
+# Test connection closed exception.
+# ===-------------------------------------------------------------------===#
+
+
+fn test_close_exc_if_client_sends_close_then_receives_close() raises:
+    """Test client-initiated close handshake on the client side complete."""
+    client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+
+    # Send close frame
+    send_close(client, CLOSE_CODE_NORMAL_CLOSURE, "")
+
+    # Receive close frame
+    receive_data(client, Bytes(136, 2, 3, 232))  # \x88\x02\x03\xe8
+
+    # Receive EOF
+    receive_eof(client)
+
+    # Verify close details
+    assert_equal(client.get_close_rcvd().value().code, CLOSE_CODE_NORMAL_CLOSURE)
+    assert_equal(client.get_close_rcvd().value().reason, "")
+    assert_equal(client.get_close_sent().value().code, CLOSE_CODE_NORMAL_CLOSURE)
+    assert_equal(client.get_close_sent().value().reason, "")
+    assert_equal(client.get_close_rcvd_then_sent().value(), False)
+
+    close_exc = get_close_exc(client)
+    assert_equal(close_exc._message(), "ConnectionClosedOK: 1000, 1000")
+
+
+
+# def test_client_sends_close_then_receives_close(self):
+#     # Client-initiated close handshake on the client side complete.
+#     client = Protocol(CLIENT)
+#     client.send_close(CloseCode.NORMAL_CLOSURE, "")
+#     client.receive_data(b"\x88\x02\x03\xe8")
+#     client.receive_eof()
+#     exc = client.close_exc
+#     self.assertIsInstance(exc, ConnectionClosedOK)
+#     self.assertEqual(exc.rcvd, Close(CloseCode.NORMAL_CLOSURE, ""))
+#     self.assertEqual(exc.sent, Close(CloseCode.NORMAL_CLOSURE, ""))
+#     self.assertFalse(exc.rcvd_then_sent)
+
+# def test_server_sends_close_then_receives_close(self):
+#     # Server-initiated close handshake on the server side complete.
+#     server = Protocol(SERVER)
+#     server.send_close(CloseCode.NORMAL_CLOSURE, "")
+#     server.receive_data(b"\x88\x82\x00\x00\x00\x00\x03\xe8")
+#     server.receive_eof()
+#     exc = server.close_exc
+#     self.assertIsInstance(exc, ConnectionClosedOK)
+#     self.assertEqual(exc.rcvd, Close(CloseCode.NORMAL_CLOSURE, ""))
+#     self.assertEqual(exc.sent, Close(CloseCode.NORMAL_CLOSURE, ""))
+#     self.assertFalse(exc.rcvd_then_sent)
+
+# def test_client_receives_close_then_sends_close(self):
+#     # Server-initiated close handshake on the client side complete.
+#     client = Protocol(CLIENT)
+#     client.receive_data(b"\x88\x02\x03\xe8")
+#     client.receive_eof()
+#     exc = client.close_exc
+#     self.assertIsInstance(exc, ConnectionClosedOK)
+#     self.assertEqual(exc.rcvd, Close(CloseCode.NORMAL_CLOSURE, ""))
+#     self.assertEqual(exc.sent, Close(CloseCode.NORMAL_CLOSURE, ""))
+#     self.assertTrue(exc.rcvd_then_sent)
+
+# def test_server_receives_close_then_sends_close(self):
+#     # Client-initiated close handshake on the server side complete.
+#     server = Protocol(SERVER)
+#     server.receive_data(b"\x88\x82\x00\x00\x00\x00\x03\xe8")
+#     server.receive_eof()
+#     exc = server.close_exc
+#     self.assertIsInstance(exc, ConnectionClosedOK)
+#     self.assertEqual(exc.rcvd, Close(CloseCode.NORMAL_CLOSURE, ""))
+#     self.assertEqual(exc.sent, Close(CloseCode.NORMAL_CLOSURE, ""))
+#     self.assertTrue(exc.rcvd_then_sent)
+
+# def test_client_sends_close_then_receives_eof(self):
+#     # Client-initiated close handshake on the client side times out.
+#     client = Protocol(CLIENT)
+#     client.send_close(CloseCode.NORMAL_CLOSURE, "")
+#     client.receive_eof()
+#     exc = client.close_exc
+#     self.assertIsInstance(exc, ConnectionClosedError)
+#     self.assertIsNone(exc.rcvd)
+#     self.assertEqual(exc.sent, Close(CloseCode.NORMAL_CLOSURE, ""))
+#     self.assertIsNone(exc.rcvd_then_sent)
+
+# def test_server_sends_close_then_receives_eof(self):
+#     # Server-initiated close handshake on the server side times out.
+#     server = Protocol(SERVER)
+#     server.send_close(CloseCode.NORMAL_CLOSURE, "")
+#     server.receive_eof()
+#     exc = server.close_exc
+#     self.assertIsInstance(exc, ConnectionClosedError)
+#     self.assertIsNone(exc.rcvd)
+#     self.assertEqual(exc.sent, Close(CloseCode.NORMAL_CLOSURE, ""))
+#     self.assertIsNone(exc.rcvd_then_sent)
+
+# def test_client_receives_eof(self):
+#     # Server-initiated close handshake on the client side times out.
+#     client = Protocol(CLIENT)
+#     client.receive_eof()
+#     exc = client.close_exc
+#     self.assertIsInstance(exc, ConnectionClosedError)
+#     self.assertIsNone(exc.rcvd)
+#     self.assertIsNone(exc.sent)
+#     self.assertIsNone(exc.rcvd_then_sent)
+
+# def test_server_receives_eof(self):
+#     # Client-initiated close handshake on the server side times out.
+#     server = Protocol(SERVER)
+#     server.receive_eof()
+#     exc = server.close_exc
+#     self.assertIsInstance(exc, ConnectionClosedError)
+#     self.assertIsNone(exc.rcvd)
+#     self.assertIsNone(exc.sent)
+#     self.assertIsNone(exc.rcvd_then_sent)
 

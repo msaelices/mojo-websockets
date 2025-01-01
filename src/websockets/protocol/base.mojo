@@ -8,6 +8,7 @@ from websockets.frames import (
        CLOSE_CODE_ABNORMAL_CLOSURE,
        CLOSE_CODE_PROTOCOL_ERROR,
        CLOSE_CODE_NO_STATUS_RCVD,
+       OK_CLOSE_CODES,
        OP_BINARY,
        OP_CLOSE,
        OP_CONT,
@@ -620,3 +621,38 @@ fn close_expected[T: Protocol](protocol: T) -> Bool:
     # TODO: Implement the handshake_exc logic
     return protocol.get_state() == CLOSING  or protocol.get_handshake_exc()
 
+
+fn get_close_exc[T: Protocol](protocol: T) raises -> Error:
+    """
+    Exception to raise when trying to interact with a closed connection.
+
+    Don't raise this exception while the connection :attr:`state`
+    is `~websockets.protocol.State.CLOSING`; wait until
+    it's `~websockets.protocol.State.CLOSED`.
+
+    Indeed, the exception includes the close code and reason, which are
+    known only once the connection is closed.
+
+    Parameters:
+        T: Protocol.
+
+    Args:
+        protocol: Protocol instance.
+
+    Returns:
+        Error: Exception to raise when trying to interact with a closed connection.
+    """
+    if protocol.get_state() != CLOSED:
+        raise Error("connection isn't closed yet")
+    close_rcvd = protocol.get_close_rcvd()
+    close_sent = protocol.get_close_sent()
+    close_rcvd_then_sent = protocol.get_close_rcvd_then_sent()
+    if (
+        close_rcvd
+        and close_sent
+        and int(close_rcvd.value().code) in OK_CLOSE_CODES
+        and int(close_sent.value().code) in OK_CLOSE_CODES
+    ):
+        return Error("ConnectionClosedOK: {}, {}".format(close_rcvd.value().code, close_sent.value().code))
+    else:
+        return Error("ConnectionClosedError: {}, {}, {}".format(bool(close_rcvd), bool(close_sent), bool(close_rcvd_then_sent)))
