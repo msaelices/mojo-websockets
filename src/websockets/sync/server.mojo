@@ -425,10 +425,10 @@ struct Server:
                 var conn = self.connections[i]
                 self.read_fds.set(int(conn.fd))
                 self.write_fds.set(int(conn.fd))
-                
+
                 if conn.fd > max_fd:
                     max_fd = conn.fd
-                
+
             var timeout = timeval(0, 10000)
 
             var select_result = select(
@@ -441,11 +441,11 @@ struct Server:
             if select_result == -1:
                 print("Select error")
                 return
-            
+
             if self.read_fds.is_set(int(self.ln.fd)):
                 var conn = self.ln.accept()
                 print('Accepted connection from ', str(conn.raddr))
-                try: 
+                try:
                     _ = conn.set_non_blocking(True)
                 except e:
                     print("Error setting connnection to non-blocking mode: ", e)
@@ -455,7 +455,7 @@ struct Server:
                 if conn.fd > max_fd:
                     max_fd = conn.fd
                     self.read_fds.set(int(conn.fd))
-            
+
             var i = 0
             while i < len(self.connections):
                 print("Connection ", i)
@@ -464,7 +464,7 @@ struct Server:
                     _ = self.handle_read(conn, handler)
                 if self.write_fds.is_set(int(conn.fd)):
                     _ = self.handle_write(conn)
-                
+
                 if conn.is_closed():
                     _ = self.connections.pop(i)
                 else:
@@ -481,7 +481,7 @@ struct Server:
         var buf = Bytes(capacity=DEFAULT_BUFFER_SIZE)
         var bytes_recv = conn.read(buf)
         print("Bytes received: ", bytes_recv)
-        
+
         if bytes_recv == 0:
             return
 
@@ -498,7 +498,7 @@ struct Server:
 
         # TODO: does this make sense?
         self.write_fds.set(int(conn.fd))
-        
+
         if not self.tcp_keep_alive:
             conn.close()
 

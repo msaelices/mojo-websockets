@@ -1,9 +1,9 @@
 from collections import Dict
-from time import perf_counter_ns as now
 
 from libc import Bytes
 
 from .aliases import Duration
+from .utils.dates import get_current_timestamp
 from .utils.string import (
     ByteReader,
     ByteWriter,
@@ -11,23 +11,23 @@ from .utils.string import (
     bytes,
     is_newline,
     is_space,
-    lineBreak, 
+    lineBreak,
     nChar,
     rChar,
     HTTP11,
     SLASH,
-    to_string, 
+    to_string,
     whitespace,
 )
 from .utils.uri import URI
 from .net import TCPAddr
 
 struct HeaderKey:
-    alias CONNECTION = "connection"
-    alias CONTENT_TYPE = "content-type"
-    alias CONTENT_LENGTH = "content-length"
-    alias CONTENT_ENCODING = "content-encoding"
-    alias DATE = "date"
+    alias CONNECTION = "Connection"
+    alias CONTENT_TYPE = "Content-type"
+    alias CONTENT_LENGTH = "Content-length"
+    alias CONTENT_ENCODING = "Content-encoding"
+    alias DATE = "Date"
 
 
 @value
@@ -368,8 +368,7 @@ struct HTTPResponse(Writable, Stringable):
         )
 
         if HeaderKey.DATE not in self.headers:
-            # TODO: Use UTC time
-            var current_time = now().__str__()
+            var current_time = get_current_timestamp()
             write_header(writer, HeaderKey.DATE, current_time)
 
         self.headers.write_to(writer)
