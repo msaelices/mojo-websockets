@@ -2,14 +2,19 @@ from collections import Optional
 from memory import UnsafePointer
 
 from websockets.aliases import Bytes, DEFAULT_MAX_REQUEST_BODY_SIZE, DEFAULT_BUFFER_SIZE
-from websockets.http import HTTPRequest
+from websockets.http import encode, HTTPRequest
 from websockets.frames import Frame, Close
 from websockets.streams import StreamReader
 from websockets.utils.bytes import gen_mask
 
 from . import CONNECTING, SERVER, Protocol, Event
-from .base import receive_data, receive_frame
-
+from .base import (
+    discard,
+    parse_buffer,
+    receive_data,
+    receive_frame,
+    send_eof,
+)
 
 struct ServerProtocol[side_param: Int = SERVER](Protocol):
     """
@@ -47,6 +52,10 @@ struct ServerProtocol[side_param: Int = SERVER](Protocol):
         self.close_rcvd_then_sent = None
         self.eof_sent = False
         self.discard_sent = False
+
+    # ===-------------------------------------------------------------------=== #
+    # Trait implementations
+    # ===-------------------------------------------------------------------=== #
 
     fn get_reader_ptr(self) -> UnsafePointer[StreamReader]:
         """Get the reader of the protocol."""
@@ -205,3 +214,43 @@ struct ServerProtocol[side_param: Int = SERVER](Protocol):
     fn set_handshake_exc(mut self, exc: Optional[Error]) -> None:
         """Set the handshake exception."""
         self.handshake_exc = exc
+
+    # ===-------------------------------------------------------------------=== #
+    # Methods
+    # ===-------------------------------------------------------------------=== #
+
+    fn accept(mut self, request: HTTPRequest) raises -> None:
+        """
+        Accept a WebSocket connection.
+
+        Args:
+            request: The HTTP request to accept.
+        """
+        raise Error("Not implemented")
+
+    fn send_response(mut self, response: HTTPResponse) raises -> None:
+        """
+        Send a handshake response to the client.
+
+        Args:
+            response: WebSocket handshake response event to send.
+
+        """
+        self.write_data(encode(response))
+
+        if response.status_code == 101:
+            if self.get_state() != CONNECTING:
+                raise Error("InvalidState: connection is not in CONNECTING state")
+            self.set_state(OPEN)
+        else:
+            # handshake_exc may be already set if accept() encountered an error.
+            # If the connection isn't open, set handshake_exc to guarantee that
+            # handshake_exc is None if and only if opening handshake succeeded.
+            if self.handshake_exc is None:
+                self.handshake_exc = Error("InvalidStatus: {}".format(str(response)))
+
+            send_eof(self)
+            discard(self)
+            # Equivalent to the next(self.parser) in the Python implementation
+            _ = parse_buffer(self)
+
