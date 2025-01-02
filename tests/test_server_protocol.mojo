@@ -5,7 +5,10 @@ from websockets.http import Header, Headers
 from websockets.frames import OP_TEXT, Frame
 from websockets.http import HTTPRequest, HTTPResponse
 from websockets.protocol import CONNECTING, OPEN, Event
-from websockets.protocol.base import receive_data
+from websockets.protocol.base import (
+    close_expected,
+    receive_data,
+)
 from websockets.protocol.server import ServerProtocol
 from websockets.utils.bytes import str_to_bytes
 
@@ -44,7 +47,7 @@ fn test_receive_request() raises:
     )
 
     assert_equal(server.data_to_send(), Bytes())
-    assert_false(server.close_expected())
+    assert_false(close_expected(server))
     assert_equal(server.state, CONNECTING)
 
 
