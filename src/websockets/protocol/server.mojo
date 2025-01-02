@@ -245,7 +245,10 @@ struct ServerProtocol[side_param: Int = SERVER](Protocol):
                 raise Error("Failed to open a WebSocket connection: missing Sec-WebSocket-Key header.\n")
         except exc:
             self.set_handshake_exc(exc)
-            return self.fail[date_func=date_func](exc)
+            body = exc._message()
+            status_code = 400
+            status_text = "Bad Request"
+            return self.reject[date_func=date_func](status_code, status_text, body)
 
         var accept = request.headers["Sec-WebSocket-Key"] + MAGIC_CONSTANT
         var py_sha1 = Python.import_module("hashlib").sha1
@@ -286,7 +289,9 @@ struct ServerProtocol[side_param: Int = SERVER](Protocol):
             # Equivalent to the next(self.parser) in the Python implementation
             _ = parse_buffer(self)
 
-    fn fail[date_func : fn () -> String = get_date_timestamp](mut self, exc: Error) -> HTTPResponse:
+    fn reject[
+        date_func : fn () -> String = get_date_timestamp,
+    ](mut self, status_code: Int, status_text: String, body: String) -> HTTPResponse:
         """
         Fail the WebSocket connection.
 
@@ -296,11 +301,10 @@ struct ServerProtocol[side_param: Int = SERVER](Protocol):
         Returns:
             The HTTP response to send to the client.
         """
-        var body = str_to_bytes(exc._message())
         var headers = Headers(
             Header("Date", date_func()),
             Header("Connection", "close"),
             Header("Content-Length", str(len(body))),
             Header("Content-type", "text/plain; charset=utf-8")
         )
-        return HTTPResponse(body, headers, 400, "Bad Request")
+        return HTTPResponse(str_to_bytes(body), headers, status_code, status_text)

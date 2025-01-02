@@ -103,27 +103,27 @@ fn test_send_response_after_failed_accept() raises:
     assert_equal(server.get_state(), CONNECTING)
 
 
-# def test_send_response_after_reject(self, _formatdate):
-#     """Server rejects a handshake request and sends a failed response."""
-#     server = ServerProtocol()
-#     response = server.reject(http.HTTPStatus.NOT_FOUND, "Sorry folks.\n")
-#     server.send_response(response)
+fn test_send_response_after_reject() raises:
+    """Server rejects a handshake request and sends a failed response."""
+    var server = ServerProtocol()
+    var response = server.reject[date_func=date_func](404, "Not Found", "Sorry folks.\n")
+    server.send_response(response)
 
-#     self.assertEqual(
-#         server.data_to_send(),
-#         [
-#             f"HTTP/1.1 404 Not Found\r\n"
-#             f"Date: {DATE}\r\n"
-#             f"Connection: close\r\n"
-#             f"Content-Length: 13\r\n"
-#             f"Content-Type: text/plain; charset=utf-8\r\n"
-#             f"\r\n"
-#             f"Sorry folks.\n".encode(),
-#             b"",
-#         ],
-#     )
-#     self.assertTrue(server.close_expected())
-#     self.assertEqual(server.state, CONNECTING)
+    var data_to_send = server.data_to_send()
+    assert_equal(
+        data_to_send,
+        str_to_bytes(
+            "HTTP/1.1 404 Not Found\r\n"
+            "date: Thu, 02 Jan 2025 22:16:23 GMT\r\n"
+            "connection: close\r\n"
+            "content-length: 13\r\n"
+            "content-type: text/plain; charset=utf-8\r\n"
+            "\r\n"
+            "Sorry folks.\n"
+        )
+    )
+    assert_true(close_expected(server))
+    assert_equal(server.get_state(), CONNECTING)
 
 
 # def test_send_response_without_accept_or_reject(self, _formatdate):

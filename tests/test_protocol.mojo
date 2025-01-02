@@ -2,7 +2,6 @@ from testing import assert_equal, assert_raises, assert_true
 from collections import Optional
 from memory import UnsafePointer
 
-from testutils import enforce_mask
 from websockets.aliases import Bytes
 from websockets.frames import (
     Close,
