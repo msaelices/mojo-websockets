@@ -1,8 +1,16 @@
+from base64 import b64encode
 from collections import Optional
 from memory import UnsafePointer
+from python import Python, PythonObject
 
-from websockets.aliases import Bytes, DEFAULT_MAX_REQUEST_BODY_SIZE, DEFAULT_BUFFER_SIZE
-from websockets.http import encode, HTTPRequest
+from websockets.aliases import Bytes, DEFAULT_MAX_REQUEST_BODY_SIZE, DEFAULT_BUFFER_SIZE, MAGIC_CONSTANT
+from websockets.http import (
+    get_date_timestamp,
+    encode,
+    Header,
+    Headers,
+    HTTPRequest,
+)
 from websockets.frames import Frame, Close
 from websockets.streams import StreamReader
 from websockets.utils.bytes import gen_mask
@@ -219,14 +227,34 @@ struct ServerProtocol[side_param: Int = SERVER](Protocol):
     # Methods
     # ===-------------------------------------------------------------------=== #
 
-    fn accept(mut self, request: HTTPRequest) raises -> None:
+    fn accept[date_func: fn () -> String = get_date_timestamp](mut self, request: HTTPRequest) raises -> HTTPResponse:
         """
         Accept a WebSocket connection.
 
         Args:
             request: The HTTP request to accept.
         """
-        raise Error("Not implemented")
+        if 'Upgrade' not in request.headers:
+            raise Error("Request headers do not contain an upgrade header")
+
+        if request.headers['upgrade'] != "websocket":
+            raise Error("Request upgrade do not contain an upgrade to websocket")
+
+        if not request.headers["Sec-WebSocket-Key"]:
+            raise Error("No Sec-WebSocket-Key for upgrading to websocket")
+
+        var accept = request.headers["Sec-WebSocket-Key"] + MAGIC_CONSTANT
+        var py_sha1 = Python.import_module("hashlib").sha1
+
+        var accept_encoded = b64encode(str(py_sha1(PythonObject(accept).encode()).digest()))
+        var headers = Headers(
+            Header("Upgrade", "websocket"),
+            Header("Date", date_func()),
+            Header("Connection", "Upgrade"),
+            Header("Sec-WebSocket-Accept", accept_encoded),
+        )
+
+        return HTTPResponse(Bytes(), headers, 101, "Switching Protocols")
 
     fn send_response(mut self, response: HTTPResponse) raises -> None:
         """

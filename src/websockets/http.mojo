@@ -1,9 +1,9 @@
 from collections import Dict
 
 from libc import Bytes
+from small_time.small_time import now
 
 from .aliases import Duration
-from .utils.dates import get_current_timestamp
 from .utils.string import (
     ByteReader,
     ByteWriter,
@@ -57,6 +57,19 @@ fn encode(owned req: HTTPRequest) -> Bytes:
 @always_inline
 fn encode(owned res: HTTPResponse) -> Bytes:
     return res._encoded()
+
+
+
+fn get_date_timestamp() -> String:
+    """
+    Get the UTC String for the Date HTTP header.
+    """
+    # TODO: Return a UTC string valid in Date HTTP header, like "Thu, 02 Jan 2025 22:16:23 GMT"
+    # See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Date
+    try:
+        return now(utc=True).__str__()
+    except e:
+        return e.__str__()
 
 
 @value
@@ -368,7 +381,7 @@ struct HTTPResponse(Writable, Stringable):
         )
 
         if HeaderKey.DATE not in self.headers:
-            var current_time = get_current_timestamp()
+            var current_time = get_date_timestamp()
             write_header(writer, HeaderKey.DATE, current_time)
 
         self.headers.write_to(writer)
@@ -394,7 +407,7 @@ struct HTTPResponse(Writable, Stringable):
 
         if HeaderKey.DATE not in self.headers:
             # TODO: Use UTC time
-            var current_time = now().__str__()
+            var current_time = get_date_timestamp()
             write_header(writer, HeaderKey.DATE, current_time)
 
         self.headers.encode_to(writer)

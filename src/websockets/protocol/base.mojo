@@ -67,7 +67,7 @@ fn parse[
         response = HTTPRequest.from_bytes(
             'http://localhost',   # TODO: Use actual host
             DEFAULT_MAX_REQUEST_BODY_SIZE,
-            data, 
+            data,
         )
         return response
     else:
@@ -330,7 +330,7 @@ fn send_continuation[
             as the initial frame.
         fin: FIN bit; set it to :obj:`True` if this is the last frame
             of a fragmented message and to :obj:`False` otherwise.
-    
+
     Raises:
         ProtocolError: If an unexpected continuation frame is received.
         InvalidState: If the connection is not open.
@@ -486,7 +486,7 @@ fn send_binary[
 
 
 fn fail[
-    T: Protocol, 
+    T: Protocol,
     gen_mask_func: fn () -> Bytes = gen_mask
 ](mut protocol: T, code: Int, reason: String = '') raises -> None:
     """
