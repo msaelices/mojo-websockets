@@ -13,8 +13,10 @@ from websockets.protocol.server import ServerProtocol
 from websockets.utils.bytes import str_to_bytes
 
 from testutils import ACCEPT, KEY
-# from .utils import DATE, DeprecationTestCase
 
+
+fn date_func() -> String:
+    return "Thu, 02 Jan 2025 22:16:23 GMT"
 
 fn make_request() -> HTTPRequest:
     """Generate a handshake request that can be altered for testing."""
@@ -46,31 +48,33 @@ fn test_receive_request() raises:
         )
     )
 
-    assert_equal(server.data_to_send(), Bytes())
+    data_to_send = server.data_to_send()
+    assert_equal(data_to_send, Bytes())
     assert_false(close_expected(server))
-    assert_equal(server.state, CONNECTING)
+    assert_equal(server.get_state(), CONNECTING)
 
 
-# fn test_accept_and_send_successful_response():
-#     """Server accepts a handshake request and sends a successful response."""
-#     server = ServerProtocol()
-#     request = make_request()
-#     response = server.accept(request)
-#     server.send_response(response)
-#
-#     self.assertEqual(
-#         server.data_to_send(),
-#         [
-#             f"HTTP/1.1 101 Switching Protocols\r\n"
-#             f"Date: {DATE}\r\n"
-#             f"Upgrade: websocket\r\n"
-#             f"Connection: Upgrade\r\n"
-#             f"Sec-WebSocket-Accept: {ACCEPT}\r\n"
-#             f"\r\n".encode()
-#         ],
-#     )
-#     self.assertFalse(server.close_expected())
-#     self.assertEqual(server.state, OPEN)
+fn test_accept_and_send_successful_response() raises:
+    """Server accepts a handshake request and sends a successful response."""
+    server = ServerProtocol()
+    request = make_request()
+    response = server.accept[date_func=date_func](request)
+    server.send_response(response)
+
+    data_to_send = server.data_to_send()
+    assert_equal(
+        data_to_send,
+        str_to_bytes(
+            "HTTP/1.1 101 Switching Protocols\r\n"
+            "date: Thu, 02 Jan 2025 22:16:23 GMT\r\n"
+            "upgrade: websocket\r\n"
+            "connection: Upgrade\r\n"
+            "sec-websocket-accept: {}\r\n"
+            "\r\n".format(ACCEPT)
+        )
+    )
+    assert_false(close_expected(server))
+    assert_equal(server.get_state(), OPEN)
 
 #
 #

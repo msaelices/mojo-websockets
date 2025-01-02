@@ -248,8 +248,8 @@ struct ServerProtocol[side_param: Int = SERVER](Protocol):
 
         var accept_encoded = b64encode(str(py_sha1(PythonObject(accept).encode()).digest()))
         var headers = Headers(
-            Header("Upgrade", "websocket"),
             Header("Date", date_func()),
+            Header("Upgrade", "websocket"),
             Header("Connection", "Upgrade"),
             Header("Sec-WebSocket-Accept", accept_encoded),
         )

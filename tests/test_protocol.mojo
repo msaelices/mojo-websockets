@@ -350,8 +350,6 @@ fn test_client_sends_text() raises:
         return Bytes(0, 0, 0, 0)
     send_text[gen_mask_func=gen_mask](client, str_to_bytes("Hello world"))
     data_to_send = client.data_to_send()
-    for c in data_to_send:
-        print("Data to send: ", c[])
 
     expected = Bytes(129, 139, 0, 0, 0, 0, 72, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100)
     assert_equal(data_to_send, expected)

@@ -333,8 +333,6 @@ struct HTTPResponse(Writable, Stringable):
         protocol: String = HTTP11,
     ):
         self.headers = headers
-        if HeaderKey.CONTENT_TYPE not in self.headers:
-            self.headers[HeaderKey.CONTENT_TYPE] = "application/octet-stream"
         self.status_code = status_code
         self.status_text = status_text
         self.protocol = protocol
@@ -343,8 +341,6 @@ struct HTTPResponse(Writable, Stringable):
         self.__is_upgrade = False
         self.raddr = TCPAddr()
         self.laddr = TCPAddr()
-        self.set_connection_keep_alive()
-        self.set_content_length(len(body_bytes))
 
     fn get_body_bytes(self) -> Bytes:
         return self.body_raw
@@ -401,8 +397,6 @@ struct HTTPResponse(Writable, Stringable):
         writer.write(bytes(str(self.status_code)))
         writer.write(whitespace)
         writer.write(self.status_text)
-        writer.write(lineBreak)
-        writer.write("server: websockets")
         writer.write(lineBreak)
 
         if HeaderKey.DATE not in self.headers:
