@@ -13,7 +13,7 @@ from websockets.http import (
 )
 from websockets.frames import Frame, Close
 from websockets.streams import StreamReader
-from websockets.utils.bytes import gen_mask
+from websockets.utils.bytes import gen_mask, str_to_bytes
 
 from . import CONNECTING, SERVER, Protocol, Event
 from .base import (
@@ -234,14 +234,18 @@ struct ServerProtocol[side_param: Int = SERVER](Protocol):
         Args:
             request: The HTTP request to accept.
         """
-        if 'Upgrade' not in request.headers:
-            raise Error("Request headers do not contain an upgrade header")
+        try:
+            if 'Upgrade' not in request.headers:
+                raise Error("Request headers do not contain an upgrade header")
 
-        if request.headers['upgrade'] != "websocket":
-            raise Error("Request upgrade do not contain an upgrade to websocket")
+            if request.headers['upgrade'] != "websocket":
+                raise Error("Request upgrade do not contain an upgrade to websocket")
 
-        if not request.headers["Sec-WebSocket-Key"]:
-            raise Error("No Sec-WebSocket-Key for upgrading to websocket")
+            if not request.headers["Sec-WebSocket-Key"]:
+                raise Error("Failed to open a WebSocket connection: missing Sec-WebSocket-Key header.\n")
+        except exc:
+            self.set_handshake_exc(exc)
+            return self.fail[date_func=date_func](exc)
 
         var accept = request.headers["Sec-WebSocket-Key"] + MAGIC_CONSTANT
         var py_sha1 = Python.import_module("hashlib").sha1
@@ -282,3 +286,21 @@ struct ServerProtocol[side_param: Int = SERVER](Protocol):
             # Equivalent to the next(self.parser) in the Python implementation
             _ = parse_buffer(self)
 
+    fn fail[date_func : fn () -> String = get_date_timestamp](mut self, exc: Error) -> HTTPResponse:
+        """
+        Fail the WebSocket connection.
+
+        Args:
+            exc: The exception to raise.
+
+        Returns:
+            The HTTP response to send to the client.
+        """
+        var body = str_to_bytes(exc._message())
+        var headers = Headers(
+            Header("Date", date_func()),
+            Header("Connection", "close"),
+            Header("Content-Length", str(len(body))),
+            Header("Content-type", "text/plain; charset=utf-8")
+        )
+        return HTTPResponse(body, headers, 400, "Bad Request")
