@@ -9,13 +9,9 @@ from time import sleep
 
 from libc import FD, c_int, fd_set, timeval, select
 
-from ..aliases import Bytes, DEFAULT_BUFFER_SIZE, DEFAULT_MAX_REQUEST_BODY_SIZE
+from ..aliases import Bytes, DEFAULT_BUFFER_SIZE, DEFAULT_MAX_REQUEST_BODY_SIZE, MAGIC_CONSTANT
 from ..http import Header, Headers, HTTPRequest, HTTPResponse, encode
 from ..net import create_listener, TCPConnection, TCPListener
-
-# It is a "magic" constant, see:
-# https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_servers#server_handshake_response
-alias MAGIC_CONSTANT = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 alias BYTE_0_TEXT: UInt8 = 1
 alias BYTE_0_NO_FRAGMENT: UInt8 = 128
