@@ -577,6 +577,8 @@ fn receive_eof[T: Protocol](mut protocol: T) raises:
     """
     if protocol.get_state() == OPEN:
         protocol.set_parser_exc(Error("EOFError: unexpected end of stream"))
+    elif T.side == SERVER and protocol.get_state() == CONNECTING:
+        protocol.set_handshake_exc(Error("EOFError: connection closed while reading HTTP request line"))
 
     if protocol.get_eof_sent() and protocol.get_state() == CLOSED:
         return

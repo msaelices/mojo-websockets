@@ -8,6 +8,7 @@ from websockets.protocol import CONNECTING, OPEN, Event
 from websockets.protocol.base import (
     close_expected,
     receive_data,
+    receive_eof,
 )
 from websockets.protocol.server import ServerProtocol
 from websockets.utils.bytes import str_to_bytes
@@ -195,30 +196,34 @@ fn test_receive_request_and_check_events() raises:
     assert_false(server.get_handshake_exc())
 
 
-#     def test_receive_no_request(self):
-#         """Server receives no handshake request."""
-#         server = ServerProtocol()
-#         server.receive_eof()
+fn test_receive_no_request() raises:
+    """Server receives no handshake request."""
+    var server = ServerProtocol()
+    receive_eof(server)
 
-#         self.assertEqual(server.events_received(), [])
-#         self.assertIsInstance(server.handshake_exc, EOFError)
-#         self.assertEqual(
-#             str(server.handshake_exc),
-#             "connection closed while reading HTTP request line",
-#         )
+    var events = server.events_received()
+    assert_equal(len(events), 0)
+    assert_true(server.get_handshake_exc())
+    assert_equal(
+        str(server.get_handshake_exc().value()),
+        "EOFError: connection closed while reading HTTP request line"
+    )
 
-#     def test_receive_truncated_request(self):
-#         """Server receives a truncated handshake request."""
-#         server = ServerProtocol()
-#         server.receive_data(b"GET /test HTTP/1.1\r\n")
-#         server.receive_eof()
 
-#         self.assertEqual(server.events_received(), [])
-#         self.assertIsInstance(server.handshake_exc, EOFError)
-#         self.assertEqual(
-#             str(server.handshake_exc),
-#             "connection closed while reading HTTP headers",
-#         )
+# fn test_receive_truncated_request() raises:
+#     """Server receives a truncated handshake request."""
+#     var server = ServerProtocol()
+#     receive_data(server, str_to_bytes("GET /test HTTP/1.1\r\n"))
+#     receive_eof(server)
+#
+#     var events = server.events_received()
+#     assert_equal(len(events), 0)
+#     assert_true(server.get_handshake_exc())
+#     assert_equal(
+#         str(server.get_handshake_exc().value()),
+#         "connection closed while reading HTTP headers"
+#     )
+
 
 #     def test_receive_junk_request(self):
 #         """Server receives a junk handshake request."""
