@@ -261,7 +261,7 @@ struct ServerProtocol[side_param: Int = SERVER](Protocol):
             Header("Sec-WebSocket-Accept", accept_encoded),
         )
 
-        return HTTPResponse(Bytes(), headers, 101, "Switching Protocols")
+        return HTTPResponse(101, "Switching Protocols", headers, Bytes())
 
     fn send_response(mut self, response: HTTPResponse) raises -> None:
         """
@@ -307,4 +307,4 @@ struct ServerProtocol[side_param: Int = SERVER](Protocol):
             Header("Content-Length", str(len(body))),
             Header("Content-type", "text/plain; charset=utf-8")
         )
-        return HTTPResponse(str_to_bytes(body), headers, status_code, status_text)
+        return HTTPResponse(status_code, status_text, headers, str_to_bytes(body))

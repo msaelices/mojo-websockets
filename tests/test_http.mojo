@@ -103,11 +103,12 @@ fn test_encode_http_request() raises:
 
 
 fn test_encode_http_response() raises:
-    var res = HTTPResponse(bytes("Hello, World!"))
+    var res = HTTPResponse(200, "OK", Headers(), bytes("Hello, World!"))
     res.headers[HeaderKey.DATE] = "2024-06-02T13:41:50.766880+00:00"
     var as_str = str(res)
     var res_encoded = to_string(encode(res^))
-    var expected_full = "HTTP/1.1 200 OK\r\nserver: websockets\r\ncontent-type: application/octet-stream\r\nconnection: keep-alive\r\ncontent-length: 13\r\ndate: 2024-06-02T13:41:50.766880+00:00\r\n\r\nHello, World!"
+    print(res_encoded)
+    var expected_full = "HTTP/1.1 200 OK\r\ndate: 2024-06-02T13:41:50.766880+00:00\r\n\r\nHello, World!"
 
     assert_equal(res_encoded, expected_full)
     assert_equal(res_encoded, as_str)

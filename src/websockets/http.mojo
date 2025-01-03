@@ -314,11 +314,11 @@ struct HTTPResponse(Writable, Stringable):
             raise Error("Failed to parse response headers: " + e.__str__())
 
         var response = HTTPResponse(
-            Bytes(),
-            headers=headers,
-            protocol=protocol,
             status_code=int(status_code),
             status_text=status_text,
+            headers=headers,
+            body_bytes=Bytes(),
+            protocol=protocol,
         )
 
         try:
@@ -329,10 +329,10 @@ struct HTTPResponse(Writable, Stringable):
 
     fn __init__(
         out self,
+        status_code: Int,
+        status_text: String,
+        headers: Headers,
         body_bytes: Bytes,
-        headers: Headers = Headers(),
-        status_code: Int = 200,
-        status_text: String = "OK",
         protocol: String = HTTP11,
     ):
         self.headers = headers
@@ -374,8 +374,6 @@ struct HTTPResponse(Writable, Stringable):
             self.status_code,
             whitespace,
             self.status_text,
-            lineBreak,
-            "server: websockets",
             lineBreak,
         )
 
