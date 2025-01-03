@@ -237,7 +237,6 @@ struct HTTPRequest(Writable, Stringable):
         self.body_raw = body
         self.server_is_tls = server_is_tls
         self.timeout = timeout
-        self.set_content_length(len(body))
         if HeaderKey.CONNECTION not in self.headers:
             self.set_connection_close()
 
@@ -258,7 +257,6 @@ struct HTTPRequest(Writable, Stringable):
             raise Error("Request body too large")
 
         r.consume(self.body_raw)
-        self.set_content_length(content_length)
 
     fn write_to[W: Writer](self, mut writer: W):
         writer.write(
