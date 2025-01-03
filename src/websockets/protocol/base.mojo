@@ -64,11 +64,7 @@ fn parse[
     """
     # See https://github.com/python-websockets/websockets/blob/59d4dcf779fe7d2b0302083b072d8b03adce2f61/src/websockets/server.py#L549
     if protocol.get_state() == CONNECTING:
-        response = HTTPRequest.from_bytes(
-            'http://localhost',   # TODO: Use actual host
-            DEFAULT_MAX_REQUEST_BODY_SIZE,
-            data,
-        )
+        response = parse_handshake(protocol, data)
         return response
     else:
         optional_frame = parse_frame[gen_mask_func=gen_mask_func](protocol, data)
@@ -76,6 +72,32 @@ fn parse[
             # TODO: change to just return None when the Mojo compiler does not complain
             return NoneType()
         return optional_frame.value()
+
+
+fn parse_handshake[T: Protocol](mut protocol: T, data: Bytes) raises -> HTTPRequest:
+    """
+    Parse an HTTP request.
+
+    Args:
+        protocol: Protocol instance.
+        data: Data to parse.
+
+    Parameters:
+        T: Protocol.
+
+    Returns:
+        HTTPRequest: The parsed HTTP request.
+
+    Raises:
+        Error: If parsing fails.
+    """
+    response = HTTPRequest.from_bytes(
+        'http://localhost',   # TODO: Use actual host
+        DEFAULT_MAX_REQUEST_BODY_SIZE,
+        data,
+    )
+    protocol.add_event(response)
+    return response
 
 
 fn parse_frame[
