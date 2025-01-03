@@ -108,6 +108,22 @@ struct Headers(Writable, Stringable):
     fn __setitem__(mut self, key: String, value: String):
         self._inner[key.lower()] = value
 
+    fn __eq__(self, other: Self) -> Bool:
+        if len(self._inner) != len(other._inner):
+            return False
+        try:
+            for item in self._inner.items():
+                key = item[].key
+                value = item[].value
+                if key not in other._inner or other._inner[key] != value:
+                    return False
+        except:
+            return False
+        return True
+
+    fn __ne__(self, other: Self) -> Bool:
+        return not self.__eq__(other)
+
     fn content_length(self) -> Int:
         if HeaderKey.CONTENT_LENGTH not in self:
             return 0

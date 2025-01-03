@@ -107,7 +107,6 @@ fn test_encode_http_response() raises:
     res.headers[HeaderKey.DATE] = "2024-06-02T13:41:50.766880+00:00"
     var as_str = str(res)
     var res_encoded = to_string(encode(res^))
-    print(res_encoded)
     var expected_full = "HTTP/1.1 200 OK\r\ndate: 2024-06-02T13:41:50.766880+00:00\r\n\r\nHello, World!"
 
     assert_equal(res_encoded, expected_full)
