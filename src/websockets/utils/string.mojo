@@ -133,14 +133,18 @@ struct ByteReader:
         self._inner = b^
         self.read_pos = 0
 
+    @always_inline
+    fn has_next(self) -> Bool:
+        return self.read_pos < len(self._inner)
+
     fn peek(self) -> Byte:
-        if self.read_pos >= len(self._inner):
+        if not self.has_next():
             return 0
         return self._inner[self.read_pos]
 
     fn read_until(mut self, char: Byte) -> Bytes:
         var start = self.read_pos
-        while self.peek() != char:
+        while self.peek() != char and self.has_next():
             self.increment()
         return self._inner[start : self.read_pos]
 

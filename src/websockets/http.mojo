@@ -145,7 +145,7 @@ struct Headers(Writable, Stringable):
         r.increment()
         var third = r.read_line()
 
-        while not is_newline(r.peek()):
+        while not is_newline(r.peek()) and r.has_next():
             var key = r.read_until(BytesConstant.colon)
             r.increment()
             if is_space(r.peek()):
