@@ -62,16 +62,17 @@ fn test_accept_and_send_successful_response() raises:
     server.send_response(response)
 
     data_to_send = server.data_to_send()
+    expected = str_to_bytes(
+        "HTTP/1.1 101 Switching Protocols\r\n"
+        "date: Thu, 02 Jan 2025 22:16:23 GMT\r\n"
+        "upgrade: websocket\r\n"
+        "connection: Upgrade\r\n"
+        "sec-websocket-accept: {}\r\n"
+        "\r\n".format(ACCEPT)
+    )
     assert_equal(
         data_to_send,
-        str_to_bytes(
-            "HTTP/1.1 101 Switching Protocols\r\n"
-            "date: Thu, 02 Jan 2025 22:16:23 GMT\r\n"
-            "upgrade: websocket\r\n"
-            "connection: Upgrade\r\n"
-            "sec-websocket-accept: {}\r\n"
-            "\r\n".format(ACCEPT)
-        )
+        expected,
     )
     assert_false(close_expected(server))
     assert_equal(server.get_state(), OPEN)
@@ -126,73 +127,73 @@ fn test_send_response_after_reject() raises:
     assert_equal(server.get_state(), CONNECTING)
 
 
-# def test_send_response_without_accept_or_reject(self, _formatdate):
-#     """Server doesn't accept or reject and sends a failed response."""
-#     server = ServerProtocol()
-#     server.send_response(
-#         HTTPResponse(
-#             410,
-#             "Gone",
-#             Headers(
-#                 {
-#                     "Connection": "close",
-#                     "Content-Length": 6,
-#                     "Content-Type": "text/plain",
-#                 }
-#             ),
-#             b"AWOL.\n",
-#         )
-#     )
-#     self.assertEqual(
-#         server.data_to_send(),
-#         [
-#             "HTTP/1.1 410 Gone\r\n"
-#             "Connection: close\r\n"
-#             "Content-Length: 6\r\n"
-#             "Content-Type: text/plain\r\n"
-#             "\r\n"
-#             "AWOL.\n".encode(),
-#             b"",
-#         ],
-#     )
-#     self.assertTrue(server.close_expected())
-#     self.assertEqual(server.state, CONNECTING)
+fn test_send_response_without_accept_or_reject() raises:
+    """Server doesn't accept or reject and sends a failed response."""
+    var server = ServerProtocol()
+    server.send_response(
+        HTTPResponse(
+            410,
+            "Gone",
+            Headers(
+                Header("Connection", "close"),
+                Header("Content-Length", "6"),
+                Header("Content-Type", "text/plain"),
+                Header("Date", date_func()),
+            ),
+            str_to_bytes("AWOL.\n"),
+        )
+    )
+
+    var data_to_send = server.data_to_send()
+    assert_equal(
+        data_to_send,
+        str_to_bytes(
+            "HTTP/1.1 410 Gone\r\n"
+            "connection: close\r\n"
+            "content-length: 6\r\n"
+            "content-type: text/plain\r\n"
+            "date: {}\r\n"
+            "\r\n"
+            "AWOL.\n".format(date_func())
+        )
+    )
+    assert_true(close_expected(server))
+    assert_equal(server.get_state(), CONNECTING)
 
 
-# class HTTPRequestTests(unittest.TestCase):
-#     """Test receiving opening handshake requests."""
+fn test_receive_request_and_check_events() raises:
+    """Server receives a handshake request and checks events."""
+    var server = ServerProtocol()
+    receive_data(
+        server,
+        str_to_bytes(
+            "GET /test HTTP/1.1\r\n"
+            "Host: example.com\r\n"
+            "Upgrade: websocket\r\n"
+            "Connection: Upgrade\r\n"
+            "Sec-WebSocket-Key: {}\r\n"
+            "Sec-WebSocket-Version: 13\r\n"
+            "\r\n".format(KEY)
+        )
+    )
 
-#     def test_receive_request(self):
-#         """Server receives a handshake request."""
-#         server = ServerProtocol()
-#         server.receive_data(
-#             (
-#                 f"GET /test HTTP/1.1\r\n"
-#                 f"Host: example.com\r\n"
-#                 f"Upgrade: websocket\r\n"
-#                 f"Connection: Upgrade\r\n"
-#                 f"Sec-WebSocket-Key: {KEY}\r\n"
-#                 f"Sec-WebSocket-Version: 13\r\n"
-#                 f"\r\n"
-#             ).encode(),
-#         )
-#         [request] = server.events_received()
+    var events = server.events_received()
+    assert_equal(len(events), 1)
 
-#         self.assertIsInstance(request, HTTPRequest)
-#         self.assertEqual(request.path, "/test")
-#         self.assertEqual(
-#             request.headers,
-#             Headers(
-#                 {
-#                     "Host": "example.com",
-#                     "Upgrade": "websocket",
-#                     "Connection": "Upgrade",
-#                     "Sec-WebSocket-Key": KEY,
-#                     "Sec-WebSocket-Version": "13",
-#                 }
-#             ),
-#         )
-#         self.assertIsNone(server.handshake_exc)
+    var request = events[0][HTTPRequest]
+    assert_equal(request.path, "/test")
+    assert_equal(
+        request.headers,
+        Headers(
+            Header("Host", "example.com"),
+            Header("Upgrade", "websocket"),
+            Header("Connection", "Upgrade"),
+            Header("Sec-WebSocket-Key", KEY),
+            Header("Sec-WebSocket-Version", "13")
+        )
+    )
+    assert_false(server.get_handshake_exc())
+
 
 #     def test_receive_no_request(self):
 #         """Server receives no handshake request."""
