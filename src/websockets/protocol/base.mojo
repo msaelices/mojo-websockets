@@ -321,10 +321,10 @@ fn send_frame[
     Raises:
         ProtocolError: If a fragmented message is in progress.
     """
-    if protocol.get_eof_sent():
-        raise Error("ProtocolError: EOF already sent")
     if protocol.get_state() == CLOSED:
         raise Error("InvalidState: connection is closed")
+    if protocol.get_eof_sent():
+        raise Error("ProtocolError: EOF already sent")
 
     protocol.write_data(
         frame.serialize[gen_mask_func=gen_mask_func](
@@ -416,12 +416,13 @@ fn discard[T: Protocol](mut protocol: T) raises:
 
     # A server closes the TCP connection immediately, while a client
     # waits for the server to close the TCP connection.
-    @parameter
-    if T.side == CLIENT:
-        if protocol.get_state() != CONNECTING:
-            send_eof(protocol)
     if reader_ptr[].at_eof():
         protocol.set_state(CLOSED)
+
+        @parameter
+        if T.side == CLIENT:
+            if protocol.get_state() != CONNECTING:
+                send_eof(protocol)
 
     # TODO: Implement the equivalent of the following Python code:
     # # If discard() completes normally, execution ends here.
