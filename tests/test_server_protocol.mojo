@@ -209,9 +209,7 @@ fn test_receive_no_request() raises:
         "EOFError: connection closed before handshake completed"
     )
     var events = server.events_received()
-    # TODO: In Python there is no events received
-    assert_equal(len(events), 1)
-    assert_true(events[0].isa[HTTPRequest]())
+    assert_equal(len(events), 0)
 
 
 fn test_receive_truncated_request() raises:
@@ -231,10 +229,8 @@ fn test_receive_truncated_request() raises:
     var data_to_send = server.data_to_send()
     assert_equal(data_to_send, Bytes())
     var events = server.events_received()
-    assert_equal(len(events), 2)
+    assert_equal(len(events), 1)
     assert_true(events[0].isa[HTTPRequest]())
-    print(String(events[1][Frame].serialize(mask=False)))
-    assert_true(events[1].isa[HTTPRequest]())
 
 
 
