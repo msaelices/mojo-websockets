@@ -45,7 +45,7 @@ fn receive_data[
 fn parse[
     T: Protocol,
     gen_mask_func: fn () -> Bytes = gen_mask,
-](mut protocol: T, data: Bytes) raises -> Event:
+](mut protocol: T, data: Optional[Bytes] = None) raises -> Event:
     """Parse a frame from a bytestring.
 
     Args:
@@ -62,19 +62,23 @@ fn parse[
     Raises:
         Error: If parsing fails.
     """
+    if data:
+        reader_ptr = protocol.get_reader_ptr()
+        reader_ptr[].feed_data(data.value())
+
     # See https://github.com/python-websockets/websockets/blob/59d4dcf779fe7d2b0302083b072d8b03adce2f61/src/websockets/server.py#L549
     if protocol.get_state() == CONNECTING:
-        response = parse_handshake(protocol, data)
+        response = parse_handshake(protocol)
         return response
     else:
-        optional_frame = parse_frame[gen_mask_func=gen_mask_func](protocol, data)
+        optional_frame = parse_frame[gen_mask_func=gen_mask_func](protocol)
         if not optional_frame:
             # TODO: change to just return None when the Mojo compiler does not complain
             return NoneType()
         return optional_frame.value()
 
 
-fn parse_handshake[T: Protocol](mut protocol: T, data: Bytes) raises -> HTTPRequest:
+fn parse_handshake[T: Protocol](mut protocol: T) raises -> HTTPRequest:
     """
     Parse an HTTP request.
 
@@ -91,10 +95,11 @@ fn parse_handshake[T: Protocol](mut protocol: T, data: Bytes) raises -> HTTPRequ
     Raises:
         Error: If parsing fails.
     """
+    reader_ptr = protocol.get_reader_ptr()
     response = HTTPRequest.from_bytes(
         'http://localhost',   # TODO: Use actual host
         DEFAULT_MAX_REQUEST_BODY_SIZE,
-        data,
+        reader_ptr[].buffer,
     )
     protocol.add_event(response)
     return response
@@ -103,13 +108,12 @@ fn parse_handshake[T: Protocol](mut protocol: T, data: Bytes) raises -> HTTPRequ
 fn parse_frame[
     T: Protocol,
     gen_mask_func: fn () -> Bytes = gen_mask,
-](mut protocol: T, data: Bytes) raises -> Optional[Frame]:
+](mut protocol: T) raises -> Optional[Frame]:
     """
     Parse incoming data into frames.
 
     Args:
         protocol: Protocol instance.
-        data: Data to parse into frames.
 
     Parameters:
         T: Protocol.
@@ -121,9 +125,6 @@ fn parse_frame[
     Raises:
         Error: If parsing fails.
     """
-    reader_ptr = protocol.get_reader_ptr()
-    reader_ptr[].feed_data(data)
-
     return parse_buffer[gen_mask_func=gen_mask_func](protocol)
 
 
@@ -588,6 +589,8 @@ fn receive_eof[T: Protocol](mut protocol: T) raises:
     except error:
         protocol.set_parser_exc(error)
     protocol.set_state(CLOSED)
+
+    _ = parse(protocol)
 
 
 fn send_ping[

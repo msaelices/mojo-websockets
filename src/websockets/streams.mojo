@@ -165,7 +165,7 @@ struct StreamReader(Streamable):
             return None
 
         result = self.buffer[self.offset:n]
-        self.offset = n 
+        self.offset = n
 
         return result
 
