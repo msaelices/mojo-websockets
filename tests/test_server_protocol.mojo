@@ -252,32 +252,30 @@ fn test_receive_junk_request() raises:
     assert_true(events[0].isa[HTTPRequest]())
     assert_true(events[1].isa[HTTPRequest]())
 
+# ===----------------------------------------------------------------------===
+# Test generating opening handshake responses.
+# ===----------------------------------------------------------------------===
 
-# class HTTPResponseTests(unittest.TestCase):
-#     """Test generating opening handshake responses."""
 
-#     @patch("email.utils.formatdate", return_value=DATE)
-#     def test_accept_response(self, _formatdate):
-#         """accept() creates a successful opening handshake response."""
-#         server = ServerProtocol()
-#         request = make_request()
-#         response = server.accept(request)
+fn test_accept_response() raises:
+    """Check that `accept()` creates a successful opening handshake response."""
+    var server = ServerProtocol()
+    var request = make_request()
+    var response = server.accept[date_func=date_func](request)
 
-#         self.assertIsInstance(response, HTTPResponse)
-#         self.assertEqual(response.status_code, 101)
-#         self.assertEqual(response.reason_phrase, "Switching Protocols")
-#         self.assertEqual(
-#             response.headers,
-#             Headers(
-#                 {
-#                     "Date": DATE,
-#                     "Upgrade": "websocket",
-#                     "Connection": "Upgrade",
-#                     "Sec-WebSocket-Accept": ACCEPT,
-#                 }
-#             ),
-#         )
-#         self.assertIsNone(response.body)
+    assert_equal(response.status_code, 101)
+    assert_equal(response.status_text, "Switching Protocols")
+    assert_equal(
+        response.headers,
+        Headers(
+            Header("Date", date_func()),
+            Header("Upgrade", "websocket"),
+            Header("Connection", "Upgrade"),
+            Header("Sec-WebSocket-Accept", ACCEPT),
+        )
+    )
+    assert_equal(response.body_raw, Bytes())
+
 
 #     @patch("email.utils.formatdate", return_value=DATE)
 #     def test_reject_response(self, _formatdate):
