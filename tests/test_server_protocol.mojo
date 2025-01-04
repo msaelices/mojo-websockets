@@ -201,28 +201,29 @@ fn test_receive_no_request() raises:
     var server = ServerProtocol()
     receive_eof(server)
 
-    var events = server.events_received()
-    assert_equal(len(events), 0)
     assert_true(server.get_handshake_exc())
     assert_equal(
         str(server.get_handshake_exc().value()),
         "EOFError: connection closed while reading HTTP request line"
     )
+    var events = server.events_received()
+    assert_equal(len(events), 0)
 
 
-# fn test_receive_truncated_request() raises:
-#     """Server receives a truncated handshake request."""
-#     var server = ServerProtocol()
-#     receive_data(server, str_to_bytes("GET /test HTTP/1.1\r\n"))
-#     receive_eof(server)
-#
-#     var events = server.events_received()
-#     assert_equal(len(events), 0)
-#     assert_true(server.get_handshake_exc())
-#     assert_equal(
-#         str(server.get_handshake_exc().value()),
-#         "connection closed while reading HTTP headers"
-#     )
+fn test_receive_truncated_request() raises:
+    """Server receives a truncated handshake request."""
+    var server = ServerProtocol()
+    receive_data(server, str_to_bytes("GET /test HTTP/1.1\r\n"))
+    assert_false(server.get_handshake_exc())
+
+    receive_eof(server)
+    assert_true(server.get_handshake_exc())
+    assert_equal(
+        str(server.get_handshake_exc().value()),
+        "EOFError: connection closed while reading HTTP headers"
+    )
+    var events = server.events_received()
+    assert_equal(len(events), 1)
 
 
 #     def test_receive_junk_request(self):

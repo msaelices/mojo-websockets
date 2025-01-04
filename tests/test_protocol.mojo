@@ -1936,7 +1936,7 @@ fn test_client_receives_eof_between_frames() raises:
 
     # Receive EOF between frames
     receive_eof(client)
-    assert_equal(client.parser_exc.value()._message(), "EOFError: unexpected end of stream")
+    assert_equal(client.parser_exc.value()._message(), "EOFError: stream ends after 0 bytes, expected 2 bytes")
     assert_equal(client.get_state(), 3)  # CLOSED
 
 
@@ -1946,7 +1946,7 @@ fn test_server_receives_eof_between_frames() raises:
 
     # Receive EOF between frames
     receive_eof(server)
-    assert_equal(server.parser_exc.value()._message(), "EOFError: unexpected end of stream")
+    assert_equal(server.parser_exc.value()._message(), "EOFError: stream ends after 0 bytes, expected 2 bytes")
     assert_equal(server.get_state(), 3)  # CLOSED
 
 
@@ -1960,8 +1960,7 @@ fn test_client_receives_eof_inside_frame() raises:
     # Receive EOF
     receive_eof(client)
 
-    # This was the "EOFError: stream ends after 1 bytes, expected 2 bytes" error in Python
-    assert_equal(client.parser_exc.value()._message(), "EOFError: unexpected end of stream")
+    assert_equal(client.parser_exc.value()._message(), "EOFError: stream ends after 1 bytes, expected 2 bytes")
     assert_equal(client.get_state(), 3)  # CLOSED
 
 
@@ -1975,7 +1974,7 @@ fn test_server_receives_eof_inside_frame() raises:
     # Receive EOF
     receive_eof(server)
 
-    assert_equal(server.parser_exc.value()._message(), "EOFError: unexpected end of stream")
+    assert_equal(server.parser_exc.value()._message(), "EOFError: stream ends after 1 bytes, expected 2 bytes")
     assert_equal(server.get_state(), 3)  # CLOSED
 
 
