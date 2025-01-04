@@ -68,8 +68,11 @@ fn parse[
 
     # See https://github.com/python-websockets/websockets/blob/59d4dcf779fe7d2b0302083b072d8b03adce2f61/src/websockets/server.py#L549
     if protocol.get_state() == CONNECTING:
-        response = parse_handshake(protocol)
-        return response
+        optional_request = parse_handshake(protocol)
+        if not optional_request:
+            # TODO: change to just return None when the Mojo compiler does not complain
+            return NoneType()
+        return optional_request.value()
     else:
         optional_frame = parse_frame[gen_mask_func=gen_mask_func](protocol)
         if not optional_frame:
@@ -78,13 +81,12 @@ fn parse[
         return optional_frame.value()
 
 
-fn parse_handshake[T: Protocol](mut protocol: T) raises -> HTTPRequest:
+fn parse_handshake[T: Protocol](mut protocol: T) raises -> Optional[HTTPRequest]:
     """
     Parse an HTTP request.
 
     Args:
         protocol: Protocol instance.
-        data: Data to parse.
 
     Parameters:
         T: Protocol.
@@ -96,13 +98,17 @@ fn parse_handshake[T: Protocol](mut protocol: T) raises -> HTTPRequest:
         Error: If parsing fails.
     """
     reader_ptr = protocol.get_reader_ptr()
-    response = HTTPRequest.from_bytes(
-        'http://localhost',   # TODO: Use actual host
-        DEFAULT_MAX_REQUEST_BODY_SIZE,
-        reader_ptr[].buffer,
-    )
-    protocol.add_event(response)
-    return response
+    try:
+        request = HTTPRequest.from_bytes(
+            'http://localhost',   # TODO: Use actual host
+            DEFAULT_MAX_REQUEST_BODY_SIZE,
+            reader_ptr[].buffer,
+        )
+        protocol.add_event(request)
+        return request
+    except exc:
+        protocol.set_handshake_exc(exc)
+    return None
 
 
 fn parse_frame[
