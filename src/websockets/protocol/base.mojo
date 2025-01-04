@@ -68,6 +68,7 @@ fn parse[
 
     # See https://github.com/python-websockets/websockets/blob/59d4dcf779fe7d2b0302083b072d8b03adce2f61/src/websockets/server.py#L549
     if protocol.get_state() == CONNECTING:
+        print("Connection state is CONNECTING")
         optional_request = parse_handshake(protocol)
         if not optional_request:
             # TODO: change to just return None when the Mojo compiler does not complain
@@ -586,7 +587,7 @@ fn receive_eof[T: Protocol](mut protocol: T) raises:
     if protocol.get_state() == OPEN:
         protocol.set_parser_exc(Error("EOFError: unexpected end of stream"))
     elif T.side == SERVER and protocol.get_state() == CONNECTING:
-        protocol.set_handshake_exc(Error("EOFError: connection closed while reading HTTP request line"))
+        protocol.set_handshake_exc(Error("EOFError: connection closed before handshake completed"))
 
     if protocol.get_eof_sent() and protocol.get_state() == CLOSED:
         return

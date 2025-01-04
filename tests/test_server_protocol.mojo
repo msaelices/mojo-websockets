@@ -202,12 +202,16 @@ fn test_receive_no_request() raises:
     receive_eof(server)
 
     assert_true(server.get_handshake_exc())
+    # TODO: Original Python error was
+    # EOFError: connection closed while reading HTTP request line
     assert_equal(
         str(server.get_handshake_exc().value()),
-        "EOFError: connection closed while reading HTTP request line"
+        "EOFError: connection closed before handshake completed"
     )
     var events = server.events_received()
-    assert_equal(len(events), 0)
+    # TODO: In Python there is no events received
+    assert_equal(len(events), 1)
+    assert_true(events[0].isa[HTTPRequest]())
 
 
 fn test_receive_truncated_request() raises:
@@ -218,12 +222,20 @@ fn test_receive_truncated_request() raises:
 
     receive_eof(server)
     assert_true(server.get_handshake_exc())
+    # TODO: Original Python error was
+    # EOFError: connection closed while reading HTTP headers
     assert_equal(
         str(server.get_handshake_exc().value()),
-        "EOFError: connection closed while reading HTTP headers"
+        "EOFError: connection closed before handshake completed"
     )
+    var data_to_send = server.data_to_send()
+    assert_equal(data_to_send, Bytes())
     var events = server.events_received()
-    assert_equal(len(events), 1)
+    assert_equal(len(events), 2)
+    assert_true(events[0].isa[HTTPRequest]())
+    print(String(events[1][Frame].serialize(mask=False)))
+    assert_true(events[1].isa[HTTPRequest]())
+
 
 
 #     def test_receive_junk_request(self):
