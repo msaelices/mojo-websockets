@@ -233,20 +233,24 @@ fn test_receive_truncated_request() raises:
     assert_true(events[0].isa[HTTPRequest]())
 
 
+fn test_receive_junk_request() raises:
+    """Server receives a junk handshake request."""
+    var server = ServerProtocol()
+    receive_data(server, str_to_bytes("HELO relay.invalid\r\n"))
+    receive_data(server, str_to_bytes("MAIL FROM: <alice@invalid>\r\n"))
+    receive_data(server, str_to_bytes("RCPT TO: <bob@invalid>\r\n"))
 
-#     def test_receive_junk_request(self):
-#         """Server receives a junk handshake request."""
-#         server = ServerProtocol()
-#         server.receive_data(b"HELO relay.invalid\r\n")
-#         server.receive_data(b"MAIL FROM: <alice@invalid>\r\n")
-#         server.receive_data(b"RCPT TO: <bob@invalid>\r\n")
-
-#         self.assertEqual(server.events_received(), [])
-#         self.assertIsInstance(server.handshake_exc, ValueError)
-#         self.assertEqual(
-#             str(server.handshake_exc),
-#             "invalid HTTP request line: HELO relay.invalid",
-#         )
+    var events = server.events_received()
+    assert_true(server.get_handshake_exc())
+    # TODO: Original Python error was
+    # ValueError: invalid HTTP request line: HELO relay.invalid
+    assert_equal(
+        str(server.get_handshake_exc().value()),
+        "ValueError: Failed to parse request headers: Failed to read third word from request line"
+    )
+    assert_equal(len(events), 2)
+    assert_true(events[0].isa[HTTPRequest]())
+    assert_true(events[1].isa[HTTPRequest]())
 
 
 # class HTTPResponseTests(unittest.TestCase):

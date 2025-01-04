@@ -154,18 +154,19 @@ struct ByteReader:
 
     fn read_line(mut self) -> Bytes:
         var start = self.read_pos
-        while not is_newline(self.peek()):
+        while not is_newline(self.peek()) and self.has_next():
             self.increment()
         var ret = self._inner[start : self.read_pos]
+        var remaining = len(self._inner) - self.read_pos - 1
         if self.peek() == BytesConstant.rChar:
-            self.increment(2)
+            self.increment(min(2, remaining))
         else:
-            self.increment()
+            self.increment(min(1, remaining))
         return ret
 
     @always_inline
     fn skip_whitespace(mut self):
-        while is_space(self.peek()):
+        while is_space(self.peek()) and self.has_next():
             self.increment()
 
     @always_inline

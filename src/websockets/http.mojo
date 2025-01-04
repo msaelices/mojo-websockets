@@ -137,11 +137,15 @@ struct Headers(Writable, Stringable):
     ) raises -> (String, String, String):
         var first_byte = r.peek()
         if not first_byte:
-            raise Error("Failed to read first byte from response header")
+            raise Error("Failed to read first byte from request line")
 
         var first = r.read_word()
+        if not r.has_next():
+            raise Error("Failed to read second word from request line")
         r.increment()
         var second = r.read_word()
+        if not r.has_next():
+            raise Error("Failed to read third word from request line")
         r.increment()
         var third = r.read_line()
 
@@ -196,7 +200,7 @@ struct HTTPRequest(Writable, Stringable):
         try:
             method, uri_str, protocol = headers.parse_raw(reader)
         except e:
-            raise Error("Failed to parse request headers: " + e.__str__())
+            raise Error("ValueError: Failed to parse request headers: " + e.__str__())
 
         var uri = URI.parse_raises(addr + uri_str)
 
