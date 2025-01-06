@@ -30,6 +30,7 @@ struct ServerProtocol[side_param: Int = SERVER](Protocol):
     """
     alias side = side_param
 
+    var origins: Optional[List[String]]
     var reader: StreamReader
     var events: List[Event]
     var writes: Bytes
@@ -45,7 +46,8 @@ struct ServerProtocol[side_param: Int = SERVER](Protocol):
     var eof_sent: Bool
     var discard_sent: Bool
 
-    fn __init__(out self):
+    fn __init__(out self, origins: Optional[List[String]] = None):
+        self.origins = origins
         self.reader = StreamReader()
         self.events = List[Event]()
         self.writes = Bytes(capacity=DEFAULT_BUFFER_SIZE)
@@ -256,6 +258,13 @@ struct ServerProtocol[side_param: Int = SERVER](Protocol):
 
             if request.headers["Sec-WebSocket-Version"] != "13":
                 raise Error('Request "Sec-WebSocket-Version" header is not "13"')
+
+            if self.origins is not None and "Origin" not in request.headers:
+                raise Error('Missing "Origin" header.')
+
+            if self.origins is not None and "Origin" in request.headers:
+                if request.headers["Origin"] not in self.origins.value():
+                    raise Error('Invalid "Origin" header: {}'.format(request.headers["Origin"]))
 
             # Validate the base64 encoded Sec-WebSocket-Key
             _ = b64decode[validate=True](request.headers["Sec-WebSocket-Key"])

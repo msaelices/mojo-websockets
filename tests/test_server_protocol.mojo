@@ -528,61 +528,53 @@ fn test_invalid_version() raises:
     )
 
 
-#     def test_invalid_version(self):
-#         """Handshake fails when the Sec-WebSocket-Version header is invalid."""
-#         server = ServerProtocol()
-#         request = make_request()
-#         del request.headers["Sec-WebSocket-Version"]
-#         request.headers["Sec-WebSocket-Version"] = "11"
-#         response = server.accept(request)
-#         server.send_response(response)
+fn test_origin() raises:
+    """Handshake succeeds when checking origin."""
+    var server = ServerProtocol(origins=List(String("https://example.com")))
+    var request = make_request()
+    request.headers["Origin"] = "https://example.com"
+    var response = server.accept[date_func=date_func](request)
+    server.send_response(response)
 
-#         self.assertEqual(response.status_code, 400)
-#         self.assertHandshakeError(
-#             server,
-#             InvalidHeader,
-#             "invalid Sec-WebSocket-Version header: 11",
-#         )
+    assert_equal(server.get_state(), OPEN)
+    assert_false(server.get_handshake_exc())
+    assert_equal(server.origins.value()[0], "https://example.com")
 
-#     def test_origin(self):
-#         """Handshake succeeds when checking origin."""
-#         server = ServerProtocol(origins=["https://example.com"])
-#         request = make_request()
-#         request.headers["Origin"] = "https://example.com"
-#         response = server.accept(request)
-#         server.send_response(response)
 
-#         self.assertHandshakeSuccess(server)
-#         self.assertEqual(server.origin, "https://example.com")
+fn test_no_origin() raises:
+    """Handshake fails when checking origin and the Origin header is missing."""
+    var server = ServerProtocol(origins=List(String("https://example.com")))
+    var request = make_request()
+    var response = server.accept[date_func=date_func](request)
+    server.send_response(response)
 
-#     def test_no_origin(self):
-#         """Handshake fails when checking origin and the Origin header is missing."""
-#         server = ServerProtocol(origins=["https://example.com"])
-#         request = make_request()
-#         response = server.accept(request)
-#         server.send_response(response)
+    # TODO: It should return 403 but it returns 400 because we cannot handle
+    # specific errors yet in Mojo
+    assert_equal(response.status_code, 400)
+    assert_true(server.get_handshake_exc())
+    assert_equal(
+        str(server.get_handshake_exc().value()),
+        'Missing "Origin" header.'
+    )
 
-#         self.assertEqual(response.status_code, 403)
-#         self.assertHandshakeError(
-#             server,
-#             InvalidOrigin,
-#             "missing Origin header",
-#         )
 
-#     def test_unexpected_origin(self):
-#         """Handshake fails when checking origin and the Origin header is unexpected."""
-#         server = ServerProtocol(origins=["https://example.com"])
-#         request = make_request()
-#         request.headers["Origin"] = "https://other.example.com"
-#         response = server.accept(request)
-#         server.send_response(response)
+fn test_unexpected_origin() raises:
+    """Handshake fails when checking origin and the Origin header is unexpected."""
+    var server = ServerProtocol(origins=List(String("https://example.com")))
+    var request = make_request()
+    request.headers["Origin"] = "https://other.example.com"
+    var response = server.accept[date_func=date_func](request)
+    server.send_response(response)
 
-#         self.assertEqual(response.status_code, 403)
-#         self.assertHandshakeError(
-#             server,
-#             InvalidOrigin,
-#             "invalid Origin header: https://other.example.com",
-#         )
+    # TODO: It should return 403 but it returns 400 because we cannot handle
+    # specific errors yet in Mojo
+    assert_equal(response.status_code, 400)
+    assert_true(server.get_handshake_exc())
+    assert_equal(
+        str(server.get_handshake_exc().value()),
+        'Invalid "Origin" header: https://other.example.com'
+    )
+
 
 #     def test_multiple_origin(self):
 #         """Handshake fails when checking origins and the Origin header is repeated."""
