@@ -249,7 +249,13 @@ struct ServerProtocol[side_param: Int = SERVER](Protocol):
                 raise Error('Request "upgrade" header is not "websocket"')
 
             if not request.headers["Sec-WebSocket-Key"]:
-                raise Error("Missing Sec-WebSocket-Key header.")
+                raise Error('Missing "Sec-WebSocket-Key" header.')
+
+            if not request.headers["Sec-WebSocket-Version"]:
+                raise Error('Missing "Sec-WebSocket-Version" header.')
+
+            if request.headers["Sec-WebSocket-Version"] != "13":
+                raise Error('Request "Sec-WebSocket-Version" header is not "13"')
 
             # Validate the base64 encoded Sec-WebSocket-Key
             _ = b64decode[validate=True](request.headers["Sec-WebSocket-Key"])

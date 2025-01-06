@@ -94,10 +94,10 @@ fn test_send_response_after_failed_accept() raises:
             "HTTP/1.1 400 Bad Request\r\n"
             "date: Thu, 02 Jan 2025 22:16:23 GMT\r\n"
             "connection: close\r\n"
-            "content-length: 33\r\n"
+            "content-length: 35\r\n"
             "content-type: text/plain; charset=utf-8\r\n"
             "\r\n"
-            "Missing Sec-WebSocket-Key header."
+            'Missing "Sec-WebSocket-Key" header.'
         )
     )
     assert_true(close_expected(server))
@@ -437,7 +437,7 @@ fn test_missing_key() raises:
     assert_true(server.get_handshake_exc())
     assert_equal(
         str(server.get_handshake_exc().value()),
-        "Missing Sec-WebSocket-Key header."
+        'Missing "Sec-WebSocket-Key" header.'
     )
 
 
@@ -495,35 +495,38 @@ fn test_truncated_key() raises:
     )
 
 
-#     def test_missing_version(self):
-#         """Handshake fails when the Sec-WebSocket-Version header is missing."""
-#         server = ServerProtocol()
-#         request = make_request()
-#         del request.headers["Sec-WebSocket-Version"]
-#         response = server.accept(request)
-#         server.send_response(response)
+fn test_missing_version() raises:
+    """Handshake fails when the Sec-WebSocket-Version header is missing."""
+    var server = ServerProtocol()
+    var request = make_request()
+    request.headers.remove("Sec-WebSocket-Version")
+    var response = server.accept[date_func=date_func](request)
+    server.send_response(response)
 
-#         self.assertEqual(response.status_code, 400)
-#         self.assertHandshakeError(
-#             server,
-#             InvalidHeader,
-#             "missing Sec-WebSocket-Version header",
-#         )
+    assert_equal(response.status_code, 400)
+    assert_true(server.get_handshake_exc())
+    assert_equal(
+        str(server.get_handshake_exc().value()),
+        'Missing "Sec-WebSocket-Version" header.'
+    )
 
-#     def test_multiple_version(self):
-#         """Handshake fails when the Sec-WebSocket-Version header is repeated."""
-#         server = ServerProtocol()
-#         request = make_request()
-#         request.headers["Sec-WebSocket-Version"] = "11"
-#         response = server.accept(request)
-#         server.send_response(response)
 
-#         self.assertEqual(response.status_code, 400)
-#         self.assertHandshakeError(
-#             server,
-#             InvalidHeader,
-#             "invalid Sec-WebSocket-Version header: multiple values",
-#         )
+fn test_invalid_version() raises:
+    """Handshake fails when the Sec-WebSocket-Version header is invalid."""
+    var server = ServerProtocol()
+    var request = make_request()
+    request.headers.remove("Sec-WebSocket-Version")
+    request.headers["Sec-WebSocket-Version"] = "11"
+    var response = server.accept[date_func=date_func](request)
+    server.send_response(response)
+
+    assert_equal(response.status_code, 400)
+    assert_true(server.get_handshake_exc())
+    assert_equal(
+        str(server.get_handshake_exc().value()),
+        'Request "Sec-WebSocket-Version" header is not "13"'
+    )
+
 
 #     def test_invalid_version(self):
 #         """Handshake fails when the Sec-WebSocket-Version header is invalid."""
