@@ -97,8 +97,7 @@ fn test_send_response_after_failed_accept() raises:
             "content-length: 73\r\n"
             "content-type: text/plain; charset=utf-8\r\n"
             "\r\n"
-            "Failed to open a WebSocket connection: "
-            "missing Sec-WebSocket-Key header.\n"
+            "Missing Sec-WebSocket-Key header."
         )
     )
     assert_true(close_expected(server))
@@ -385,7 +384,7 @@ fn test_invalid_connection() raises:
     # Request headers do not contain an "connection" header
     assert_equal(
         str(server.get_handshake_exc().value()),
-        'Request connection header is not "upgrade"'
+        'Request "connection" header is not "upgrade"'
     )
 
 
@@ -406,37 +405,40 @@ fn test_missing_upgrade() raises:
         'Request headers do not contain an "upgrade" header'
     )
 
-#     def test_invalid_upgrade(self):
-#         """Handshake fails when the Upgrade header is invalid."""
-#         server = ServerProtocol()
-#         request = make_request()
-#         del request.headers["Upgrade"]
-#         request.headers["Upgrade"] = "h2c"
-#         response = server.accept(request)
-#         server.send_response(response)
 
-#         self.assertEqual(response.status_code, 426)
-#         self.assertEqual(response.headers["Upgrade"], "websocket")
-#         self.assertHandshakeError(
-#             server,
-#             InvalidUpgrade,
-#             "invalid Upgrade header: h2c",
-#         )
+fn test_invalid_upgrade() raises:
+    """Handshake fails when the Upgrade header is invalid."""
+    var server = ServerProtocol()
+    var request = make_request()
+    request.headers.remove("Upgrade")
+    request.headers["Upgrade"] = "h2c"
+    var response = server.accept[date_func=date_func](request)
+    server.send_response(response)
 
-#     def test_missing_key(self):
-#         """Handshake fails when the Sec-WebSocket-Key header is missing."""
-#         server = ServerProtocol()
-#         request = make_request()
-#         del request.headers["Sec-WebSocket-Key"]
-#         response = server.accept(request)
-#         server.send_response(response)
+    # TODO: It should return 426 but it returns 400 because we cannot handle
+    # specific errors yet in Mojo
+    assert_equal(response.status_code, 400)
+    assert_true(server.get_handshake_exc())
+    assert_equal(
+        str(server.get_handshake_exc().value()),
+        'Request "upgrade" header is not "websocket"'
+    )
 
-#         self.assertEqual(response.status_code, 400)
-#         self.assertHandshakeError(
-#             server,
-#             InvalidHeader,
-#             "missing Sec-WebSocket-Key header",
-#         )
+
+fn test_missing_key() raises:
+    """Handshake fails when the Sec-WebSocket-Key header is missing."""
+    var server = ServerProtocol()
+    var request = make_request()
+    request.headers.remove("Sec-WebSocket-Key")
+    var response = server.accept[date_func=date_func](request)
+    server.send_response(response)
+
+    assert_equal(response.status_code, 400)
+    assert_true(server.get_handshake_exc())
+    assert_equal(
+        str(server.get_handshake_exc().value()),
+        "Missing Sec-WebSocket-Key header."
+    )
 
 #     def test_multiple_key(self):
 #         """Handshake fails when the Sec-WebSocket-Key header is repeated."""

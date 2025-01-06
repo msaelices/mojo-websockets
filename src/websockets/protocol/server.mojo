@@ -243,13 +243,13 @@ struct ServerProtocol[side_param: Int = SERVER](Protocol):
                 raise Error('Request headers do not contain an "connection" header')
 
             if request.headers["connection"].lower() != "upgrade":
-                raise Error('Request connection header is not "upgrade"')
+                raise Error('Request "connection" header is not "upgrade"')
 
             if request.headers["upgrade"] != "websocket":
-                raise Error("Request upgrade do not contain an upgrade to websocket")
+                raise Error('Request "upgrade" header is not "websocket"')
 
             if not request.headers["Sec-WebSocket-Key"]:
-                raise Error("Failed to open a WebSocket connection: missing Sec-WebSocket-Key header.\n")
+                raise Error("Missing Sec-WebSocket-Key header.")
         except exc:
             # TODO: Handle specific exceptions with different status codes.
             self.set_handshake_exc(exc)
