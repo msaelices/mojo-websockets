@@ -236,11 +236,14 @@ struct ServerProtocol[side_param: Int = SERVER](Protocol):
         """
         try:
             if "Upgrade" not in request.headers:
-                raise Error("Request headers do not contain an upgrade header")
+                raise Error('Request headers do not contain an "upgrade" header')
 
             if "Connection" not in request.headers:
                 # This should return a 426 status code (Upgrade Required) not a 400
                 raise Error('Request headers do not contain an "connection" header')
+
+            if request.headers["connection"].lower() != "upgrade":
+                raise Error('Request connection header is not "upgrade"')
 
             if request.headers["upgrade"] != "websocket":
                 raise Error("Request upgrade do not contain an upgrade to websocket")

@@ -536,7 +536,7 @@ fn serve(handler: ConnHandler, host: String, port: Int) raises -> Server:
 
 fn handshake(req: HTTPRequest) raises -> HTTPResponse:
     if 'Upgrade' not in req.headers:
-        raise Error("Request headers do not contain an upgrade header")
+        raise Error('Request headers do not contain an "upgrade" header')
 
     if req.headers['upgrade'] != "websocket":
         raise Error("Request upgrade do not contain an upgrade to websocket")

@@ -339,6 +339,7 @@ fn test_reject_response_supports_int_status() raises:
 #             exc_str += "; " + str(exc)
 #         self.assertEqual(exc_str, msg)
 
+
 fn test_basic() raises:
     """Handshake succeeds."""
     var server = ServerProtocol()
@@ -367,38 +368,43 @@ fn test_missing_connection() raises:
         'Request headers do not contain an "connection" header'
     )
 
-#     def test_invalid_connection(self):
-#         """Handshake fails when the Connection header is invalid."""
-#         server = ServerProtocol()
-#         request = make_request()
-#         del request.headers["Connection"]
-#         request.headers["Connection"] = "close"
-#         response = server.accept(request)
-#         server.send_response(response)
 
-#         self.assertEqual(response.status_code, 426)
-#         self.assertEqual(response.headers["Upgrade"], "websocket")
-#         self.assertHandshakeError(
-#             server,
-#             InvalidUpgrade,
-#             "invalid Connection header: close",
-#         )
+fn test_invalid_connection() raises:
+    """Handshake fails when the Connection header is invalid."""
+    var server = ServerProtocol()
+    var request = make_request()
+    request.headers["Connection"] = "close"
+    var response = server.accept[date_func=date_func](request)
+    server.send_response(response)
 
-#     def test_missing_upgrade(self):
-#         """Handshake fails when the Upgrade header is missing."""
-#         server = ServerProtocol()
-#         request = make_request()
-#         del request.headers["Upgrade"]
-#         response = server.accept(request)
-#         server.send_response(response)
+    # TODO: It should return 426 but it returns 400 because we cannot handle
+    # specific errors yet in Mojo
+    assert_equal(response.status_code, 400)
+    assert_true(server.get_handshake_exc())
+    # TODO: Original Python error was
+    # Request headers do not contain an "connection" header
+    assert_equal(
+        str(server.get_handshake_exc().value()),
+        'Request connection header is not "upgrade"'
+    )
 
-#         self.assertEqual(response.status_code, 426)
-#         self.assertEqual(response.headers["Upgrade"], "websocket")
-#         self.assertHandshakeError(
-#             server,
-#             InvalidUpgrade,
-#             "missing Upgrade header",
-#         )
+
+fn test_missing_upgrade() raises:
+    """Handshake fails when the Upgrade header is missing."""
+    var server = ServerProtocol()
+    var request = make_request()
+    request.headers.remove("Upgrade")
+    var response = server.accept[date_func=date_func](request)
+    server.send_response(response)
+
+    # TODO: It should return 426 but it returns 400 because we cannot handle
+    # specific errors yet in Mojo
+    assert_equal(response.status_code, 400)
+    assert_true(server.get_handshake_exc())
+    assert_equal(
+        str(server.get_handshake_exc().value()),
+        'Request headers do not contain an "upgrade" header'
+    )
 
 #     def test_invalid_upgrade(self):
 #         """Handshake fails when the Upgrade header is invalid."""
