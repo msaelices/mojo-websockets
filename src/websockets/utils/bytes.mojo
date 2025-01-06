@@ -2,8 +2,8 @@
 This module mimic the Python struct one converting between Mojo Butes and C structs
 
 Compact format strings describe the intended conversions to/from Python values.
-The module’s functions and objects can be used for two largely distinct applications, 
-data exchange with external sources (files or network connections), or data transfer 
+The module’s functions and objects can be used for two largely distinct applications,
+data exchange with external sources (files or network connections), or data transfer
 between the Python application and the C layer.
 """
 from bit import byte_swap
@@ -190,7 +190,7 @@ struct ByteReader:
             The next value from the buffer.
         """
         var ptr: UnsafePointer[Byte] = UnsafePointer.address_of(self.buffer[][self.index])
-        alias width = bitwidthof[type]() 
+        alias width = bitwidthof[type]()
         var value: SIMD[type, 1] = ptr.bitcast[Scalar[type]]()[]
         var ordered_value = self._set_order(value, order)
         self.index += width // 8
@@ -308,3 +308,82 @@ fn gen_mask() -> Bytes:
     mask = Bytes(4)
     randint[Byte.type](mask.unsafe_ptr(), 4, 0, 255)
     return mask^
+
+
+# TODO: Remove this function when the validate parameter is implemented in the Mojo base64 module
+# See https://github.com/modularml/mojo/pull/3929
+@always_inline
+fn b64decode[validate: Bool = False](str: String) raises -> String:
+    """Performs base64 decoding on the input string.
+
+    Parameters:
+      validate: If true, the function will validate the input string.
+
+    Args:
+      str: A base64 encoded string.
+
+    Returns:
+      The decoded string.
+    """
+    var n = str.byte_length()
+
+    @parameter
+    if validate:
+        if n % 4 != 0:
+            raise Error("ValueError: Input length must be divisible by 4")
+
+    var p = String._buffer_type(capacity=n + 1)
+
+    # This algorithm is based on https://arxiv.org/abs/1704.00605
+    for i in range(0, n, 4):
+        var a = _ascii_to_value(str[i])
+        var b = _ascii_to_value(str[i + 1])
+        var c = _ascii_to_value(str[i + 2])
+        var d = _ascii_to_value(str[i + 3])
+
+        @parameter
+        if validate:
+            if a < 0 or b < 0 or c < 0 or d < 0:
+                raise Error("ValueError: Unexpected character encountered")
+
+        p.append((a << 2) | (b >> 4))
+        if str[i + 2] == "=":
+            break
+
+        p.append(((b & 0x0F) << 4) | (c >> 2))
+
+        if str[i + 3] == "=":
+            break
+
+        p.append(((c & 0x03) << 6) | d)
+
+    p.append(0)
+    return p
+
+
+@always_inline
+fn _ascii_to_value(char: String) -> Int:
+    """Converts an ASCII character to its integer value for base64 decoding.
+
+    Args:
+        char: A single character string.
+
+    Returns:
+        The integer value of the character for base64 decoding, or -1 if invalid.
+    """
+    var char_val = ord(char)
+
+    if char == "=":
+        return 0
+    elif ord("A") <= char_val <= ord("Z"):
+        return char_val - ord("A")
+    elif ord("a") <= char_val <= ord("z"):
+        return char_val - ord("a") + 26
+    elif ord("0") <= char_val <= ord("9"):
+        return char_val - ord("0") + 52
+    elif char == "+":
+        return 62
+    elif char == "/":
+        return 63
+    else:
+        return -1

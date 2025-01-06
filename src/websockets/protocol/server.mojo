@@ -13,7 +13,7 @@ from websockets.http import (
 )
 from websockets.frames import Frame, Close
 from websockets.streams import StreamReader
-from websockets.utils.bytes import gen_mask, str_to_bytes
+from websockets.utils.bytes import b64decode, gen_mask, str_to_bytes
 
 from . import CONNECTING, SERVER, Protocol, Event
 from .base import (
@@ -250,6 +250,9 @@ struct ServerProtocol[side_param: Int = SERVER](Protocol):
 
             if not request.headers["Sec-WebSocket-Key"]:
                 raise Error("Missing Sec-WebSocket-Key header.")
+
+            # Validate the base64 encoded Sec-WebSocket-Key
+            _ = b64decode[validate=True](request.headers["Sec-WebSocket-Key"])
         except exc:
             # TODO: Handle specific exceptions with different status codes.
             self.set_handshake_exc(exc)
