@@ -612,15 +612,19 @@ fn test_unsupported_origin() raises:
     )
 
 
-#     def test_no_origin_accepted(self):
-#         """Handshake succeeds when the lack of an origin is accepted."""
-#         server = ServerProtocol(origins=[None])
-#         request = make_request()
-#         response = server.accept(request)
-#         server.send_response(response)
+fn test_no_origin_accepted() raises:
+    """Handshake succeeds when the lack of an origin is accepted."""
+    var server = ServerProtocol(origins=None)
+    var request = make_request()
+    var response = server.accept[date_func=date_func](request)
+    server.send_response(response)
 
-#         self.assertHandshakeSuccess(server)
-#         self.assertIsNone(server.origin)
+    assert_equal(server.get_state(), OPEN)
+    assert_false(server.get_handshake_exc())
+
+    # TODO: Set the origin in the server after parsing the request?
+    # Not sure why we need the server.origin attribute
+    # assert_equal(server.origin, None)
 
 #     def test_no_extensions(self):
 #         """Handshake succeeds without extensions."""
