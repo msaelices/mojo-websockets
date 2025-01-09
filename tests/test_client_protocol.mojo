@@ -30,7 +30,7 @@ alias SOCKET_URI = "wss://example.com/test"  # for tests where the URI doesn't m
 
 fn test_send_request() raises -> None:
     """Client sends a handshake request."""
-    client = ClientProtocol(URI.parse_raises(SOCKET_URI))
+    client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
     request = client.connect()
     client.send_request(request)
 

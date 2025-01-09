@@ -50,9 +50,11 @@ struct ClientProtocol[side_param: Int = CLIENT](Protocol):
     var eof_sent: Bool
     var discard_sent: Bool
 
-    fn __init__(out self, owned uri: URI, owned origin: Optional[String] = None):
-        self.key = b64encode(gen_token(16))
-        print(len(self.key))
+    fn __init__(out self, owned uri: URI, owned key: Optional[String] = None, owned origin: Optional[String] = None):
+        if not key:
+            self.key = b64encode(gen_token(16))
+        else:
+            self.key = key.value()
         self.wsuri = uri
         self.origin = origin^
         self.reader = StreamReader()
