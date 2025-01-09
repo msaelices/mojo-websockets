@@ -1,6 +1,6 @@
 from collections import Dict
 
-from libc import Bytes
+from libc import Bytes, AF_INET6
 from small_time.small_time import now
 
 from .aliases import Duration
@@ -20,7 +20,7 @@ from .utils.string import (
     whitespace,
 )
 from .utils.uri import URI
-from .net import TCPAddr
+from .net import TCPAddr, get_address_info, addrinfo_macos, addrinfo_unix
 
 struct HeaderKey:
     alias CONNECTION = "Connection"
@@ -70,6 +70,31 @@ fn get_date_timestamp() -> String:
         return now(utc=True).__str__()
     except e:
         return e.__str__()
+
+
+fn build_host_header(host: String, port: Int, secure: Bool) raises -> String:
+    """
+    Build a `Host` HTTP header.
+    """
+    # https://datatracker.ietf.org/doc/html/rfc3986#section-3.2.2
+    # IPv6 addresses must be enclosed in brackets.
+    try:
+        address = get_address_info(host)
+    except ValueError:
+        # host is a hostname
+        host_header = host
+    else:
+        host_header = host
+        # host is an IP address
+        if address.isa[addrinfo_macos]() and address[addrinfo_macos].ai_family == AF_INET6:
+            host_header = "[{}]".format(host)
+        elif address.isa[addrinfo_unix]() and address[addrinfo_unix].ai_family == AF_INET6:
+            host_header = "[{}]".format(host)
+
+    if port != (443 if secure else 80):
+        host_header = "{}:{}".format(host_header, port)
+
+    return host_header
 
 
 @value
