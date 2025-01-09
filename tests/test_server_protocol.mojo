@@ -12,6 +12,7 @@ from websockets.protocol.base import (
 )
 from websockets.protocol.server import ServerProtocol
 from websockets.utils.bytes import str_to_bytes
+from websockets.utils.uri import URI
 
 from testutils import ACCEPT, KEY
 
@@ -19,10 +20,10 @@ from testutils import ACCEPT, KEY
 fn date_func() -> String:
     return "Thu, 02 Jan 2025 22:16:23 GMT"
 
-fn make_request() -> HTTPRequest:
+fn make_request() raises -> HTTPRequest:
     """Generate a handshake request that can be altered for testing."""
     return HTTPRequest(
-        path="/test",
+        uri=URI.parse_raises("/test"),
         headers=Headers(
             Header("Host", "example.com"),
             Header("Upgrade", "websocket"),
@@ -181,7 +182,7 @@ fn test_receive_request_and_check_events() raises:
     assert_equal(len(events), 1)
 
     var request = events[0][HTTPRequest]
-    assert_equal(request.path, "/test")
+    assert_equal(request.uri.get_path(), "/test")
     assert_equal(
         request.headers,
         Headers(
