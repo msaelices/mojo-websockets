@@ -85,7 +85,7 @@ fn test_http() raises:
 fn test_encode_http_request() raises:
     var uri = URI(DEFAULT_SERVER_CONN_STRING + "/foobar?baz")
     var req = HTTPRequest(
-        uri.path,
+        uri,
         body=String("Hello world!").as_bytes(),
         headers=Headers(Header("Connection", "keep-alive")),
     )
@@ -95,8 +95,8 @@ fn test_encode_http_request() raises:
     assert_equal(
         req_encoded,
         (
-            "GET / HTTP/1.1\r\nconnection: keep-alive\r\ncontent-length:"
-            " 12\r\n\r\nHello world!"
+            "GET / HTTP/1.1\r\nconnection: keep-alive\r\n"
+            "\r\nHello world!"
         ),
     )
     assert_equal(req_encoded, as_str)
