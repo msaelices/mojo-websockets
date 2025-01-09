@@ -204,8 +204,8 @@ struct Headers(Writable, Stringable):
 @value
 struct HTTPRequest(Writable, Stringable):
     var headers: Headers
-    var path: String
     var body_raw: Bytes
+    var uri: URI
 
     var method: String
     var protocol: String
@@ -239,7 +239,7 @@ struct HTTPRequest(Writable, Stringable):
             raise Error("Request body too large")
 
         var request = HTTPRequest(
-            uri.path, headers=headers, method=method, protocol=protocol
+            uri, headers=headers, method=method, protocol=protocol
         )
 
         try:
@@ -251,7 +251,7 @@ struct HTTPRequest(Writable, Stringable):
 
     fn __init__(
         out self,
-        path: String,
+        uri: URI,
         headers: Headers = Headers(),
         method: String = "GET",
         protocol: String = HTTP11,
@@ -262,7 +262,7 @@ struct HTTPRequest(Writable, Stringable):
         self.headers = headers
         self.method = method
         self.protocol = protocol
-        self.path = path
+        self.uri = uri
         self.body_raw = body
         self.server_is_tls = server_is_tls
         self.timeout = timeout
@@ -291,7 +291,7 @@ struct HTTPRequest(Writable, Stringable):
         writer.write(
             self.method,
             whitespace,
-            self.path if len(self.path) > 1 else SLASH,
+            self.uri.get_path() if len(self.uri.path) > 1 else SLASH,
             whitespace,
             self.protocol,
             lineBreak,
@@ -310,7 +310,7 @@ struct HTTPRequest(Writable, Stringable):
         var writer = ByteWriter()
         writer.write(self.method)
         writer.write(whitespace)
-        var path = self.path if len(self.path) > 1 else SLASH
+        var path = self.uri.get_path() if len(self.uri.path) > 1 else SLASH
         writer.write(path)
         writer.write(whitespace)
         writer.write(self.protocol)

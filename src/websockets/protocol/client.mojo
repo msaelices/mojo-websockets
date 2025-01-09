@@ -284,7 +284,7 @@ struct ClientProtocol[side_param: Int = CLIENT](Protocol):
         #     protocol_header = build_subprotocol(self.available_subprotocols)
         #     headers["Sec-WebSocket-Protocol"] = protocol_header
 
-        return HTTPRequest(self.wsuri.path, headers=headers)
+        return HTTPRequest(self.wsuri, headers=headers)
 
     fn send_request(mut self, request: HTTPRequest) raises -> None:
         """

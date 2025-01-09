@@ -68,6 +68,15 @@ struct URI:
     fn is_wss(self) -> Bool:
         return self.scheme == WSS
 
+    fn get_path(self) -> String:
+        # TODO: Remove try-catch when .format() does not raise
+        if self.query_string:
+            try:
+                return "{}?{}".format(self.path, self.query_string)
+            except e:
+                pass
+        return self.path
+
     fn _parse(mut self) raises -> None:
         var raw_uri = self.full_uri
         var proto_str = String(HTTP11)

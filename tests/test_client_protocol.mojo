@@ -102,7 +102,7 @@ fn test_connect() raises -> None:
     client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
     request = client.connect()
 
-    assert_equal(request.path, "/test")
+    assert_equal(request.uri.get_path(), "/test")
     assert_equal(
         request.headers,
         Headers(
@@ -114,12 +114,12 @@ fn test_connect() raises -> None:
         )
     )
 
-#     def test_path(self):
-#         """connect() uses the path from the URI."""
-#         client = ClientProtocol(parse_uri("wss://example.com/endpoint?test=1"))
-#         request = client.connect()
+fn test_path() raises -> None:
+    """Check that connect() uses the path from the URI."""
+    client = ClientProtocol(uri=URI.parse_raises("wss://example.com/endpoint?test=1"), key=String(KEY))
+    request = client.connect()
 
-#         self.assertEqual(request.path, "/endpoint?test=1")
+    assert_equal(request.uri.get_path(), "/endpoint?test=1")
 
 #     def test_port(self):
 #         """connect() uses the port from the URI or the default port."""
