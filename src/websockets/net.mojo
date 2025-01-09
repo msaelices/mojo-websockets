@@ -1,10 +1,11 @@
 from sys.info import alignof, sizeof
 from sys import external_call, os_is_macos
 from memory import UnsafePointer, Pointer
-from utils import StaticTuple, StringRef
+from utils import StaticTuple, StringRef, Variant
 
 from libc import (
     AF_INET,
+    AF_INET6,
     AI_PASSIVE,
     SHUT_RDWR,
     SOCK_STREAM,
@@ -197,10 +198,10 @@ struct TCPConnection(Connection):
         self.laddr = laddr
         self.fd = fd
         self._write_buffer = Bytes()
-    
+
     fn write_buffer(self) -> Bytes:
         return self._write_buffer
-    
+
     fn set_write_buffer(mut self, buf: Bytes):
         self._write_buffer = buf
 
@@ -239,7 +240,7 @@ struct TCPConnection(Connection):
         var close_status = close(self.fd)
         if close_status == -1:
             print("Failed to close new_sockfd")
-    
+
     fn is_closed(self) -> Bool:
         var error = 0
         var len = socklen_t(sizeof[Int]())
@@ -248,7 +249,7 @@ struct TCPConnection(Connection):
         c_int,
     ](self.fd, SOL_SOCKET, SO_ERROR, UnsafePointer.address_of(error), UnsafePointer.address_of(len))
         return result == -1 or error != 0
-    
+
     fn set_non_blocking(self, non_blocking: Bool) raises:
         var flags = fcntl(self.fd, 3)
         if flags == -1:
@@ -461,7 +462,7 @@ struct addrinfo_macos(AddrInfo):
         self.ai_addr = UnsafePointer[sockaddr]()
         self.ai_next = UnsafePointer[c_void]()
 
-    fn get_ip_address(self, host: String) raises -> in_addr:
+    fn get_from_host(self, host: String) raises -> Self:
         """
         Returns an IP address based on the host.
         This is a MacOS-specific implementation.
@@ -499,7 +500,22 @@ struct addrinfo_macos(AddrInfo):
                 "Failed to get IP address. getaddrinfo was called successfully,"
                 " but ai_addr is null."
             )
+        return addrinfo
 
+    fn get_ip_address(self, host: String) raises -> in_addr:
+        """
+        Returns an IP address based on the host.
+        This is a MacOS-specific implementation.
+
+        Args:
+            host: String - The host to get the IP from.
+
+        Returns:
+            The IP address.
+        """
+        var addrinfo = self.get_from_host(host)
+
+        var ai_addr = addrinfo.ai_addr
         var addr_in = ai_addr.bitcast[sockaddr_in]()[]
 
         return addr_in.sin_addr
@@ -531,35 +547,33 @@ struct addrinfo_unix(AddrInfo):
         self.ai_canonname = UnsafePointer[c_char]()
         self.ai_next = UnsafePointer[c_void]()
 
-    fn get_ip_address(self, host: String) raises -> in_addr:
+    fn get_from_host(self, host: String) raises -> Self:
         """
         Returns an IP address based on the host.
-        This is a Unix-specific implementation.
+        This is a MacOS-specific implementation.
 
         Args:
-            host: String - The host to get IP from.
+            host: String - The host to get the IP from.
 
         Returns:
-            UInt32 - The IP address.
+            The IP address.
         """
         var host_ptr = host.unsafe_cstr_ptr()
-        var self_addrinfo = rebind[addrinfo](Self())
-        var servinfo = UnsafePointer[addrinfo]().alloc(1)
-        servinfo.init_pointee_move(self_addrinfo)
+        var servinfo = Pointer.address_of(Self())
+        var servname = UnsafePointer[Int8]()
 
-        var hints = rebind[addrinfo](Self())
+        var hints = Self()
         hints.ai_family = AF_INET
         hints.ai_socktype = SOCK_STREAM
         hints.ai_flags = AI_PASSIVE
 
-        var error = getaddrinfo(
-            host_ptr,
-            UnsafePointer[c_char](),
-            UnsafePointer.address_of(hints),
-            UnsafePointer.address_of(servinfo),
-        )
+        var error = external_call[
+            "getaddrinfo",
+            Int32,
+        ](host_ptr, servname, Pointer.address_of(hints), Pointer.address_of(servinfo))
+
         if error != 0:
-            print("getaddrinfo failed")
+            print("getaddrinfo failed with error code: " + error.__str__())
             raise Error("Failed to get IP address. getaddrinfo failed.")
 
         var addrinfo = servinfo[]
@@ -571,7 +585,22 @@ struct addrinfo_unix(AddrInfo):
                 "Failed to get IP address. getaddrinfo was called successfully,"
                 " but ai_addr is null."
             )
+        return addrinfo
 
+    fn get_ip_address(self, host: String) raises -> in_addr:
+        """
+        Returns an IP address based on the host.
+        This is a MacOS-specific implementation.
+
+        Args:
+            host: String - The host to get the IP from.
+
+        Returns:
+            The IP address.
+        """
+        var addrinfo = self.get_from_host(host)
+
+        var ai_addr = addrinfo.ai_addr
         var addr_in = ai_addr.bitcast[sockaddr_in]()[]
 
         return addr_in.sin_addr
@@ -598,7 +627,7 @@ struct TCPListener(Listener):
         self._addr = addr
         self.fd = fd
 
-    fn listen(mut self) raises: 
+    fn listen(mut self) raises:
         var address_family = AF_INET
         var ip_buf_size = 4
         var addr = self._addr
@@ -667,7 +696,7 @@ struct TCPListener(Listener):
         print("Got connection from " + peer.host + ":" + peer.port)
 
         return TCPConnection(
-            new_sockfd, self._addr, TCPAddr(peer.host, atol(peer.port)), 
+            new_sockfd, self._addr, TCPAddr(peer.host, atol(peer.port)),
         )
 
     fn close(self) raises:
@@ -678,6 +707,21 @@ struct TCPListener(Listener):
 
     fn addr(self) -> TCPAddr:
         return self._addr
+
+
+fn get_address_info(host: String) raises -> Variant[addrinfo_macos, addrinfo_unix]:
+    """
+    Get the IP address of a host.
+
+    Args:
+        host: String - The host to get the IP address of.
+
+    Returns:
+        The IP address.
+    """
+    if os_is_macos():
+        return addrinfo_macos().get_from_host(host)
+    return addrinfo_unix().get_from_host(host)
 
 
 fn create_connection(
@@ -699,7 +743,6 @@ fn create_connection(
         ip = addrinfo_macos().get_ip_address(host)
     else:
         ip = addrinfo_unix().get_ip_address(host)
-
 
     # Convert ip address to network byte order.
     var addr: sockaddr_in = sockaddr_in(
