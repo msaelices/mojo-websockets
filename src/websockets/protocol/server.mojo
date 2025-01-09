@@ -129,6 +129,10 @@ struct ServerProtocol[side_param: Int = SERVER](Protocol):
         """
         self.events.append(event)
 
+    fn process_response(mut self, response: HTTPResponse) raises -> None:
+        """Process the handshare response from the server."""
+        constrained[Self.side == CLIENT, "Protocol.process_response() is only available for client connections."]()
+
     # Public method for getting outgoing data after receiving data or sending events.
 
     fn data_to_send(mut self) -> Bytes:

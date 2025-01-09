@@ -1,7 +1,7 @@
 from collections import Optional
 
 from websockets.aliases import Bytes, DEFAULT_MAX_REQUEST_BODY_SIZE
-from websockets.http import HTTPRequest
+from websockets.http import HTTPRequest, HTTPResponse
 from websockets.frames import (
        Close,
        Frame,
@@ -98,16 +98,30 @@ fn parse_handshake[T: Protocol](mut protocol: T) raises -> Optional[HTTPRequest]
         Error: If parsing fails.
     """
     reader_ptr = protocol.get_reader_ptr()
-    try:
-        request = HTTPRequest.from_bytes(
-            'http://localhost',   # TODO: Use actual host
-            DEFAULT_MAX_REQUEST_BODY_SIZE,
-            reader_ptr[].buffer,
-        )
-        protocol.add_event(request)
-        return request
-    except exc:
-        protocol.set_handshake_exc(exc)
+
+    @parameter
+    if T.side == SERVER:
+        try:
+            request = HTTPRequest.from_bytes(
+                'http://localhost',   # TODO: Use actual host
+                DEFAULT_MAX_REQUEST_BODY_SIZE,
+                reader_ptr[].buffer,
+            )
+            protocol.add_event(request)
+            return request
+        except exc:
+            protocol.set_handshake_exc(exc)
+    else:
+        try:
+            response = HTTPResponse.from_bytes(
+                reader_ptr[].buffer,
+            )
+            protocol.add_event(response)
+            protocol.process_response(response)
+        except exc:
+            protocol.set_handshake_exc(exc)
+            send_eof(protocol)
+            discard(protocol)
     return None
 
 

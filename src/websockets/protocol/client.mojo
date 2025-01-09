@@ -15,6 +15,7 @@ from websockets.http import (
 from websockets.frames import Frame, Close
 from websockets.streams import StreamReader
 from websockets.utils.bytes import b64decode, gen_token, str_to_bytes,gen_mask
+from websockets.utils.handshake import ws_accept_key
 from websockets.utils.uri import URI
 
 from . import CONNECTING, CLIENT, Protocol, Event
@@ -293,6 +294,41 @@ struct ClientProtocol[side_param: Int = CLIENT](Protocol):
             request: WebSocket handshake request event.
         """
         self.write_data(encode(request))
+
+    fn process_response(mut self, response: HTTPResponse) raises -> None:
+        """Process the handshare response from the server."""
+        constrained[Self.side == CLIENT, "Protocol.process_response() is only available for client connections."]()
+
+        if response.status_code != 101:
+            raise Error("InvalidStatus: {}".format(response.status_code))
+
+        headers = response.headers
+
+        # TODO: Support for several "Connection" headers
+        # See process_response in the Python implementation
+        connection = response.headers["Connection"]
+
+        if connection.lower() != "upgrade":
+            raise Error('InvalidUpgrade: Response "Connection" header is not "Upgrade"')
+
+        if "Upgrade" not in response.headers:
+            raise Error('InvalidHeader: Missing "Upgrade" header')
+
+        # TODO: Support for several "Upgrade" headers
+        # See process_response in the Python implementation
+        upgrade = response.headers["Upgrade"]
+
+        if upgrade != "websocket":
+            raise Error('InvalidUpgrade: Response "Upgrade" header is not "websocket"')
+
+        if "Sec-WebSocket-Accept" not in response.headers:
+            raise Error('InvalidHeader: Missing "Sec-WebSocket-Accept" header')
+
+        s_w_accept = response.headers["Sec-WebSocket-Accept"]
+        if s_w_accept != ws_accept_key(self.key):
+            raise Error('InvalidHeaderValue: "Sec-WebSocket-Accept" header is invalid')
+
+        self.set_state(OPEN)
 
     # fn accept[date_func: fn () -> String = get_date_timestamp](mut self, request: HTTPRequest) raises -> HTTPResponse:
     #     """

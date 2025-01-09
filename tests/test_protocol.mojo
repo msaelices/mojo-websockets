@@ -18,6 +18,7 @@ from websockets.frames import (
     OP_TEXT,
     OP_CLOSE,
 )
+from websockets.http import HTTPResponse
 from websockets.protocol import Event, CLIENT, SERVER, OPEN
 from websockets.protocol.base import (
     close_expected,
@@ -104,6 +105,10 @@ struct DummyProtocol[masked: Bool, side_param: Int](Protocol):
     fn add_event(mut self, event: Event) -> None:
         """Add an event to the protocol."""
         self.events.append(event)
+
+    fn process_response(mut self, response: HTTPResponse) raises -> None:
+        """Process the handshare response from the server."""
+        constrained[Self.side == CLIENT, "Protocol.process_response() is only available for client connections."]()
 
     fn data_to_send(mut self) -> Bytes:
         """Get data to send to the protocol."""

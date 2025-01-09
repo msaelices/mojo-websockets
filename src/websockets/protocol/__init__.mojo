@@ -61,6 +61,10 @@ trait Protocol:
         """Add an event to the protocol."""
         ...
 
+    fn process_response(mut self, response: HTTPResponse) raises -> None:
+        """Process the response from the server."""
+        ...
+
     # Public method for getting outgoing data after receiving data or sending events.
 
     fn data_to_send(mut self) -> Bytes:
