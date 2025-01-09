@@ -1,5 +1,5 @@
 from utils import Variant
-from libc import Bytes 
+from libc import Bytes
 
 from .string import (
     bytes,
@@ -8,6 +8,7 @@ from .string import (
     HTTP10,
     HTTP11,
     HTTPS,
+    WSS,
     SLASH,
 )
 
@@ -36,7 +37,7 @@ struct URI:
             return "Failed to parse URI: " + str(e)
 
         return u
-    
+
     @staticmethod
     fn parse_raises(uri: String) raises -> URI:
         var u = URI(uri)
@@ -49,7 +50,7 @@ struct URI:
     ):
         self._original_path = "/"
         self._hash = ""
-        self.scheme = 
+        self.scheme = ""
         self.path = "/"
         self.query_string = ""
         self.host = ""
@@ -63,6 +64,9 @@ struct URI:
 
     fn is_http(self) -> Bool:
         return self.scheme == HTTP or len(self.scheme) == 0
+
+    fn is_wss(self) -> Bool:
+        return self.scheme == WSS
 
     fn _parse(mut self) raises -> None:
         var raw_uri = self.full_uri
@@ -78,9 +82,9 @@ struct URI:
             remainder_uri = raw_uri[proto_end + 3:]
         else:
             remainder_uri = raw_uri
-        
+
         self.scheme = proto_str^
-        
+
         var path_start = remainder_uri.find("/")
         var host_and_port: String
         var request_uri: String
@@ -97,7 +101,7 @@ struct URI:
             self.scheme = HTTPS
         else:
             self.scheme = HTTP
-        
+
         var n = request_uri.find("?")
         if n >= 0:
             self._original_path = request_uri[:n]

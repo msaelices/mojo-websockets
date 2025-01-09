@@ -8,6 +8,8 @@ alias HTTP = "http"
 alias HTTPS = "https"
 alias HTTP11 = "HTTP/1.1"
 alias HTTP10 = "HTTP/1.0"
+alias WS = "ws"
+alias WSS = "wss"
 
 alias strMethodGet = "GET"
 
