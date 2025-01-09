@@ -5,6 +5,7 @@ from python import Python, PythonObject
 
 from websockets.aliases import Bytes, DEFAULT_MAX_REQUEST_BODY_SIZE, DEFAULT_BUFFER_SIZE, MAGIC_CONSTANT
 from websockets.http import (
+    build_host_header,
     get_date_timestamp,
     encode,
     Header,
@@ -13,7 +14,8 @@ from websockets.http import (
 )
 from websockets.frames import Frame, Close
 from websockets.streams import StreamReader
-from websockets.utils.bytes import b64decode, gen_mask, str_to_bytes
+from websockets.utils.bytes import b64decode, gen_token, str_to_bytes,gen_mask
+from websockets.utils.uri import URI
 
 from . import CONNECTING, CLIENT, Protocol, Event
 from .base import (
@@ -30,8 +32,9 @@ struct ClientProtocol[side_param: Int = CLIENT](Protocol):
     """
     alias side = side_param
 
-    var uri: String
-    var origin: String
+    var key: String
+    var wsuri: URI
+    var origin: Optional[String]
     var reader: StreamReader
     var events: List[Event]
     var writes: Bytes
@@ -47,8 +50,10 @@ struct ClientProtocol[side_param: Int = CLIENT](Protocol):
     var eof_sent: Bool
     var discard_sent: Bool
 
-    fn __init__(out self, owned uri: String, owned origin: String):
-        self.uri = uri^
+    fn __init__(out self, owned uri: URI, owned origin: Optional[String] = None):
+        self.key = b64encode(gen_token(16))
+        print(len(self.key))
+        self.wsuri = uri
         self.origin = origin^
         self.reader = StreamReader()
         self.events = List[Event]()
@@ -230,6 +235,62 @@ struct ClientProtocol[side_param: Int = CLIENT](Protocol):
     # ===-------------------------------------------------------------------=== #
     # Methods
     # ===-------------------------------------------------------------------=== #
+
+    fn connect(self) raises -> HTTPRequest:
+        """
+        Create a handshake request to open a connection.
+
+        You must send the handshake request with :meth:`send_request`.
+
+        You can modify it before sending it, for example to add HTTP headers.
+
+        Returns:
+            WebSocket handshake request event to send to the server.
+
+        """
+        is_secure = self.wsuri.is_wss()
+        port = 433 if is_secure else 80
+
+        host_header = build_host_header(
+            self.wsuri.host, port, is_secure
+        )
+
+        var headers = Headers(
+            Header("Host", host_header),
+            Header("Upgrade", "websocket"),
+            Header("Connection", "Upgrade"),
+            Header("Sec-WebSocket-Key", self.key),
+            Header("Sec-WebSocket-Version", "13"),
+        )
+        if self.origin:
+            headers["Origin"] = self.origin.value()
+
+        # if self.wsuri.user_info:
+        #     headers["Authorization"] = build_authorization_basic(*self.wsuri.user_info)
+
+        # if self.available_extensions is not None:
+        #     extensions_header = build_extension(
+        #         [
+        #             (extension_factory.name, extension_factory.get_request_params())
+        #             for extension_factory in self.available_extensions
+        #         ]
+        #     )
+        #     headers["Sec-WebSocket-Extensions"] = extensions_header
+        #
+        # if self.available_subprotocols is not None:
+        #     protocol_header = build_subprotocol(self.available_subprotocols)
+        #     headers["Sec-WebSocket-Protocol"] = protocol_header
+
+        return HTTPRequest(self.wsuri.path, headers=headers)
+
+    fn send_request(mut self, request: HTTPRequest) raises -> None:
+        """
+        Send a handshake request to the server.
+
+        Args:
+            request: WebSocket handshake request event.
+        """
+        self.write_data(encode(request))
 
     # fn accept[date_func: fn () -> String = get_date_timestamp](mut self, request: HTTPRequest) raises -> HTTPResponse:
     #     """

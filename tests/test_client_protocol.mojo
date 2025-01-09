@@ -10,8 +10,9 @@ from websockets.protocol.base import (
     receive_data,
     receive_eof,
 )
-from websockets.protocol.server import ServerProtocol
+from websockets.protocol.client import ClientProtocol
 from websockets.utils.bytes import str_to_bytes
+from websockets.utils.uri import URI
 
 from testutils import ACCEPT, KEY
 
@@ -20,13 +21,36 @@ fn date_func() -> String:
     return "Thu, 02 Jan 2025 22:16:23 GMT"
 
 
-# URI = parse_uri("wss://example.com/test")  # for tests where the URI doesn't matter
-#
-#
-# @patch("websockets.client.generate_key", return_value=KEY)
-# class BasicTests(unittest.TestCase):
-#     """Test basic opening handshake scenarios."""
-#
+alias SOCKET_URI = "wss://example.com/test"  # for tests where the URI doesn't matter
+
+# ===----------------------------------------------------------------------===
+# Test basic opening handshake scenarios.
+# ===----------------------------------------------------------------------===
+
+
+fn test_send_request() raises -> None:
+    """Client sends a handshake request."""
+    client = ClientProtocol(URI.parse_raises(SOCKET_URI))
+    request = client.connect()
+    client.send_request(request)
+
+    data_to_send = client.data_to_send()
+    assert_equal(
+        data_to_send,
+        str_to_bytes(
+            "GET /test HTTP/1.1\r\n"
+            "host: example.com\r\n"
+            "upgrade: websocket\r\n"
+            "connection: Upgrade\r\n"
+            "sec-websocket-key: {}\r\n"
+            "sec-websocket-version: 13\r\n"
+            "\r\n".format(KEY)
+        ),
+    )
+    assert_false(close_expected(client))
+    assert_equal(client.get_state(), CONNECTING)
+
+
 #     def test_send_request(self, _generate_key):
 #         """Client sends a handshake request."""
 #         client = ClientProtocol(URI)
