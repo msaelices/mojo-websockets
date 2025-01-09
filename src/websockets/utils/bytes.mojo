@@ -301,12 +301,22 @@ fn str_to_bytes(s: String) -> Bytes:
 
 
 @always_inline
+fn gen_token(length: Int) -> Bytes:
+    """
+    Generate a random token.
+    """
+    token = Bytes(capacity=length)
+    token.size = length
+    randint[Byte.type](token.unsafe_ptr(), length, 0, 255)
+    return token^
+
+
+@always_inline
 fn gen_mask() -> Bytes:
     """
     Generate a random mask.
     """
-    mask = Bytes(4)
-    randint[Byte.type](mask.unsafe_ptr(), 4, 0, 255)
+    mask = gen_token(4)
     return mask^
 
 
