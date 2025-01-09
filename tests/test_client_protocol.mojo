@@ -71,67 +71,48 @@ fn test_receive_successful_response() raises -> None:
     assert_false(close_expected(client))
     assert_equal(client.get_state(), OPEN)
 
-#     def test_receive_successful_response(self, _generate_key):
-#         """Client receives a successful handshake response."""
-#         client = ClientProtocol(URI)
-#         client.receive_data(
-#             (
-#                 f"HTTP/1.1 101 Switching Protocols\r\n"
-#                 f"Upgrade: websocket\r\n"
-#                 f"Connection: Upgrade\r\n"
-#                 f"Sec-WebSocket-Accept: {ACCEPT}\r\n"
-#                 f"Date: {DATE}\r\n"
-#                 f"\r\n"
-#             ).encode(),
-#         )
 
-#         self.assertEqual(client.data_to_send(), [])
-#         self.assertFalse(client.close_expected())
-#         self.assertEqual(client.state, OPEN)
+fn test_receive_failed_response() raises -> None:
+    """Client receives a failed handshake response."""
+    client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
+    # Receive HTTP response from the server
+    receive_data(
+        client,
+        str_to_bytes(
+            "HTTP/1.1 404 Not Found\r\n"
+            "Date: {}\r\n"
+            "Content-Length: 13\r\n"
+            "Content-Type: text/plain; charset=utf-8\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+            "Sorry folks.\n".format(date_func())
+        ),
+    )
 
-#     def test_receive_failed_response(self, _generate_key):
-#         """Client receives a failed handshake response."""
-#         client = ClientProtocol(URI)
-#         client.receive_data(
-#             (
-#                 f"HTTP/1.1 404 Not Found\r\n"
-#                 f"Date: {DATE}\r\n"
-#                 f"Content-Length: 13\r\n"
-#                 f"Content-Type: text/plain; charset=utf-8\r\n"
-#                 f"Connection: close\r\n"
-#                 f"\r\n"
-#                 f"Sorry folks.\n"
-#             ).encode(),
-#         )
+    assert_equal(client.data_to_send(), Bytes())
+    assert_true(close_expected(client))
+    assert_equal(client.get_state(), CONNECTING)
 
-#         self.assertEqual(client.data_to_send(), [b""])
-#         self.assertTrue(client.close_expected())
-#         self.assertEqual(client.state, CONNECTING)
+# ===----------------------------------------------------------------------===
+# Test generating opening handshake requests.
+# ===----------------------------------------------------------------------===
 
+fn test_connect() raises -> None:
+    """Check that connect() creates an opening handshake request."""
+    client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
+    request = client.connect()
 
-# class RequestTests(unittest.TestCase):
-#     """Test generating opening handshake requests."""
-
-#     @patch("websockets.client.generate_key", return_value=KEY)
-#     def test_connect(self, _generate_key):
-#         """connect() creates an opening handshake request."""
-#         client = ClientProtocol(URI)
-#         request = client.connect()
-
-#         self.assertIsInstance(request, Request)
-#         self.assertEqual(request.path, "/test")
-#         self.assertEqual(
-#             request.headers,
-#             Headers(
-#                 {
-#                     "Host": "example.com",
-#                     "Upgrade": "websocket",
-#                     "Connection": "Upgrade",
-#                     "Sec-WebSocket-Key": KEY,
-#                     "Sec-WebSocket-Version": "13",
-#                 }
-#             ),
-#         )
+    assert_equal(request.path, "/test")
+    assert_equal(
+        request.headers,
+        Headers(
+            Header("Host", "example.com"),
+            Header("Upgrade", "websocket"),
+            Header("Connection", "Upgrade"),
+            Header("Sec-WebSocket-Key", KEY),
+            Header("Sec-WebSocket-Version", "13")
+        )
+    )
 
 #     def test_path(self):
 #         """connect() uses the path from the URI."""

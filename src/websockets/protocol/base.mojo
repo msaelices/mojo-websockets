@@ -111,7 +111,7 @@ fn parse_handshake[T: Protocol](mut protocol: T) raises -> Optional[HTTPRequest]
             return request
         except exc:
             protocol.set_handshake_exc(exc)
-    else:
+    else:  # Client logic for parsing handshake HTTP response
         try:
             response = HTTPResponse.from_bytes(
                 reader_ptr[].buffer,
