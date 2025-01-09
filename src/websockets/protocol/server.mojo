@@ -14,6 +14,7 @@ from websockets.http import (
 from websockets.frames import Frame, Close
 from websockets.streams import StreamReader
 from websockets.utils.bytes import b64decode, gen_mask, str_to_bytes
+from websockets.utils.handshake import ws_accept_key
 
 from . import CONNECTING, SERVER, Protocol, Event
 from .base import (
@@ -276,10 +277,8 @@ struct ServerProtocol[side_param: Int = SERVER](Protocol):
             status_text = "Bad Request"
             return self.reject[date_func=date_func](status_code, status_text, body)
 
-        var accept = request.headers["Sec-WebSocket-Key"] + MAGIC_CONSTANT
-        var py_sha1 = Python.import_module("hashlib").sha1
-
-        var accept_encoded = b64encode(str(py_sha1(PythonObject(accept).encode()).digest()))
+        var key = request.headers["Sec-WebSocket-Key"]
+        var accept_encoded = ws_accept_key(key)
         var headers = Headers(
             Header("Date", date_func()),
             Header("Upgrade", "websocket"),
