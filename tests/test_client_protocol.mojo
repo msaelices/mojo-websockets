@@ -245,45 +245,52 @@ fn test_receive_failed_response_with_events() raises -> None:
     )
     assert_equal(response.body_raw, str_to_bytes("\r\nSorry folks.\n"))
 
-#     def test_receive_no_response(self, _generate_key):
-#         """Client receives no handshake response."""
-#         client = ClientProtocol(URI)
-#         client.receive_eof()
 
-#         self.assertEqual(client.events_received(), [])
-#         self.assertIsInstance(client.handshake_exc, EOFError)
-#         self.assertEqual(
-#             str(client.handshake_exc),
-#             "connection closed while reading HTTP status line",
-#         )
+fn test_receive_no_response() raises -> None:
+    """Client receives no handshake response."""
+    client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
+    receive_eof(client)
 
-#     def test_receive_truncated_response(self, _generate_key):
-#         """Client receives a truncated handshake response."""
-#         client = ClientProtocol(URI)
-#         client.receive_data(b"HTTP/1.1 101 Switching Protocols\r\n")
-#         client.receive_eof()
+    assert_equal(len(client.events_received()), 0)
+    assert_true(client.get_handshake_exc())
+    # Original exception in Python was:
+    # EOFError: connection closed while reading HTTP status line
+    assert_equal(
+        str(client.get_handshake_exc().value()),
+        "EOFError: connection closed before handshake completed",
+    )
 
-#         self.assertEqual(client.events_received(), [])
-#         self.assertIsInstance(client.handshake_exc, EOFError)
-#         self.assertEqual(
-#             str(client.handshake_exc),
-#             "connection closed while reading HTTP headers",
-#         )
 
-#     def test_receive_random_response(self, _generate_key):
-#         """Client receives a junk handshake response."""
-#         client = ClientProtocol(URI)
-#         client.receive_data(b"220 smtp.invalid\r\n")
-#         client.receive_data(b"250 Hello relay.invalid\r\n")
-#         client.receive_data(b"250 Ok\r\n")
-#         client.receive_data(b"250 Ok\r\n")
+# TODO: Make sure it passes
+# fn test_receive_truncated_response() raises -> None:
+#     """Client receives a truncated handshake response."""
+#     client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
+#     receive_data(client, str_to_bytes("HTTP/1.1 101 Switching Protocols\r\n"))
+#     receive_eof(client)
+#
+#     assert_equal(len(client.events_received()), 0)
+#     assert_true(client.get_handshake_exc())
+#     assert_equal(
+#         str(client.get_handshake_exc().value()),
+#         "EOFError: connection closed while reading HTTP headers",
+#     )
 
-#         self.assertEqual(client.events_received(), [])
-#         self.assertIsInstance(client.handshake_exc, ValueError)
-#         self.assertEqual(
-#             str(client.handshake_exc),
-#             "invalid HTTP status line: 220 smtp.invalid",
-#         )
+fn test_receive_random_response() raises -> None:
+    """Client receives a junk handshake response."""
+    client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
+    receive_data(client, str_to_bytes("220 smtp.invalid\r\n"))
+    receive_data(client, str_to_bytes("250 Hello relay.invalid\r\n"))
+    receive_data(client, str_to_bytes("250 Ok\r\n"))
+    receive_data(client, str_to_bytes("250 Ok\r\n"))
+
+    assert_equal(len(client.events_received()), 0)
+    assert_true(client.get_handshake_exc())
+    # Original exception in Python was:
+    # ValueError: invalid HTTP status line: 220 smtp.invalid
+    assert_equal(
+        str(client.get_handshake_exc().value()),
+        "Failed to parse response headers: Failed to read third word from request line",
+    )
 
 
 # @contextlib.contextmanager
