@@ -252,10 +252,8 @@ struct ClientProtocol[side_param: Int = CLIENT](Protocol):
 
         """
         is_secure = self.wsuri.is_wss()
-        port = 433 if is_secure else 80
-
         host_header = build_host_header(
-            self.wsuri.host, port, is_secure
+            self.wsuri.get_hostname(), self.wsuri.get_port(), is_secure
         )
 
         var headers = Headers(

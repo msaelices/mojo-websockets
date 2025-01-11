@@ -1,4 +1,4 @@
-from utils import Variant
+from utils import StringSlice, Variant
 from libc import Bytes
 
 from .string import (
@@ -79,7 +79,7 @@ struct URI:
 
     fn _parse(mut self) raises -> None:
         var raw_uri = self.full_uri
-        var proto_str = String(HTTP11)
+        var proto_str = String(HTTP)
         var is_https = False
 
         var proto_end = raw_uri.find("://")
@@ -92,7 +92,7 @@ struct URI:
         else:
             remainder_uri = raw_uri
 
-        self.scheme = proto_str^
+        self.scheme = proto_str
 
         var path_start = remainder_uri.find("/")
         var host_and_port: String
@@ -106,11 +106,6 @@ struct URI:
             request_uri = SLASH
             self.host = host_and_port
 
-        if is_https:
-            self.scheme = HTTPS
-        else:
-            self.scheme = HTTP
-
         var n = request_uri.find("?")
         if n >= 0:
             self._original_path = request_uri[:n]
@@ -122,3 +117,22 @@ struct URI:
         self.path = self._original_path
         self.request_uri = request_uri
 
+    fn get_hostname(ref self) -> String:
+        """
+        Returns the hostname of the URI.
+        """
+        var i = max(0, self.host.find("@"))
+        j = self.host.find(":")
+        if j < 0:
+            j = len(self.host)
+
+        return self.host[i: j]
+
+    fn get_port(ref self) raises -> Int:
+        """
+        Returns the port of the URI.
+        """
+        var i = self.host.find(":")
+        if i < 0:
+            return 443 if self.is_https() or self.is_wss() else 80
+        return int(self.host[i + 1 :])

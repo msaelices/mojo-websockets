@@ -121,21 +121,26 @@ fn test_path() raises -> None:
 
     assert_equal(request.uri.get_path(), "/endpoint?test=1")
 
-#     def test_port(self):
-#         """connect() uses the port from the URI or the default port."""
-#         for uri, host in [
-#             ("ws://example.com/", "example.com"),
-#             ("ws://example.com:80/", "example.com"),
-#             ("ws://example.com:8080/", "example.com:8080"),
-#             ("wss://example.com/", "example.com"),
-#             ("wss://example.com:443/", "example.com"),
-#             ("wss://example.com:8443/", "example.com:8443"),
-#         ]:
-#             with self.subTest(uri=uri):
-#                 client = ClientProtocol(parse_uri(uri))
-#                 request = client.connect()
 
-#                 self.assertEqual(request.headers["Host"], host)
+fn test_port() raises -> None:
+    """Check that connect() uses the port from the URI or the default port."""
+    var test_cases = List(
+        ("ws://example.com/", "example.com"),
+        ("ws://example.com:80/", "example.com"),
+        ("ws://example.com:8080/", "example.com:8080"),
+        ("wss://example.com/", "example.com"),
+        ("wss://example.com:443/", "example.com"),
+        ("wss://example.com:8443/", "example.com:8443")
+    )
+
+    for i in range(len(test_cases)):
+        uri = test_cases[i][0]
+        expected_host = test_cases[i][1]
+
+        client = ClientProtocol(uri=URI.parse_raises(uri), key=String(KEY))
+        request = client.connect()
+
+        assert_equal(request.headers["Host"], expected_host)
 
 #     def test_user_info(self):
 #         """connect() perfoms HTTP Basic Authentication with user info from the URI."""
