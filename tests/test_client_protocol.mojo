@@ -142,6 +142,7 @@ fn test_port() raises -> None:
 
         assert_equal(request.headers["Host"], expected_host)
 
+
 fn test_user_info() raises -> None:
     """Check that connect() performs HTTP Basic Authentication with user info from the URI."""
     client = ClientProtocol(uri=URI.parse_raises("wss://hello:iloveyou@example.com/"), key=String(KEY))
@@ -174,76 +175,75 @@ fn test_subprotocols() raises -> None:
 # Test receiving opening handshake responses.
 # ===----------------------------------------------------------------------===
 
-# @patch("websockets.client.generate_key", return_value=KEY)
-# class ResponseTests(unittest.TestCase):
-#     """Test receiving opening handshake responses."""
+fn test_receive_successful_response_with_events() raises -> None:
+    """Client receives a successful handshake response and checks events."""
+    client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
 
-#     def test_receive_successful_response(self, _generate_key):
-#         """Client receives a successful handshake response."""
-#         client = ClientProtocol(URI)
-#         client.receive_data(
-#             (
-#                 f"HTTP/1.1 101 Switching Protocols\r\n"
-#                 f"Upgrade: websocket\r\n"
-#                 f"Connection: Upgrade\r\n"
-#                 f"Sec-WebSocket-Accept: {ACCEPT}\r\n"
-#                 f"Date: {DATE}\r\n"
-#                 f"\r\n"
-#             ).encode(),
-#         )
-#         [response] = client.events_received()
+    # Receive HTTP response from the server
+    receive_data(
+        client,
+        str_to_bytes(
+            "HTTP/1.1 101 Switching Protocols\r\n"
+            "Upgrade: websocket\r\n"
+            "Connection: Upgrade\r\n"
+            "Sec-WebSocket-Accept: {}\r\n"
+            "Date: {}\r\n"
+            "\r\n".format(ACCEPT, date_func())
+        ),
+    )
 
-#         self.assertEqual(response.status_code, 101)
-#         self.assertEqual(response.reason_phrase, "Switching Protocols")
-#         self.assertEqual(
-#             response.headers,
-#             Headers(
-#                 {
-#                     "Upgrade": "websocket",
-#                     "Connection": "Upgrade",
-#                     "Sec-WebSocket-Accept": ACCEPT,
-#                     "Date": DATE,
-#                 }
-#             ),
-#         )
-#         self.assertIsNone(response.body)
-#         self.assertIsNone(client.handshake_exc)
+    events = client.events_received()
+    assert_equal(len(events), 1)
 
-#     def test_receive_failed_response(self, _generate_key):
-#         """Client receives a failed handshake response."""
-#         client = ClientProtocol(URI)
-#         client.receive_data(
-#             (
-#                 f"HTTP/1.1 404 Not Found\r\n"
-#                 f"Date: {DATE}\r\n"
-#                 f"Content-Length: 13\r\n"
-#                 f"Content-Type: text/plain; charset=utf-8\r\n"
-#                 f"Connection: close\r\n"
-#                 f"\r\n"
-#                 f"Sorry folks.\n"
-#             ).encode(),
-#         )
-#         [response] = client.events_received()
+    response = events[0][HTTPResponse]
+    assert_equal(response.status_code, 101)
+    assert_equal(response.status_text, "Switching Protocols")
+    assert_equal(
+        response.headers,
+        Headers(
+            Header("Upgrade", "websocket"),
+            Header("Connection", "Upgrade"),
+            Header("Sec-WebSocket-Accept", ACCEPT),
+            Header("Date", date_func())
+        )
+    )
+    assert_equal(response.body_raw, str_to_bytes("\r\n"))
 
-#         self.assertEqual(response.status_code, 404)
-#         self.assertEqual(response.reason_phrase, "Not Found")
-#         self.assertEqual(
-#             response.headers,
-#             Headers(
-#                 {
-#                     "Date": DATE,
-#                     "Content-Length": "13",
-#                     "Content-Type": "text/plain; charset=utf-8",
-#                     "Connection": "close",
-#                 }
-#             ),
-#         )
-#         self.assertEqual(response.body, b"Sorry folks.\n")
-#         self.assertIsInstance(client.handshake_exc, InvalidStatus)
-#         self.assertEqual(
-#             str(client.handshake_exc),
-#             "server rejected WebSocket connection: HTTP 404",
-#         )
+
+fn test_receive_failed_response_with_events() raises -> None:
+    """Client receives a failed handshake response and checks events."""
+    client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
+
+    # Receive HTTP response from the server
+    receive_data(
+        client,
+        str_to_bytes(
+            "HTTP/1.1 404 Not Found\r\n"
+            "Date: {}\r\n"
+            "Content-Length: 13\r\n"
+            "Content-Type: text/plain; charset=utf-8\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+            "Sorry folks.\n".format(date_func())
+        ),
+    )
+
+    events = client.events_received()
+    assert_equal(len(events), 1)
+
+    response = events[0][HTTPResponse]
+    assert_equal(response.status_code, 404)
+    assert_equal(response.status_text, "Not Found")
+    assert_equal(
+        response.headers,
+        Headers(
+            Header("Date", date_func()),
+            Header("Content-Length", "13"),
+            Header("Content-Type", "text/plain; charset=utf-8"),
+            Header("Connection", "close")
+        )
+    )
+    assert_equal(response.body_raw, str_to_bytes("\r\nSorry folks.\n"))
 
 #     def test_receive_no_response(self, _generate_key):
 #         """Client receives no handshake response."""
