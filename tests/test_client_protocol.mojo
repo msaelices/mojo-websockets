@@ -157,20 +157,22 @@ fn test_origin() raises -> None:
 
     assert_equal(request.headers["Origin"], "https://example.com")
 
-#     def test_extensions(self):
-#         """connect(extensions=...) generates a Sec-WebSocket-Extensions header."""
-#         client = ClientProtocol(URI, extensions=[ClientOpExtensionFactory()])
-#         request = client.connect()
 
-#         self.assertEqual(request.headers["Sec-WebSocket-Extensions"], "x-op; op")
+fn test_extensions() raises -> None:
+    """Check that connect(extensions=...) generates a Sec-WebSocket-Extensions header."""
+    # TODO: Implement once extensions are supported
+    pass
 
-#     def test_subprotocols(self):
-#         """connect(subprotocols=...) generates a Sec-WebSocket-Protocol header."""
-#         client = ClientProtocol(URI, subprotocols=["chat"])
-#         request = client.connect()
 
-#         self.assertEqual(request.headers["Sec-WebSocket-Protocol"], "chat")
+fn test_subprotocols() raises -> None:
+    """Check that connect(subprotocols=...) generates a Sec-WebSocket-Protocol header."""
+    # TODO: Implement once subprotocols are supported
+    pass
 
+
+# ===----------------------------------------------------------------------===
+# Test receiving opening handshake responses.
+# ===----------------------------------------------------------------------===
 
 # @patch("websockets.client.generate_key", return_value=KEY)
 # class ResponseTests(unittest.TestCase):
