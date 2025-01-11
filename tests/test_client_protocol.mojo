@@ -142,19 +142,20 @@ fn test_port() raises -> None:
 
         assert_equal(request.headers["Host"], expected_host)
 
-#     def test_user_info(self):
-#         """connect() perfoms HTTP Basic Authentication with user info from the URI."""
-#         client = ClientProtocol(parse_uri("wss://hello:iloveyou@example.com/"))
-#         request = client.connect()
+fn test_user_info() raises -> None:
+    """Check that connect() performs HTTP Basic Authentication with user info from the URI."""
+    client = ClientProtocol(uri=URI.parse_raises("wss://hello:iloveyou@example.com/"), key=String(KEY))
+    request = client.connect()
 
-#         self.assertEqual(request.headers["Authorization"], "Basic aGVsbG86aWxvdmV5b3U=")
+    assert_equal(request.headers["Authorization"], "Basic aGVsbG86aWxvdmV5b3U=")
 
-#     def test_origin(self):
-#         """connect(origin=...) generates an Origin header."""
-#         client = ClientProtocol(URI, origin="https://example.com")
-#         request = client.connect()
 
-#         self.assertEqual(request.headers["Origin"], "https://example.com")
+fn test_origin() raises -> None:
+    """Check that connect(origin=...) generates an Origin header."""
+    client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY), origin=String("https://example.com"))
+    request = client.connect()
+
+    assert_equal(request.headers["Origin"], "https://example.com")
 
 #     def test_extensions(self):
 #         """connect(extensions=...) generates a Sec-WebSocket-Extensions header."""

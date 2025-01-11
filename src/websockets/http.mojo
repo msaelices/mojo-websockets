@@ -1,3 +1,4 @@
+from base64 import b64encode
 from collections import Dict
 
 from libc import Bytes, AF_INET6
@@ -95,6 +96,16 @@ fn build_host_header(host: String, port: Int, secure: Bool) raises -> String:
         host_header = "{}:{}".format(host_header, port)
 
     return host_header
+
+
+fn build_authorization_basic(username: String, password: String) raises -> String:
+    """
+    Build an `Authorization` header for HTTP Basic Auth.
+    """
+    # https://datatracker.ietf.org/doc/html/rfc7617#section-2
+    user_pass = "{}:{}".format(username, password)
+    basic_credentials = b64encode(user_pass)
+    return "Basic {}".format(basic_credentials)
 
 
 @value

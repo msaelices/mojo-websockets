@@ -6,6 +6,7 @@ from python import Python, PythonObject
 from websockets.aliases import Bytes, DEFAULT_MAX_REQUEST_BODY_SIZE, DEFAULT_BUFFER_SIZE, MAGIC_CONSTANT
 from websockets.http import (
     build_host_header,
+    build_authorization_basic,
     get_date_timestamp,
     encode,
     Header,
@@ -266,8 +267,10 @@ struct ClientProtocol[side_param: Int = CLIENT](Protocol):
         if self.origin:
             headers["Origin"] = self.origin.value()
 
-        # if self.wsuri.user_info:
-        #     headers["Authorization"] = build_authorization_basic(*self.wsuri.user_info)
+        opt_user_info = self.wsuri.get_user_info()
+        if opt_user_info:
+            user_info = opt_user_info.value()
+            headers["Authorization"] = build_authorization_basic(user_info[0], user_info[1])
 
         # if self.available_extensions is not None:
         #     extensions_header = build_extension(

@@ -1,3 +1,4 @@
+from collections import Optional
 from utils import StringSlice, Variant
 from libc import Bytes
 
@@ -117,7 +118,7 @@ struct URI:
         self.path = self._original_path
         self.request_uri = request_uri
 
-    fn get_hostname(ref self) -> String:
+    fn get_hostname(self) -> String:
         """
         Returns the hostname of the URI.
         """
@@ -128,11 +129,29 @@ struct URI:
 
         return self.host[i: j]
 
-    fn get_port(ref self) raises -> Int:
+    fn get_port(self) raises -> Int:
         """
         Returns the port of the URI.
         """
-        var i = self.host.find(":")
-        if i < 0:
+        # Ignore the potential username and password
+        var i = max(0, self.host.find("@"))
+        var j = self.host.find(":", start=i)
+        if j < 0:
             return 443 if self.is_https() or self.is_wss() else 80
-        return int(self.host[i + 1 :])
+        return int(self.host[j + 1 :])
+
+    fn get_user_info(self) -> Optional[(String, String)]:
+        """
+        Returns the username and password of the URI.
+        """
+        var i = self.host.find("@")
+        if i < 0:
+            return None
+
+        user_info = self.host[:i]
+        try:
+            result = user_info.split(":", maxsplit=2)
+            return (result[0], result[1])
+        except:
+            return (user_info, String(""))
+
