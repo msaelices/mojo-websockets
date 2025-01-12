@@ -323,23 +323,6 @@ fn test_reject_response_supports_int_status() raises:
 # Test processing of handshake responses to configure the connection.
 # ===----------------------------------------------------------------------===
 
-#     def assertHandshakeSuccess(self, server):
-#         """Assert that the opening handshake succeeded."""
-#         self.assertEqual(server.state, OPEN)
-#         self.assertIsNone(server.handshake_exc)
-
-#     def assertHandshakeError(self, server, exc_type, msg):
-#         """Assert that the opening handshake failed with the given exception."""
-#         self.assertEqual(server.state, CONNECTING)
-#         self.assertIsInstance(server.handshake_exc, exc_type)
-#         exc = server.handshake_exc
-#         exc_str = str(exc)
-#         while exc.__cause__ is not None:
-#             exc = exc.__cause__
-#             exc_str += "; " + str(exc)
-#         self.assertEqual(exc_str, msg)
-
-
 fn test_basic() raises:
     """Handshake succeeds."""
     var server = ServerProtocol()
@@ -891,33 +874,4 @@ fn test_bypass_handshake() raises:
 #         self.assertHandshakeSuccess(server)
 #         self.assertNotIn("Sec-WebSocket-Protocol", response.headers)
 #         self.assertIsNone(server.subprotocol)
-
-
-# class MiscTests(unittest.TestCase):
-#     def test_bypass_handshake(self):
-#         """ServerProtocol bypasses the opening handshake."""
-#         server = ServerProtocol(state=OPEN)
-#         server.receive_data(b"\x81\x86\x00\x00\x00\x00Hello!")
-#         [frame] = server.events_received()
-#         self.assertEqual(frame, Frame(OP_TEXT, b"Hello!"))
-
-#     def test_custom_logger(self):
-#         """ServerProtocol accepts a logger argument."""
-#         logger = logging.getLogger("test")
-#         with self.assertLogs("test", logging.DEBUG) as logs:
-#             ServerProtocol(logger=logger)
-#         self.assertEqual(len(logs.records), 1)
-
-
-# class BackwardsCompatibilityTests(DeprecationTestCase):
-#     def test_server_connection_class(self):
-#         """ServerConnection is a deprecated alias for ServerProtocol."""
-#         with self.assertDeprecationWarning(
-#             "ServerConnection was renamed to ServerProtocol"
-#         ):
-#             from websockets.server import ServerConnection
-
-#             server = ServerConnection()
-
-#         self.assertIsInstance(server, ServerProtocol)
 
