@@ -506,19 +506,50 @@ fn test_missing_accept() raises -> None:
 #         'InvalidHeader: Multiple "Sec-WebSocket-Accept" headers'
 #     )
 
-#     def test_invalid_accept(self):
-#         """Handshake fails when the Sec-WebSocket-Accept header is invalid."""
-#         client = ClientProtocol(URI)
-#         with alter_and_receive_response(client) as response:
-#             del response.headers["Sec-WebSocket-Accept"]
-#             response.headers["Sec-WebSocket-Accept"] = ACCEPT
+fn test_invalid_accept() raises -> None:
+    """Handshake fails when the Sec-WebSocket-Accept header is invalid."""
+    client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
 
-#         self.assertHandshakeError(
-#             client,
-#             InvalidHeader,
-#             f"invalid Sec-WebSocket-Accept header: {ACCEPT}",
-#         )
+    # Receive HTTP response from the server with invalid Sec-WebSocket-Accept header
+    receive_data(
+        client,
+        str_to_bytes(
+            "HTTP/1.1 101 Switching Protocols\r\n"
+            "Upgrade: websocket\r\n"
+            "Connection: Upgrade\r\n"
+            "Sec-WebSocket-Accept: invalid_accept_key\r\n"
+            "Date: {}\r\n"
+            "\r\n".format(date_func())
+        ),
+    )
 
+    assert_equal(client.get_state(), CONNECTING)
+    assert_true(client.get_handshake_exc())
+    assert_equal(
+        str(client.get_handshake_exc().value()),
+        'InvalidHeader: "Sec-WebSocket-Accept" header is invalid'
+    )
+
+# fn test_close_reason_not_provided() raises:
+#     """Test handling when no close reason is provided."""
+#     client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+#     receive_data(client, Bytes(136, 0))  # \x88\x00
+#     events = client.events_received()
+#     assert_equal(events[0][Frame], Frame(OP_CLOSE, Bytes(), fin=True))
+
+fn test_bypass_handshake() raises -> None:
+    """ClientProtocol bypasses the opening handshake if state is OPEN."""
+    client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
+    client.set_state(OPEN)
+    receive_data(client, str_to_bytes("\x81\x06Hello!"))
+
+    events = client.events_received()
+
+    assert_true(events[0].isa[Frame]())
+    assert_equal(events[0][Frame].data, Frame(OP_TEXT, str_to_bytes("Hello!")).data)
+
+
+# TODO: Implement this tests when extensions are supported
 #     def test_no_extensions(self):
 #         """Handshake succeeds without extensions."""
 #         client = ClientProtocol(URI)
@@ -645,6 +676,7 @@ fn test_missing_accept() raises -> None:
 #         self.assertHandshakeSuccess(client)
 #         self.assertEqual(client.extensions, [Rsv2Extension(), OpExtension()])
 
+# TODO: Implement this tests when subprotocols are supported
 #     def test_no_subprotocols(self):
 #         """Handshake succeeds without subprotocols."""
 #         client = ClientProtocol(URI)
@@ -727,13 +759,6 @@ fn test_missing_accept() raises -> None:
 #         )
 
 
-# class MiscTests(unittest.TestCase):
-#     def test_bypass_handshake(self):
-#         """ClientProtocol bypasses the opening handshake."""
-#         client = ClientProtocol(URI, state=OPEN)
-#         client.receive_data(b"\x81\x06Hello!")
-#         [frame] = client.events_received()
-#         self.assertEqual(frame, Frame(OP_TEXT, b"Hello!"))
 
 #     def test_custom_logger(self):
 #         """ClientProtocol accepts a logger argument."""

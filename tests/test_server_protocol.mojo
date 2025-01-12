@@ -627,6 +627,20 @@ fn test_no_origin_accepted() raises:
     # Not sure why we need the server.origin attribute
     # assert_equal(server.origin, None)
 
+
+fn test_bypass_handshake() raises:
+    """ServerProtocol bypasses the opening handshake if state is OPEN."""
+    var server = ServerProtocol()
+    server.set_state(OPEN)
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 0, 0, 0)
+    receive_data[gen_mask_func=gen_mask](server, Bytes(129, 134, 0, 0, 0, 0, 72, 101, 108, 108, 111, 33))  # "\x81\x86\x00\x00\x00\x00Hello!"
+    events = server.events_received()
+    assert_equal(len(events), 1)
+    var frame = events[0][Frame]
+    assert_equal(frame, Frame(OP_TEXT, str_to_bytes("Hello!")))
+
+
 #     def test_no_extensions(self):
 #         """Handshake succeeds without extensions."""
 #         server = ServerProtocol()
