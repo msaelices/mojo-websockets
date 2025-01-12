@@ -106,7 +106,7 @@ struct ClientProtocol[side_param: Int = CLIENT](Protocol):
         Returns:
             Whether the connection is masked.
         """
-        return True  # Server connections are always masked
+        return False  # Client connections are always non-masked
 
     fn write_data(mut self, data: Bytes) -> None:
         """Write data to the protocol."""
@@ -330,7 +330,7 @@ struct ClientProtocol[side_param: Int = CLIENT](Protocol):
 
         s_w_accept = response.headers["Sec-WebSocket-Accept"]
         if s_w_accept != ws_accept_key(self.key):
-            raise Error('InvalidHeaderValue: "Sec-WebSocket-Accept" header is invalid')
+            raise Error('InvalidHeader: "Sec-WebSocket-Accept" header is invalid')
 
         self.set_state(OPEN)
 
