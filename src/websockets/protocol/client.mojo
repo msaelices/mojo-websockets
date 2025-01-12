@@ -307,6 +307,9 @@ struct ClientProtocol[side_param: Int = CLIENT](Protocol):
 
         # TODO: Support for several "Connection" headers
         # See process_response in the Python implementation
+        if "Connection" not in response.headers:
+            raise Error('InvalidHeader: Missing "Connection" header')
+
         connection = response.headers["Connection"]
 
         if connection.lower() != "upgrade":
