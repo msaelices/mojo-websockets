@@ -318,8 +318,9 @@ fn test_receive_random_response() raises -> None:
 #     assert response == dataclasses.replace(parsed_response, _exception=None)
 
 
-# class HandshakeTests(unittest.TestCase):
-#     """Test processing of handshake responses to configure the connection."""
+# === ------------------------------------------------------------------ ===
+# Test processing of handshake responses to configure the connection.
+# === ------------------------------------------------------------------ ===
 
 #     def assertHandshakeSuccess(self, client):
 #         """Assert that the opening handshake succeeded."""
@@ -334,87 +335,176 @@ fn test_receive_random_response() raises -> None:
 #         assert client.handshake_exc.__cause__ is None
 #         self.assertEqual(str(client.handshake_exc), msg)
 
-#     def test_basic(self):
-#         """Handshake succeeds."""
-#         client = ClientProtocol(URI)
-#         with alter_and_receive_response(client):
-#             pass
+fn test_basic() raises -> None:
+    """Handshake succeeds."""
+    client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
 
-#         self.assertHandshakeSuccess(client)
+    # Receive HTTP response from the server
+    receive_data(
+        client,
+        str_to_bytes(
+            "HTTP/1.1 101 Switching Protocols\r\n"
+            "Upgrade: websocket\r\n"
+            "Connection: Upgrade\r\n"
+            "Sec-WebSocket-Accept: {}\r\n"
+            "Date: {}\r\n"
+            "\r\n".format(ACCEPT, date_func())
+        ),
+    )
 
-#     def test_missing_connection(self):
-#         """Handshake fails when the Connection header is missing."""
-#         client = ClientProtocol(URI)
-#         with alter_and_receive_response(client) as response:
-#             del response.headers["Connection"]
+    assert_equal(client.get_state(), OPEN)
+    assert_false(client.get_handshake_exc())
 
-#         self.assertHandshakeError(
-#             client,
-#             InvalidHeader,
-#             "missing Connection header",
-#         )
 
-#     def test_invalid_connection(self):
-#         """Handshake fails when the Connection header is invalid."""
-#         client = ClientProtocol(URI)
-#         with alter_and_receive_response(client) as response:
-#             del response.headers["Connection"]
-#             response.headers["Connection"] = "close"
+fn test_missing_connection() raises -> None:
+    """Handshake fails when the Connection header is missing."""
+    client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
 
-#         self.assertHandshakeError(
-#             client,
-#             InvalidHeader,
-#             "invalid Connection header: close",
-#         )
+    # Receive HTTP response from the server with missing Connection header
+    receive_data(
+        client,
+        str_to_bytes(
+            "HTTP/1.1 101 Switching Protocols\r\n"
+            "Upgrade: websocket\r\n"
+            "Sec-WebSocket-Accept: {}\r\n"
+            "Date: {}\r\n"
+            "\r\n".format(ACCEPT, date_func())
+        ),
+    )
 
-#     def test_missing_upgrade(self):
-#         """Handshake fails when the Upgrade header is missing."""
-#         client = ClientProtocol(URI)
-#         with alter_and_receive_response(client) as response:
-#             del response.headers["Upgrade"]
+    assert_equal(client.get_state(), CONNECTING)
+    assert_true(client.get_handshake_exc())
+    assert_equal(
+        str(client.get_handshake_exc().value()),
+        'InvalidHeader: Missing "Connection" header'
+    )
 
-#         self.assertHandshakeError(
-#             client,
-#             InvalidHeader,
-#             "missing Upgrade header",
-#         )
 
-#     def test_invalid_upgrade(self):
-#         """Handshake fails when the Upgrade header is invalid."""
-#         client = ClientProtocol(URI)
-#         with alter_and_receive_response(client) as response:
-#             del response.headers["Upgrade"]
-#             response.headers["Upgrade"] = "h2c"
+fn test_invalid_connection() raises -> None:
+    """Handshake fails when the Connection header is invalid."""
+    client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
 
-#         self.assertHandshakeError(
-#             client,
-#             InvalidHeader,
-#             "invalid Upgrade header: h2c",
-#         )
+    # Receive HTTP response from the server with invalid Connection header
+    receive_data(
+        client,
+        str_to_bytes(
+            "HTTP/1.1 101 Switching Protocols\r\n"
+            "Upgrade: websocket\r\n"
+            "Connection: close\r\n"
+            "Sec-WebSocket-Accept: {}\r\n"
+            "Date: {}\r\n"
+            "\r\n".format(ACCEPT, date_func())
+        ),
+    )
 
-#     def test_missing_accept(self):
-#         """Handshake fails when the Sec-WebSocket-Accept header is missing."""
-#         client = ClientProtocol(URI)
-#         with alter_and_receive_response(client) as response:
-#             del response.headers["Sec-WebSocket-Accept"]
+    assert_equal(client.get_state(), CONNECTING)
+    assert_true(client.get_handshake_exc())
+    # Original exception in Python was:
+    # InvalidHeader: Invalid "Connection" header: close
+    assert_equal(
+        str(client.get_handshake_exc().value()),
+        'InvalidUpgrade: Response "Connection" header is not "Upgrade"'
+    )
 
-#         self.assertHandshakeError(
-#             client,
-#             InvalidHeader,
-#             "missing Sec-WebSocket-Accept header",
-#         )
 
-#     def test_multiple_accept(self):
-#         """Handshake fails when the Sec-WebSocket-Accept header is repeated."""
-#         client = ClientProtocol(URI)
-#         with alter_and_receive_response(client) as response:
-#             response.headers["Sec-WebSocket-Accept"] = ACCEPT
+fn test_missing_upgrade() raises -> None:
+    """Handshake fails when the Upgrade header is missing."""
+    client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
 
-#         self.assertHandshakeError(
-#             client,
-#             InvalidHeader,
-#             "invalid Sec-WebSocket-Accept header: multiple values",
-#         )
+    # Receive HTTP response from the server with missing Upgrade header
+    receive_data(
+        client,
+        str_to_bytes(
+            "HTTP/1.1 101 Switching Protocols\r\n"
+            "Connection: Upgrade\r\n"
+            "Sec-WebSocket-Accept: {}\r\n"
+            "Date: {}\r\n"
+            "\r\n".format(ACCEPT, date_func())
+        ),
+    )
+
+    assert_equal(client.get_state(), CONNECTING)
+    assert_true(client.get_handshake_exc())
+    assert_equal(
+        str(client.get_handshake_exc().value()),
+        'InvalidHeader: Missing "Upgrade" header'
+    )
+
+
+fn test_invalid_upgrade() raises -> None:
+    """Handshake fails when the Upgrade header is invalid."""
+    client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
+
+    # Receive HTTP response from the server with invalid Upgrade header
+    receive_data(
+        client,
+        str_to_bytes(
+            "HTTP/1.1 101 Switching Protocols\r\n"
+            "Upgrade: h2c\r\n"
+            "Connection: Upgrade\r\n"
+            "Sec-WebSocket-Accept: {}\r\n"
+            "Date: {}\r\n"
+            "\r\n".format(ACCEPT, date_func())
+        ),
+    )
+
+    assert_equal(client.get_state(), CONNECTING)
+    assert_true(client.get_handshake_exc())
+    assert_equal(
+        str(client.get_handshake_exc().value()),
+        'InvalidUpgrade: Response "Upgrade" header is not "websocket"'
+    )
+
+
+fn test_missing_accept() raises -> None:
+    """Handshake fails when the Sec-WebSocket-Accept header is missing."""
+    client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
+
+    # Receive HTTP response from the server with missing Sec-WebSocket-Accept header
+    receive_data(
+        client,
+        str_to_bytes(
+            "HTTP/1.1 101 Switching Protocols\r\n"
+            "Upgrade: websocket\r\n"
+            "Connection: Upgrade\r\n"
+            "Date: {}\r\n"
+            "\r\n".format(date_func())
+        ),
+    )
+
+    assert_equal(client.get_state(), CONNECTING)
+    assert_true(client.get_handshake_exc())
+    assert_equal(
+        str(client.get_handshake_exc().value()),
+        'InvalidHeader: Missing "Sec-WebSocket-Accept" header'
+    )
+
+
+# TODO: Implement multiple accept logic in the future
+# fn test_multiple_accept() raises -> None:
+#     """Handshake fails when the Sec-WebSocket-Accept header is repeated."""
+#     client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
+#
+#     # Receive HTTP response from the server with repeated Sec-WebSocket-Accept header
+#     receive_data(
+#         client,
+#         str_to_bytes(
+#             "HTTP/1.1 101 Switching Protocols\r\n"
+#             "Upgrade: websocket\r\n"
+#             "Connection: Upgrade\r\n"
+#             "Sec-WebSocket-Accept: {}\r\n"
+#             "Sec-WebSocket-Accept: {}\r\n"
+#             "Date: {}\r\n"
+#             "\r\n".format(ACCEPT, ACCEPT, date_func())
+#         ),
+#     )
+#
+#     assert_equal(client.get_state(), CONNECTING)
+#     assert_true(client.get_handshake_exc())
+#     assert_equal(
+#         str(client.get_handshake_exc().value()),
+#         'InvalidHeader: Multiple "Sec-WebSocket-Accept" headers'
+#     )
 
 #     def test_invalid_accept(self):
 #         """Handshake fails when the Sec-WebSocket-Accept header is invalid."""
