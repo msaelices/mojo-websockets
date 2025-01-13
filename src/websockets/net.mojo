@@ -23,6 +23,7 @@ from libc import (
     getaddrinfo,
     getpeername,
     getsockname,
+    getsockopt,
     htons,
     in_addr,
     inet_ntop,
@@ -244,10 +245,7 @@ struct TCPConnection(Connection):
     fn is_closed(self) -> Bool:
         var error = 0
         var len = socklen_t(sizeof[Int]())
-        var result = external_call[
-        "getsockopt",
-        c_int,
-    ](self.fd, SOL_SOCKET, SO_ERROR, UnsafePointer.address_of(error), UnsafePointer.address_of(len))
+        var result = getsockopt(self.fd, SOL_SOCKET, SO_ERROR, UnsafePointer.address_of(error), UnsafePointer.address_of(len))
         return result == -1 or error != 0
 
     fn set_non_blocking(self, non_blocking: Bool) raises:
