@@ -12,6 +12,8 @@ from libc import FD, c_int, fd_set, timeval, select
 from ..aliases import Bytes, DEFAULT_BUFFER_SIZE, DEFAULT_MAX_REQUEST_BODY_SIZE, MAGIC_CONSTANT
 from ..http import Header, Headers, HTTPRequest, HTTPResponse, encode
 from ..net import create_listener, TCPConnection, TCPListener
+from ..protocol.server import ServerProtocol
+from ..protocol.client import ClientProtocol
 
 alias BYTE_0_TEXT: UInt8 = 1
 alias BYTE_0_NO_FRAGMENT: UInt8 = 128
@@ -362,6 +364,7 @@ struct Server:
     var connections: List[TCPConnection]
     var read_fds: fd_set
     var write_fds: fd_set
+    var protocol: ServerProtocol
 
     fn __init__(out self, host: String, port: Int, handler: ConnHandler, max_request_body_size: Int = 1024, tcp_keep_alive: Bool = False) raises:
         """
@@ -386,14 +389,16 @@ struct Server:
         self.connections = List[TCPConnection]()
         self.read_fds = fd_set()
         self.write_fds = fd_set()
+        self.protocol = ServerProtocol()
 
     fn serve_forever(inout self) raises -> None: # TODO: conditional conformance on main struct , then a default for handler e.g. WebsocketHandshake
         """
         Listen for incoming connections and serve HTTP requests.
         """
+        print("Serving on ", self.host, ":", self.port)
         var listener = create_listener(self.host, self.port)
-        print('Listening on ', self.host, ':', self.port)
         listener.listen()
+        print("Listening on ", self.host, ":", self.port)
         self.serve(listener, self.handler)
 
     fn serve(inout self, ln: TCPListener, handler: ConnHandler) raises -> None:
@@ -454,12 +459,14 @@ struct Server:
 
             var i = 0
             while i < len(self.connections):
-                print("Connection ", i)
+                print("Handling connection ", i)
                 var conn = self.connections[i]
                 if self.read_fds.is_set(int(conn.fd)):
                     _ = self.handle_read(conn, handler)
                 if self.write_fds.is_set(int(conn.fd)):
                     _ = self.handle_write(conn)
+
+                _ = i  # Needed to avoid a bug in the compiler
 
                 if conn.is_closed():
                     _ = self.connections.pop(i)

@@ -28,6 +28,7 @@ from .base import (
     send_eof,
 )
 
+
 struct ClientProtocol[side_param: Int = CLIENT](Protocol):
     """
     Sans-I/O implementation of a WebSocket client connection.

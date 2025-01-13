@@ -661,8 +661,8 @@ struct TCPListener(Listener):
         )
         if bind != 0:
             print(
-                "Bind attempt failed. The address might be in use or"
-                " the socket might not be available."
+                "Bind attempt failed: {}. The address might be in use or"
+                " the socket might not be available.".format(bind)
             )
             _ = shutdown(sockfd, SHUT_RDWR)
 

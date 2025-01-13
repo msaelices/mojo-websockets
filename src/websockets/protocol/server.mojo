@@ -25,6 +25,7 @@ from .base import (
     send_eof,
 )
 
+
 struct ServerProtocol[side_param: Int = SERVER](Protocol):
     """
     Sans-I/O implementation of a WebSocket server connection.
@@ -63,6 +64,26 @@ struct ServerProtocol[side_param: Int = SERVER](Protocol):
         self.close_rcvd_then_sent = None
         self.eof_sent = False
         self.discard_sent = False
+
+    fn __copyinit__(out self, other: ServerProtocol):
+        self.origins = other.origins
+
+        self.reader = StreamReader()
+        # This weirdly makes the copy to cause an error while binding the server socket
+        # self.events = other.events
+        self.events = List[Event]()
+        self.writes = Bytes(capacity=DEFAULT_BUFFER_SIZE)
+        self.state = other.state
+        self.expect_cont_frame = other.expect_cont_frame
+        self.parser_exc = other.parser_exc
+        self.handshake_exc = other.handshake_exc
+        self.curr_size = other.curr_size
+
+        self.close_rcvd = other.close_rcvd
+        self.close_sent = other.close_sent
+        self.close_rcvd_then_sent = other.close_rcvd_then_sent
+        self.eof_sent = other.eof_sent
+        self.discard_sent = other.discard_sent
 
     # ===-------------------------------------------------------------------=== #
     # Trait implementations
