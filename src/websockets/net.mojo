@@ -243,7 +243,7 @@ struct TCPConnection(Connection):
             print("Failed to close new_sockfd")
 
     fn is_closed(self) -> Bool:
-        var error = 0
+        var error: UInt8 = 0
         var len = socklen_t(sizeof[Int]())
         var result = getsockopt(self.fd, SOL_SOCKET, SO_ERROR, UnsafePointer.address_of(error), UnsafePointer.address_of(len))
         return result == -1 or error != 0
