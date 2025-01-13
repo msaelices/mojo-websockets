@@ -9,11 +9,11 @@ from libc import (
     select,
     timeval,
 )
-from websockets.sync.server import serve, send_message, receive_message
+from websockets.sync.server import serve_old, send_message, receive_message
 
 
 fn main() raises:
-    var ws = serve()
+    var ws = serve_old()
     if ws:
         # TODO: Make an abstraction layer to not deal with libc socket FDs
         var conn = ws.value()
@@ -32,7 +32,7 @@ fn main() raises:
                 # first argument is the number of file descriptors (TODO: make it dynamic)
                 res = select(socket + 1, fds_ptr, null_ptr, null_ptr, null_timeval_ptr)
                 print("\nwait\n")
-                sleep(1)
+                sleep(1.0)
             m = receive_message(ws.value())
             if m:
                 # print(m.value())
