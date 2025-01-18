@@ -1,4 +1,3 @@
-alias Byte = UInt8
 alias Bytes = List[Byte, True]
 alias Duration = Int
 alias DEFAULT_BUFFER_SIZE = 4096
