@@ -14,7 +14,7 @@ from websockets.protocol.client import ClientProtocol
 from websockets.utils.bytes import str_to_bytes
 from websockets.utils.uri import URI
 
-from testutils import ACCEPT, KEY
+from testutils import ACCEPT, KEY, assert_bytes_equal
 
 
 fn date_func() -> String:
@@ -35,7 +35,7 @@ fn test_send_request() raises -> None:
     client.send_request(request)
 
     data_to_send = client.data_to_send()
-    assert_equal(
+    assert_bytes_equal(
         data_to_send,
         str_to_bytes(
             "GET /test HTTP/1.1\r\n"
@@ -67,7 +67,7 @@ fn test_receive_successful_response() raises -> None:
         ),
     )
 
-    assert_equal(client.data_to_send(), Bytes())
+    assert_bytes_equal(client.data_to_send(), Bytes())
     assert_false(close_expected(client))
     assert_equal(client.get_state(), OPEN)
 
@@ -89,7 +89,7 @@ fn test_receive_failed_response() raises -> None:
         ),
     )
 
-    assert_equal(client.data_to_send(), Bytes())
+    assert_bytes_equal(client.data_to_send(), Bytes())
     assert_true(close_expected(client))
     assert_equal(client.get_state(), CONNECTING)
 
@@ -207,7 +207,7 @@ fn test_receive_successful_response_with_events() raises -> None:
             Header("Date", date_func())
         )
     )
-    assert_equal(response.body_raw, str_to_bytes("\r\n"))
+    assert_bytes_equal(response.body_raw, str_to_bytes("\r\n"))
 
 
 fn test_receive_failed_response_with_events() raises -> None:
@@ -243,7 +243,7 @@ fn test_receive_failed_response_with_events() raises -> None:
             Header("Connection", "close")
         )
     )
-    assert_equal(response.body_raw, str_to_bytes("\r\nSorry folks.\n"))
+    assert_bytes_equal(response.body_raw, str_to_bytes("\r\nSorry folks.\n"))
 
 
 fn test_receive_no_response() raises -> None:
@@ -256,7 +256,7 @@ fn test_receive_no_response() raises -> None:
     # Original exception in Python was:
     # EOFError: connection closed while reading HTTP status line
     assert_equal(
-        str(client.get_handshake_exc().value()),
+        String(client.get_handshake_exc().value()),
         "EOFError: connection closed before handshake completed",
     )
 
@@ -271,7 +271,7 @@ fn test_receive_no_response() raises -> None:
 #     assert_equal(len(client.events_received()), 0)
 #     assert_true(client.get_handshake_exc())
 #     assert_equal(
-#         str(client.get_handshake_exc().value()),
+#         String(client.get_handshake_exc().value()),
 #         "EOFError: connection closed while reading HTTP headers",
 #     )
 
@@ -288,7 +288,7 @@ fn test_receive_random_response() raises -> None:
     # Original exception in Python was:
     # ValueError: invalid HTTP status line: 220 smtp.invalid
     assert_equal(
-        str(client.get_handshake_exc().value()),
+        String(client.get_handshake_exc().value()),
         "Failed to parse response headers: Failed to read third word from request line",
     )
 
@@ -333,7 +333,7 @@ fn test_receive_random_response() raises -> None:
 #         self.assertIsInstance(client.handshake_exc, exc_type)
 #         # Exception chaining isn't used is client handshake implementation.
 #         assert client.handshake_exc.__cause__ is None
-#         self.assertEqual(str(client.handshake_exc), msg)
+#         self.assertEqual(String(client.handshake_exc), msg)
 
 fn test_basic() raises -> None:
     """Handshake succeeds."""
@@ -375,7 +375,7 @@ fn test_missing_connection() raises -> None:
     assert_equal(client.get_state(), CONNECTING)
     assert_true(client.get_handshake_exc())
     assert_equal(
-        str(client.get_handshake_exc().value()),
+        String(client.get_handshake_exc().value()),
         'InvalidHeader: Missing "Connection" header'
     )
 
@@ -402,7 +402,7 @@ fn test_invalid_connection() raises -> None:
     # Original exception in Python was:
     # InvalidHeader: Invalid "Connection" header: close
     assert_equal(
-        str(client.get_handshake_exc().value()),
+        String(client.get_handshake_exc().value()),
         'InvalidUpgrade: Response "Connection" header is not "Upgrade"'
     )
 
@@ -426,7 +426,7 @@ fn test_missing_upgrade() raises -> None:
     assert_equal(client.get_state(), CONNECTING)
     assert_true(client.get_handshake_exc())
     assert_equal(
-        str(client.get_handshake_exc().value()),
+        String(client.get_handshake_exc().value()),
         'InvalidHeader: Missing "Upgrade" header'
     )
 
@@ -451,7 +451,7 @@ fn test_invalid_upgrade() raises -> None:
     assert_equal(client.get_state(), CONNECTING)
     assert_true(client.get_handshake_exc())
     assert_equal(
-        str(client.get_handshake_exc().value()),
+        String(client.get_handshake_exc().value()),
         'InvalidUpgrade: Response "Upgrade" header is not "websocket"'
     )
 
@@ -475,7 +475,7 @@ fn test_missing_accept() raises -> None:
     assert_equal(client.get_state(), CONNECTING)
     assert_true(client.get_handshake_exc())
     assert_equal(
-        str(client.get_handshake_exc().value()),
+        String(client.get_handshake_exc().value()),
         'InvalidHeader: Missing "Sec-WebSocket-Accept" header'
     )
 
@@ -502,7 +502,7 @@ fn test_missing_accept() raises -> None:
 #     assert_equal(client.get_state(), CONNECTING)
 #     assert_true(client.get_handshake_exc())
 #     assert_equal(
-#         str(client.get_handshake_exc().value()),
+#         String(client.get_handshake_exc().value()),
 #         'InvalidHeader: Multiple "Sec-WebSocket-Accept" headers'
 #     )
 
@@ -526,7 +526,7 @@ fn test_invalid_accept() raises -> None:
     assert_equal(client.get_state(), CONNECTING)
     assert_true(client.get_handshake_exc())
     assert_equal(
-        str(client.get_handshake_exc().value()),
+        String(client.get_handshake_exc().value()),
         'InvalidHeader: "Sec-WebSocket-Accept" header is invalid'
     )
 
@@ -546,7 +546,7 @@ fn test_bypass_handshake() raises -> None:
     events = client.events_received()
 
     assert_true(events[0].isa[Frame]())
-    assert_equal(events[0][Frame].data, Frame(OP_TEXT, str_to_bytes("Hello!")).data)
+    assert_bytes_equal(events[0][Frame].data, Frame(OP_TEXT, str_to_bytes("Hello!")).data)
 
 
 # TODO: Implement this tests when extensions are supported
