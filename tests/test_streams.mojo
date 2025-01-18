@@ -3,6 +3,7 @@ from testing import assert_equal, assert_false, assert_raises, assert_true
 from websockets.aliases import Bytes
 from websockets.utils.bytes import str_to_bytes
 from websockets.streams import StreamReader
+from testutils import assert_bytes_equal
 
 alias SIZE = 32
 
@@ -12,10 +13,10 @@ fn test_read_line() raises:
     reader.feed_data(str_to_bytes("spam\neggs\n"))
 
     line = reader.read_line(SIZE)
-    assert_equal(line.value(), str_to_bytes("spam\n"))
+    assert_bytes_equal(line.value(), str_to_bytes("spam\n"))
 
     line = reader.read_line(SIZE)
-    assert_equal(line.value(), str_to_bytes("eggs\n"))
+    assert_bytes_equal(line.value(), str_to_bytes("eggs\n"))
 
 
 fn test_read_line_need_more_data() raises:
@@ -23,16 +24,16 @@ fn test_read_line_need_more_data() raises:
     reader.feed_data(str_to_bytes("spa"))
 
     line = reader.read_line(SIZE)
-    assert_false(bool(line)) 
+    assert_false(Bool(line)) 
     reader.feed_data(str_to_bytes("m\neg"))
     line2 = reader.read_line(SIZE)
-    assert_equal(line2.value(), str_to_bytes("spam\n"))
+    assert_bytes_equal(line2.value(), str_to_bytes("spam\n"))
 
     line3 = reader.read_line(SIZE)
-    assert_false(bool(line3)) 
+    assert_false(Bool(line3)) 
     reader.feed_data(str_to_bytes("gs\n"))
     line4 = reader.read_line(SIZE)
-    assert_equal(line4.value(), str_to_bytes("eggs\n"))
+    assert_bytes_equal(line4.value(), str_to_bytes("eggs\n"))
 
 
 fn test_read_line_not_enough_data() raises:
@@ -65,10 +66,10 @@ fn test_read_exact() raises:
     reader.feed_data(str_to_bytes("spameggs"))
 
     data = reader.read_exact(4)
-    assert_equal(data.value(), str_to_bytes("spam"))
+    assert_bytes_equal(data.value(), str_to_bytes("spam"))
 
     data = reader.read_exact(4)
-    assert_equal(data.value(), str_to_bytes("eggs"))
+    assert_bytes_equal(data.value(), str_to_bytes("eggs"))
 
 
 fn test_read_exact_need_more_data() raises:
@@ -76,16 +77,16 @@ fn test_read_exact_need_more_data() raises:
     reader.feed_data(str_to_bytes("spa"))
 
     data = reader.read_exact(4)
-    assert_false(bool(data))
+    assert_false(Bool(data))
     reader.feed_data(str_to_bytes("meg"))
     data = reader.read_exact(4)
-    assert_equal(data.value(), str_to_bytes("spam"))
+    assert_bytes_equal(data.value(), str_to_bytes("spam"))
 
     data = reader.read_exact(4)
-    assert_false(bool(data))
+    assert_false(Bool(data))
     reader.feed_data(str_to_bytes("gs"))
     data = reader.read_exact(4)
-    assert_equal(data.value(), str_to_bytes("eggs"))
+    assert_bytes_equal(data.value(), str_to_bytes("eggs"))
 
 
 fn test_read_exact_not_enough_data() raises:
@@ -100,18 +101,18 @@ fn test_read_exact_not_enough_data() raises:
 fn test_read_to_eof() raises:
     reader = StreamReader()
     data = reader.read_to_eof(SIZE)
-    assert_false(bool(data))
+    assert_false(Bool(data))
     reader.feed_data(str_to_bytes("spam"))
     reader.feed_eof()
     data = reader.read_to_eof(SIZE)
-    assert_equal(data.value(), str_to_bytes("spam"))
+    assert_bytes_equal(data.value(), str_to_bytes("spam"))
 
 fn test_read_to_eof_at_eof() raises:
     reader = StreamReader()
     reader.feed_eof()
 
     data = reader.read_to_eof(SIZE)
-    assert_equal(data.value(), str_to_bytes(""))
+    assert_bytes_equal(data.value(), str_to_bytes(""))
 
 
 fn test_read_to_eof_too_long() raises:
@@ -128,7 +129,7 @@ fn test_feed_data_after_feed_data() raises:
     reader.feed_data(str_to_bytes("eggs"))
 
     data = reader.read_exact(8)
-    assert_equal(data.value(), str_to_bytes("spameggs"))
+    assert_bytes_equal(data.value(), str_to_bytes("spameggs"))
     eof = reader.at_eof()
     assert_false(eof)
 
@@ -139,7 +140,7 @@ fn test_feed_eof_after_feed_data() raises:
     reader.feed_eof()
 
     data = reader.read_exact(4)
-    assert_equal(data.value(), str_to_bytes("spam"))
+    assert_bytes_equal(data.value(), str_to_bytes("spam"))
     eof = reader.at_eof()
     assert_true(eof)
 
@@ -184,5 +185,5 @@ fn test_discard() raises:
     reader.discard()
     reader.feed_eof()
     data = reader.read_to_eof(SIZE)
-    assert_equal(data.value(), str_to_bytes(""))
+    assert_bytes_equal(data.value(), str_to_bytes(""))
 

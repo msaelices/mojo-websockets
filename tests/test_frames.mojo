@@ -16,24 +16,25 @@ from websockets.frames import (
 )
 from websockets.streams import StreamReader
 from websockets.utils.string import bytes
+from testutils import assert_bytes_equal
 
 
 fn test_str() raises:
-    assert_equal(str(Frame(OP_TEXT, bytes("Spam"))), "TEXT 'Spam' [text, 4 bytes, ]")
-    assert_equal(str(Frame(OP_TEXT, bytes("Spam"), fin=False)), "TEXT 'Spam' [text, 4 bytes, continued]")
-    assert_equal(str(Frame(OP_BINARY, bytes("Eggs"))), "BINARY 0x30 0x30 0x30 0x30 [binary, 4 bytes, ]")
-    assert_equal(str(Frame(OP_BINARY, bytes("Eggs"), fin=False)), "BINARY 0x30 0x30 0x30 0x30 [binary, 4 bytes, continued]")
-    assert_equal(str(Frame(OP_CLOSE, bytes(""))), "CLOSE NO_STATUS_RCVD (no status received [internal]) [, 0 bytes, ]")
-    assert_equal(str(Frame(OP_CLOSE, bytes("\x03\xe9OK"))), "CLOSE GOING_AWAY (going away) OK [, 4 bytes, ]")
-    assert_equal(str(Frame(OP_PING, bytes(""))), "PING '' [, 0 bytes, ]")
-    assert_equal(str(Frame(OP_PING, bytes("ping"))), "PING 'ping' [text, 4 bytes, ]")
-    assert_equal(str(Frame(OP_PONG, bytes(""))), "PONG '' [, 0 bytes, ]")
-    assert_equal(str(Frame(OP_PONG, bytes("pong"))), "PONG 'pong' [text, 4 bytes, ]")
+    assert_equal(String(Frame(OP_TEXT, bytes("Spam"))), "TEXT 'Spam' [text, 4 bytes, ]")
+    assert_equal(String(Frame(OP_TEXT, bytes("Spam"), fin=False)), "TEXT 'Spam' [text, 4 bytes, continued]")
+    assert_equal(String(Frame(OP_BINARY, bytes("Eggs"))), "BINARY 0x30 0x30 0x30 0x30 [binary, 4 bytes, ]")
+    assert_equal(String(Frame(OP_BINARY, bytes("Eggs"), fin=False)), "BINARY 0x30 0x30 0x30 0x30 [binary, 4 bytes, continued]")
+    assert_equal(String(Frame(OP_CLOSE, bytes(""))), "CLOSE NO_STATUS_RCVD (no status received [internal]) [, 0 bytes, ]")
+    assert_equal(String(Frame(OP_CLOSE, bytes("\x03\xe9OK"))), "CLOSE GOING_AWAY (going away) OK [, 4 bytes, ]")
+    assert_equal(String(Frame(OP_PING, bytes(""))), "PING '' [, 0 bytes, ]")
+    assert_equal(String(Frame(OP_PING, bytes("ping"))), "PING 'ping' [text, 4 bytes, ]")
+    assert_equal(String(Frame(OP_PONG, bytes(""))), "PONG '' [, 0 bytes, ]")
+    assert_equal(String(Frame(OP_PONG, bytes("pong"))), "PONG 'pong' [text, 4 bytes, ]")
 
 
 fn test_close_serialize() raises:
-    assert_equal(Close(1000, "").serialize(), bytes("\x03\xe8"))
-    assert_equal(Close(1000, "OK").serialize(), bytes("\x03\xe8OK"))
+    assert_bytes_equal(Close(1000, "").serialize(), bytes("\x03\xe8"))
+    assert_bytes_equal(Close(1000, "OK").serialize(), bytes("\x03\xe8OK"))
 
 
 fn parse(data: Bytes, mask: Bool) raises -> Optional[Frame]:
@@ -59,7 +60,7 @@ fn assert_frame_data(frame: Frame, data: Bytes, mask: Bool) raises:
     # Compare frames first, because test failures are easier to read,
     # especially when mask = True.
     parsed_frame = parse(data, mask=mask)
-    assert_equal(parsed_frame.value().data, frame.data)
+    assert_bytes_equal(parsed_frame.value().data, frame.data)
 
     # Make masking deterministic by reusing the same "random" mask.
     # This has an effect only when mask is True.
@@ -67,7 +68,7 @@ fn assert_frame_data(frame: Frame, data: Bytes, mask: Bool) raises:
     # mask_bytes = data[2:6] if mask else str_to_bytes("")
     # with enforce_mask(mask_bytes):
     #     serialized = frame.serialize(mask=mask, extensions=extensions)
-    # assert_equal(serialized, data)
+    # assert_bytes_equal(serialized, data)
 
 
 fn test_text_unmasked() raises:
@@ -266,167 +267,167 @@ fn test_text_unmasked() raises:
 # class StrTests(unittest.TestCase):
 #     def test_cont_text(self):
 #         self.assertEqual(
-#             str(Frame(OP_CONT, b" cr\xc3\xa8me", fin=False)),
+#             String(Frame(OP_CONT, b" cr\xc3\xa8me", fin=False)),
 #             "CONT ' crème' [text, 7 bytes, continued]",
 #         )
 #
 #     def test_cont_binary(self):
 #         self.assertEqual(
-#             str(Frame(OP_CONT, b"\xfc\xfd\xfe\xff", fin=False)),
+#             String(Frame(OP_CONT, b"\xfc\xfd\xfe\xff", fin=False)),
 #             "CONT fc fd fe ff [binary, 4 bytes, continued]",
 #         )
 #
 #     def test_cont_binary_from_memoryview(self):
 #         self.assertEqual(
-#             str(Frame(OP_CONT, memoryview(b"\xfc\xfd\xfe\xff"), fin=False)),
+#             String(Frame(OP_CONT, memoryview(b"\xfc\xfd\xfe\xff"), fin=False)),
 #             "CONT fc fd fe ff [binary, 4 bytes, continued]",
 #         )
 #
 #     def test_cont_final_text(self):
 #         self.assertEqual(
-#             str(Frame(OP_CONT, b" cr\xc3\xa8me")),
+#             String(Frame(OP_CONT, b" cr\xc3\xa8me")),
 #             "CONT ' crème' [text, 7 bytes]",
 #         )
 #
 #     def test_cont_final_binary(self):
 #         self.assertEqual(
-#             str(Frame(OP_CONT, b"\xfc\xfd\xfe\xff")),
+#             String(Frame(OP_CONT, b"\xfc\xfd\xfe\xff")),
 #             "CONT fc fd fe ff [binary, 4 bytes]",
 #         )
 #
 #     def test_cont_final_binary_from_memoryview(self):
 #         self.assertEqual(
-#             str(Frame(OP_CONT, memoryview(b"\xfc\xfd\xfe\xff"))),
+#             String(Frame(OP_CONT, memoryview(b"\xfc\xfd\xfe\xff"))),
 #             "CONT fc fd fe ff [binary, 4 bytes]",
 #         )
 #
 #     def test_cont_text_truncated(self):
 #         self.assertEqual(
-#             str(Frame(OP_CONT, b"caf\xc3\xa9 " * 16, fin=False)),
+#             String(Frame(OP_CONT, b"caf\xc3\xa9 " * 16, fin=False)),
 #             "CONT 'café café café café café café café café café ca..."
 #             "fé café café café café ' [text, 96 bytes, continued]",
 #         )
 #
 #     def test_cont_binary_truncated(self):
 #         self.assertEqual(
-#             str(Frame(OP_CONT, bytes(range(256)), fin=False)),
+#             String(Frame(OP_CONT, bytes(range(256)), fin=False)),
 #             "CONT 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f ..."
 #             " f8 f9 fa fb fc fd fe ff [binary, 256 bytes, continued]",
 #         )
 #
 #     def test_cont_binary_truncated_from_memoryview(self):
 #         self.assertEqual(
-#             str(Frame(OP_CONT, memoryview(bytes(range(256))), fin=False)),
+#             String(Frame(OP_CONT, memoryview(bytes(range(256))), fin=False)),
 #             "CONT 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f ..."
 #             " f8 f9 fa fb fc fd fe ff [binary, 256 bytes, continued]",
 #         )
 #
 #     def test_text(self):
 #         self.assertEqual(
-#             str(Frame(OP_TEXT, b"caf\xc3\xa9")),
+#             String(Frame(OP_TEXT, b"caf\xc3\xa9")),
 #             "TEXT 'café' [5 bytes]",
 #         )
 #
 #     def test_text_non_final(self):
 #         self.assertEqual(
-#             str(Frame(OP_TEXT, b"caf\xc3\xa9", fin=False)),
+#             String(Frame(OP_TEXT, b"caf\xc3\xa9", fin=False)),
 #             "TEXT 'café' [5 bytes, continued]",
 #         )
 #
 #     def test_text_truncated(self):
 #         self.assertEqual(
-#             str(Frame(OP_TEXT, b"caf\xc3\xa9 " * 16)),
+#             String(Frame(OP_TEXT, b"caf\xc3\xa9 " * 16)),
 #             "TEXT 'café café café café café café café café café ca..."
 #             "fé café café café café ' [96 bytes]",
 #         )
 #
 #     def test_text_with_newline(self):
 #         self.assertEqual(
-#             str(Frame(OP_TEXT, b"Hello\nworld!")),
+#             String(Frame(OP_TEXT, b"Hello\nworld!")),
 #             "TEXT 'Hello\\nworld!' [12 bytes]",
 #         )
 #
 #     def test_binary(self):
 #         self.assertEqual(
-#             str(Frame(OP_BINARY, b"\x00\x01\x02\x03")),
+#             String(Frame(OP_BINARY, b"\x00\x01\x02\x03")),
 #             "BINARY 00 01 02 03 [4 bytes]",
 #         )
 #
 #     def test_binary_from_memoryview(self):
 #         self.assertEqual(
-#             str(Frame(OP_BINARY, memoryview(b"\x00\x01\x02\x03"))),
+#             String(Frame(OP_BINARY, memoryview(b"\x00\x01\x02\x03"))),
 #             "BINARY 00 01 02 03 [4 bytes]",
 #         )
 #
 #     def test_binary_non_final(self):
 #         self.assertEqual(
-#             str(Frame(OP_BINARY, b"\x00\x01\x02\x03", fin=False)),
+#             String(Frame(OP_BINARY, b"\x00\x01\x02\x03", fin=False)),
 #             "BINARY 00 01 02 03 [4 bytes, continued]",
 #         )
 #
 #     def test_binary_non_final_from_memoryview(self):
 #         self.assertEqual(
-#             str(Frame(OP_BINARY, memoryview(b"\x00\x01\x02\x03"), fin=False)),
+#             String(Frame(OP_BINARY, memoryview(b"\x00\x01\x02\x03"), fin=False)),
 #             "BINARY 00 01 02 03 [4 bytes, continued]",
 #         )
 #
 #     def test_binary_truncated(self):
 #         self.assertEqual(
-#             str(Frame(OP_BINARY, bytes(range(256)))),
+#             String(Frame(OP_BINARY, bytes(range(256)))),
 #             "BINARY 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f ..."
 #             " f8 f9 fa fb fc fd fe ff [256 bytes]",
 #         )
 #
 #     def test_binary_truncated_from_memoryview(self):
 #         self.assertEqual(
-#             str(Frame(OP_BINARY, memoryview(bytes(range(256))))),
+#             String(Frame(OP_BINARY, memoryview(bytes(range(256))))),
 #             "BINARY 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f ..."
 #             " f8 f9 fa fb fc fd fe ff [256 bytes]",
 #         )
 #
 #     def test_close(self):
 #         self.assertEqual(
-#             str(Frame(OP_CLOSE, b"\x03\xe8")),
+#             String(Frame(OP_CLOSE, b"\x03\xe8")),
 #             "CLOSE 1000 (OK) [2 bytes]",
 #         )
 #
 #     def test_close_reason(self):
 #         self.assertEqual(
-#             str(Frame(OP_CLOSE, b"\x03\xe9Bye!")),
+#             String(Frame(OP_CLOSE, b"\x03\xe9Bye!")),
 #             "CLOSE 1001 (going away) Bye! [6 bytes]",
 #         )
 #
 #     def test_ping(self):
 #         self.assertEqual(
-#             str(Frame(OP_PING, b"")),
+#             String(Frame(OP_PING, b"")),
 #             "PING '' [0 bytes]",
 #         )
 #
 #     def test_ping_text(self):
 #         self.assertEqual(
-#             str(Frame(OP_PING, b"ping")),
+#             String(Frame(OP_PING, b"ping")),
 #             "PING 'ping' [text, 4 bytes]",
 #         )
 #
 #     def test_ping_text_with_newline(self):
 #         self.assertEqual(
-#             str(Frame(OP_PING, b"ping\n")),
+#             String(Frame(OP_PING, b"ping\n")),
 #             "PING 'ping\\n' [text, 5 bytes]",
 #         )
 #
 #     def test_ping_binary(self):
 #         self.assertEqual(
-#             str(Frame(OP_PING, b"\xff\x00\xff\x00")),
+#             String(Frame(OP_PING, b"\xff\x00\xff\x00")),
 #             "PING ff 00 ff 00 [binary, 4 bytes]",
 #         )
 #
 #     def test_pong(self):
 #         self.assertEqual(
-#             str(Frame(OP_PONG, b"")),
+#             String(Frame(OP_PONG, b"")),
 #             "PONG '' [0 bytes]",
 #         )
 #
 #     def test_pong_text(self):
 #         self.assertEqual(
-#             str(Frame(OP_PONG, b"pong")),
+#             String(Frame(OP_PONG, b"pong")),
 #             "PONG 'pong' [text, 4 bytes]",
