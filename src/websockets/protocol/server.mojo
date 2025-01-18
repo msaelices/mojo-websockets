@@ -26,11 +26,11 @@ from .base import (
 )
 
 
-struct ServerProtocol[side_param: Int = SERVER](Protocol):
+struct ServerProtocol(Protocol):
     """
     Sans-I/O implementation of a WebSocket server connection.
     """
-    alias side = side_param
+    alias side = SERVER
 
     var origins: Optional[List[String]]
     var reader: StreamReader
@@ -332,7 +332,7 @@ struct ServerProtocol[side_param: Int = SERVER](Protocol):
             # If the connection isn't open, set handshake_exc to guarantee that
             # handshake_exc is None if and only if opening handshake succeeded.
             if self.handshake_exc is None:
-                self.handshake_exc = Error("InvalidStatus: {}".format(str(response)))
+                self.handshake_exc = Error(String("InvalidStatus: ", response))
 
             send_eof(self)
             discard(self)
@@ -354,7 +354,7 @@ struct ServerProtocol[side_param: Int = SERVER](Protocol):
         var headers = Headers(
             Header("Date", date_func()),
             Header("Connection", "close"),
-            Header("Content-Length", str(len(body))),
+            Header("Content-Length", String(len(body))),
             Header("Content-type", "text/plain; charset=utf-8")
         )
         return HTTPResponse(status_code, status_text, headers, str_to_bytes(body))

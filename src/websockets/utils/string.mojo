@@ -106,7 +106,7 @@ struct ByteWriter:
         self._inner.extend(b^)
 
     @always_inline
-    fn write(mut self, inout s: String):
+    fn write(mut self, mut s: String):
         # kind of cursed but seems to work?
         _ = s._buffer.pop()
         self._inner.extend(s._buffer^)
@@ -176,7 +176,7 @@ struct ByteReader:
         self.read_pos += v
 
     @always_inline
-    fn consume(mut self, inout buffer: Bytes):
+    fn consume(mut self, mut buffer: Bytes):
         var pos = self.read_pos
         self.read_pos = -1
         var read_len = len(self._inner) - pos
@@ -220,7 +220,7 @@ fn byte(s: String) -> Byte:
 
 @always_inline
 fn bytes(s: String) -> Bytes:
-    return s.as_bytes()
+    return Bytes(s.as_bytes())
 
 
 @always_inline

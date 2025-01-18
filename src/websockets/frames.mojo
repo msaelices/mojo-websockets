@@ -177,7 +177,7 @@ fn apply_mask(data: Bytes, mask: Bytes) raises -> Bytes:
     mask_repeated = mask * (len(data) // 4) + mask[: len(data) % 4]
     masked = Bytes(capacity=len(data))
     for i in range(len(data)):
-        masked += Byte(data[i] ^ mask_repeated[i])
+        masked.append(Byte(data[i] ^ mask_repeated[i]))
     return masked
 
 
@@ -238,7 +238,7 @@ struct Frame(Writable, Stringable, EqualityComparable):
         var data: String
 
         length = "{} byte{}".format(
-           int(len(self.data)),
+           Int(len(self.data)),
            "" if len(self.data) == 1 else "s",
         )
         non_final = "" if self.fin else "continued"
@@ -254,7 +254,7 @@ struct Frame(Writable, Stringable, EqualityComparable):
             data = self._data_as_binary()
             coding = "binary"
         elif self.opcode == OP_CLOSE:
-            data = str(Close.parse(self.data))
+            data = String(Close.parse(self.data))
         elif self.data:
             # We don't know if a Continuation frame contains text or binary.
             # Ping and Pong frames could contain UTF-8.
@@ -294,7 +294,7 @@ struct Frame(Writable, Stringable, EqualityComparable):
         """
         Return the data as a string.
         """
-        return StringRef(self.data.unsafe_ptr(), len(self.data))
+        return String(StringRef(self.data.unsafe_ptr(), len(self.data)))
 
     @always_inline
     fn _data_as_binary(self) raises -> String:
@@ -303,8 +303,8 @@ struct Frame(Writable, Stringable, EqualityComparable):
         """
         var s: String = ""
         for byte in self.data:
-            s += "{} ".format(hex(ord(str(byte))))
-        return s.strip()
+            s += "{} ".format(hex(ord(String(byte))))
+        return String(s.strip())
 
     @staticmethod
     fn parse[T: Streamable](
@@ -355,7 +355,7 @@ struct Frame(Writable, Stringable, EqualityComparable):
             raise Error("ProtocolError: invalid opcode")
 
         # Check if the mask bit is set correctly.
-        if bool(head2 & 0b10000000) != mask:
+        if Bool(head2 & 0b10000000) != mask:
             raise Error("ProtocolError: incorrect masking")
 
         length = head2 & 0b01111111
@@ -497,10 +497,10 @@ struct Close:
 
             @parameter
             if not is_big_endian():
-                code = int(byte_swap(data_u16))
+                code = Int(byte_swap(data_u16))
             else:
-                code = int(data_u16)
-            reason = StringRef(data.unsafe_ptr().offset(2), len(data) - 2)
+                code = Int(data_u16)
+            reason = String(StringRef(data.unsafe_ptr().offset(2), len(data) - 2))
             close = Close(code, reason)
             close.check()
             return close
@@ -524,7 +524,8 @@ struct Close:
 
         bytes = UnsafePointer.address_of(code).bitcast[Byte]()
         code_bytes = Bytes(bytes[0], bytes[1])
-        return code_bytes + self.reason.as_bytes()
+        code_bytes.extend(self.reason.as_bytes())
+        return code_bytes
 
     fn check(self) raises -> None:
         """
@@ -534,7 +535,7 @@ struct Close:
             Error: If the close code is invalid.
 
         """
-        code = int(self.code)
+        code = Int(self.code)
         if not (code in EXTERNAL_CLOSE_CODES or 3000 <= code < 5000):
             raise Error("ProtocolError: invalid status code: {}".format(self.code))
 

@@ -35,7 +35,7 @@ struct URI:
         try:
             u._parse()
         except e:
-            return "Failed to parse URI: " + str(e)
+            return String("Failed to parse URI: ", e)
 
         return u
 
@@ -113,7 +113,7 @@ struct URI:
             self.query_string = request_uri[n + 1 :]
         else:
             self._original_path = request_uri
-            self.query_string = Bytes()
+            self.query_string = String()
 
         self.path = self._original_path
         self.request_uri = request_uri
@@ -138,7 +138,7 @@ struct URI:
         var j = self.host.find(":", start=i)
         if j < 0:
             return 443 if self.is_https() or self.is_wss() else 80
-        return int(self.host[j + 1 :])
+        return Int(self.host[j + 1 :])
 
     fn get_user_info(self) -> Optional[(String, String)]:
         """

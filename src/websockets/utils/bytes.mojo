@@ -58,25 +58,25 @@ fn unpack(format: String, buffer: Bytes) raises -> List[Int]:
     for c_ref in fmt_span:
         c = c_ref[]
         if c == ord('b'):
-            values.append(int(reader.read[DType.int8](order)))
+            values.append(Int(reader.read[DType.int8](order)))
         elif c == ord('B'):
-            values.append(int(reader.read[DType.uint8](order)))
+            values.append(Int(reader.read[DType.uint8](order)))
         elif c == ord('h'):
-            values.append(int(reader.read[DType.int16](order)))
+            values.append(Int(reader.read[DType.int16](order)))
         elif c == ord('H'):
-            values.append(int(reader.read[DType.uint16](order)))
+            values.append(Int(reader.read[DType.uint16](order)))
         elif c == ord('i'):
-            values.append(int(reader.read[DType.int32](order)))
+            values.append(Int(reader.read[DType.int32](order)))
         elif c == ord('I'):
-            values.append(int(reader.read[DType.uint32](order)))
+            values.append(Int(reader.read[DType.uint32](order)))
         elif c == ord('l'):
-            values.append(int(reader.read[DType.int32](order)))
+            values.append(Int(reader.read[DType.int32](order)))
         elif c == ord('L'):
-            values.append(int(reader.read[DType.uint32](order)))
+            values.append(Int(reader.read[DType.uint32](order)))
         elif c == ord('q'):
-            values.append(int(reader.read[DType.int64](order)))
+            values.append(Int(reader.read[DType.int64](order)))
         elif c == ord('Q'):
-            values.append(int(reader.read[DType.uint64](order)))
+            values.append(Int(reader.read[DType.uint64](order)))
         else:
             raise Error("ValueError: Unknown format character: {}".format(String(c)))
     return values
@@ -123,7 +123,7 @@ fn pack[format: String](*values: Int) raises -> Bytes:
     alias big_endian = format[0] == '>' or format[0] == '!' or is_big_endian()
 
     var buffer = Bytes(capacity=len(fmt_span) * 8)  # 8 is the maximum size of a type
-    for c in fmt_span:
+    for c in fmt_span.char_slices():
         if c == 'b':
             buffer += int_as_bytes[DType.int8, big_endian](values[i])
         elif c == 'B':
@@ -250,7 +250,7 @@ fn int_from_bytes[
         value = byte_swap(value)
     elif not is_big_endian() and big_endian:
         value = byte_swap(value)
-    return int(value)
+    return Int(value)
 
 
 fn int_as_bytes[
@@ -295,7 +295,7 @@ fn str_to_bytes(s: String) -> Bytes:
     """
     capacity = len(s)
     bytes = Bytes(capacity=capacity)
-    for c in s:
+    for c in s.char_slices():
         bytes.append(ord(c))
     return bytes
 
@@ -368,7 +368,7 @@ fn b64decode[validate: Bool = False](str: String) raises -> String:
         p.append(((c & 0x03) << 6) | d)
 
     p.append(0)
-    return p
+    return String(p)
 
 
 @always_inline

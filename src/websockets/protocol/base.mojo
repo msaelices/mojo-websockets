@@ -699,9 +699,9 @@ fn get_close_exc[T: Protocol](protocol: T) raises -> Error:
     if (
         close_rcvd
         and close_sent
-        and int(close_rcvd.value().code) in OK_CLOSE_CODES
-        and int(close_sent.value().code) in OK_CLOSE_CODES
+        and Int(close_rcvd.value().code) in OK_CLOSE_CODES
+        and Int(close_sent.value().code) in OK_CLOSE_CODES
     ):
         return Error("ConnectionClosedOK: {}, {}".format(close_rcvd.value().code, close_sent.value().code))
     else:
-        return Error("ConnectionClosedError: {}, {}, {}".format(bool(close_rcvd), bool(close_sent), bool(close_rcvd_then_sent)))
+        return Error("ConnectionClosedError: {}, {}, {}".format(Bool(close_rcvd), Bool(close_sent), Bool(close_rcvd_then_sent)))

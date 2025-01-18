@@ -20,7 +20,7 @@ def ws_accept_key(key: String) -> String:
     var encoded_key = py_sha1(PythonObject(accept_key).encode()).digest()
     # TODO: Find a simpler way. The simpler str(encoded_key) is not working
     # of the still poor Mojo support for UTF-8 strings or PythonObject conversion
-    var s = Bytes(capacity=len(encoded_key))
-    for i in range(len(encoded_key)):
-        s.append(Byte(encoded_key[i]))
-    return b64encode(s)
+    # var s = Bytes(capacity=len(encoded_key))
+    # for i in range(len(encoded_key)):
+    #     s.append(Byte(encoded_key[i]))
+    return b64encode(String(encoded_key))

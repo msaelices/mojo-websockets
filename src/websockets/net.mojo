@@ -86,7 +86,7 @@ trait Listener(Movable):
     fn __init__(out self, addr: TCPAddr) raises:
         ...
 
-    fn accept(borrowed self) raises -> TCPConnection:
+    fn accept(self) raises -> TCPConnection:
         ...
 
     fn close(self) raises:
@@ -103,7 +103,7 @@ trait Connection(CollectionElement):
     fn __init__(out self, laddr: TCPAddr, raddr: TCPAddr) raises:
         ...
 
-    fn read(self, inout buf: Bytes) raises -> Int:
+    fn read(self, mut buf: Bytes) raises -> Int:
         ...
 
     fn write(self, buf: Bytes) raises -> Int:
@@ -206,10 +206,11 @@ struct TCPConnection(Connection):
     fn set_write_buffer(mut self, buf: Bytes):
         self._write_buffer = buf
 
-    fn read(self, inout buf: Bytes) raises -> Int:
+    fn read(self,mut buf: Bytes) raises -> Int:
+        var idx = buf.size
         var bytes_recv = recv(
             self.fd,
-            buf.unsafe_ptr().offset(buf.size),
+            buf.unsafe_ptr().offset(idx),
             buf.capacity - buf.size,
             0,
         )
@@ -360,7 +361,7 @@ fn split_host_port(hostport: String) raises -> HostPort:
 
 
 fn convert_binary_port_to_int(port: UInt16) -> Int:
-    return int(ntohs(port))
+    return Int(ntohs(port))
 
 
 fn convert_binary_ip_to_string(
@@ -379,7 +380,7 @@ fn convert_binary_ip_to_string(
     # It seems like the len of the buffer depends on the length of the string IP.
     # Allocating 10 works for localhost (127.0.0.1) which I suspect is 9 bytes + 1 null terminator byte. So max should be 16 (15 + 1).
     var ip_buffer = UnsafePointer[c_char].alloc(16)
-    var ip_address_ptr = UnsafePointer.address_of(ip_address).bitcast[Byte, alignment=1]()
+    var ip_address_ptr = UnsafePointer.address_of(ip_address).bitcast[Byte]()
     _ = inet_ntop(address_family, ip_address_ptr, ip_buffer, 16)
 
     var string_buf = ip_buffer.bitcast[Int8]()
@@ -389,7 +390,7 @@ fn convert_binary_ip_to_string(
             break
         index += 1
 
-    return StringRef(string_buf, index)
+    return String(StringRef(ptr=string_buf, len=index))
 
 
 fn get_sock_name(fd: Int32) raises -> HostPort:
@@ -757,7 +758,7 @@ fn create_connection(
         raise Error("Failed to connect to server")
 
     var laddr = TCPAddr()
-    var raddr = TCPAddr(host, int(port))
+    var raddr = TCPAddr(host, Int(port))
     var conn = TCPConnection(sock, laddr, raddr)
 
     return conn
@@ -774,5 +775,5 @@ fn create_listener(host: String, port: UInt16) raises -> TCPListener:
     Returns:
         TCPListener - The listener.
     """
-    var addr = TCPAddr(host, int(port))
+    var addr = TCPAddr(host, Int(port))
     return TCPListener(addr)

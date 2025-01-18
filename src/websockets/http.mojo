@@ -1,8 +1,9 @@
 from base64 import b64encode
 from collections import Dict
+from memory import Span
+from utils import StringSlice
 
 from libc import Bytes, AF_INET6
-from small_time.small_time import now
 
 from .aliases import Duration
 from .utils.string import (
@@ -20,6 +21,7 @@ from .utils.string import (
     to_string,
     whitespace,
 )
+from .utils.time import now
 from .utils.uri import URI
 from .net import TCPAddr, get_address_info, addrinfo_macos, addrinfo_unix
 
@@ -32,9 +34,15 @@ struct HeaderKey:
 
 
 @value
-struct Header:
+struct Header(Writable, Stringable):
     var key: String
     var value: String
+
+    fn __str__(self) -> String:
+        return String.write(self)
+
+    fn write_to[T: Writer, //](self, mut writer: T):
+        writer.write(self.key + ": ", self.value, lineBreak)
 
 
 @always_inline
@@ -43,7 +51,7 @@ fn write_header[W: Writer](mut writer: W, key: String, value: String):
 
 
 @always_inline
-fn write_header(mut writer: ByteWriter, key: String, inout value: String):
+fn write_header(mut writer: ByteWriter, key: String, mut value: String):
     var k = key + ": "
     writer.write(k)
     writer.write(value)
@@ -164,12 +172,12 @@ struct Headers(Writable, Stringable):
         if HeaderKey.CONTENT_LENGTH not in self:
             return 0
         try:
-            return int(self[HeaderKey.CONTENT_LENGTH])
+            return Int(self[HeaderKey.CONTENT_LENGTH])
         except:
             return 0
 
     fn parse_raw(
-        mut self, inout r: ByteReader
+        mut self, mut r: ByteReader
     ) raises -> (String, String, String):
         var first_byte = r.peek()
         if not first_byte:
@@ -284,14 +292,14 @@ struct HTTPRequest(Writable, Stringable):
         self.headers[HeaderKey.CONNECTION] = "close"
 
     fn set_content_length(mut self, l: Int):
-        self.headers[HeaderKey.CONTENT_LENGTH] = str(l)
+        self.headers[HeaderKey.CONTENT_LENGTH] = String(l)
 
     fn connection_close(self) -> Bool:
         return self.headers[HeaderKey.CONNECTION] == "close"
 
     @always_inline
     fn read_body(
-        mut self, inout r: ByteReader, content_length: Int, max_body_size: Int
+        mut self, mut r: ByteReader, content_length: Int, max_body_size: Int
     ) raises -> None:
         if content_length > max_body_size:
             raise Error("Request body too large")
@@ -368,7 +376,7 @@ struct HTTPResponse(Writable, Stringable):
             raise Error("Failed to parse response headers: " + e.__str__())
 
         var response = HTTPResponse(
-            status_code=int(status_code),
+            status_code=Int(status_code),
             status_text=status_text,
             headers=headers,
             body_bytes=Bytes(),
@@ -402,6 +410,9 @@ struct HTTPResponse(Writable, Stringable):
     fn get_body_bytes(self) -> Bytes:
         return self.body_raw
 
+    fn get_body(self) -> StringSlice[__origin_of(self.body_raw)]:
+        return StringSlice(unsafe_from_utf8=self.body_raw)
+
     @always_inline
     fn set_connection_close(mut self):
         self.headers[HeaderKey.CONNECTION] = "close"
@@ -415,10 +426,10 @@ struct HTTPResponse(Writable, Stringable):
 
     @always_inline
     fn set_content_length(mut self, l: Int):
-        self.headers[HeaderKey.CONTENT_LENGTH] = str(l)
+        self.headers[HeaderKey.CONTENT_LENGTH] = String(l)
 
     @always_inline
-    fn read_body(mut self, inout r: ByteReader) raises -> None:
+    fn read_body(mut self, mut r: ByteReader) raises -> None:
         r.consume(self.body_raw)
 
     fn write_to[W: Writer](self, mut writer: W):
@@ -449,7 +460,7 @@ struct HTTPResponse(Writable, Stringable):
         var writer = ByteWriter()
         writer.write(self.protocol)
         writer.write(whitespace)
-        writer.write(bytes(str(self.status_code)))
+        writer.write(bytes(String(self.status_code)))
         writer.write(whitespace)
         writer.write(self.status_text)
         writer.write(lineBreak)

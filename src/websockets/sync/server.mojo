@@ -12,8 +12,10 @@ from libc import FD, c_int, fd_set, timeval, select
 from ..aliases import Bytes, DEFAULT_BUFFER_SIZE, DEFAULT_MAX_REQUEST_BODY_SIZE, MAGIC_CONSTANT
 from ..http import Header, Headers, HTTPRequest, HTTPResponse, encode
 from ..net import create_listener, TCPConnection, TCPListener
+from ..protocol import SERVER
 from ..protocol.server import ServerProtocol
 from ..protocol.client import ClientProtocol
+from ..utils.bytes import str_to_bytes
 
 alias BYTE_0_TEXT: UInt8 = 1
 alias BYTE_0_NO_FRAGMENT: UInt8 = 128
@@ -46,11 +48,11 @@ fn serve_old[
         listener.listen()
 
         var conn = listener.accept()
-        print('Accepted connection from ', str(conn.raddr))
-        print("ws://" + str(host) + ":" + str(port))
+        print('Accepted connection from ', String(conn.raddr))
+        print("ws://" + String(host) + ":" + String(port))
 
         if conn.raddr.ip != "127.0.0.1":
-            print("Exit, request from: " + str(conn.raddr.ip))
+            print("Exit, request from: " + String(conn.raddr.ip))
             conn.close()
             listener.close()
             return None
@@ -67,7 +69,7 @@ fn serve_old[
         var end_header = request.find("\r\n\r")
         if end_header == -1:
             raise "end_header == -1, no \\r\\n\\r\\n"
-        var request_split = str(request)[:end_header].split("\r\n")
+        var request_split = String(request)[:end_header].split("\r\n")
         if len(request_split) == 0:
             raise "error: len(request_split) == 0"
         if request_split[0] != "GET / HTTP/1.1":
@@ -105,7 +107,7 @@ fn serve_old[
 
         var accept = request_header["Sec-WebSocket-Key"]
         accept += MAGIC_CONSTANT
-        accept = b64encode(str(py_sha1(PythonObject(accept).encode()).digest()))
+        accept = b64encode(String(py_sha1(PythonObject(accept).encode()).digest()))
 
         var response = String("HTTP/1.1 101 Switching Protocols\r\n")
         response += "Upgrade: websocket\r\n"
@@ -125,13 +127,13 @@ fn serve_old[
     return None
 
 
-# fn read_byte(inout ws: PythonObject) raises -> UInt8:
-#     return UInt8(int(ws[0].recv(1)[0]))
+# fn read_byte(mut ws: PythonObject) raises -> UInt8:
+#     return UInt8(Int(ws[0].recv(1)[0]))
 #
 #
 # fn receive_message[
 #     maximum_default_capacity: Int = 1 << 16
-# ](inout ws: PythonObject) -> Optional[String]:
+# ](mut ws: PythonObject) -> Optional[String]:
 #     # limit to 64kb by default!
 #     var res = String("")
 #
@@ -149,7 +151,7 @@ fn serve_old[
 #
 #         if byte_size_of_message_size <= BYTE_1_SIZE_ONE_BYTE:
 #             # when size is <= 125, no need for more bytes
-#             message_size = int(byte_size_of_message_size)
+#             message_size = Int(byte_size_of_message_size)
 #             byte_size_of_message_size = 1
 #         elif (
 #             byte_size_of_message_size == BYTE_1_SIZE_TWO_BYTES
@@ -164,10 +166,10 @@ fn serve_old[
 #             # next loop is basically reading 4 or 8 bytes (big endian)
 #             # (theses will form a number that is the message size)
 #             for i in range(byte_size_of_message_size):
-#                 bytes |= int(read_byte(ws)) << (
-#                     int(byte_size_of_message_size - 1 - i) * 8
+#                 bytes |= Int(read_byte(ws)) << (
+#                     Int(byte_size_of_message_size - 1 - i) * 8
 #                 )
-#             message_size = int(bytes)
+#             message_size = Int(bytes)
 #             if bytes & (1 << 63) != 0:
 #                 # First bit should always be 0, see step 3:
 #                 # https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_servers#decoding_payload_length
@@ -202,7 +204,7 @@ fn serve_old[
 #     return None
 #
 
-# fn send_message(inout ws: PythonObject, message: String) -> Bool:
+# fn send_message(mut ws: PythonObject, message: String) -> Bool:
 #     # return False if an error got raised
 #
 #     try:
@@ -211,18 +213,18 @@ fn serve_old[
 #         var tmp_len = UInt64(len(message_part))
 #
 #         var first_part = byte_array(2)
-#         first_part[0] = int(BYTE_0_NO_FRAGMENT | BYTE_0_TEXT)
+#         first_part[0] = Int(BYTE_0_NO_FRAGMENT | BYTE_0_TEXT)
 #
 #         var bytes_for_size = 0
-#         if tmp_len <= int(BYTE_1_SIZE_ONE_BYTE):
+#         if tmp_len <= Int(BYTE_1_SIZE_ONE_BYTE):
 #             first_part[1] = tmp_len & 255
 #             bytes_for_size = 0
 #         else:
 #             if tmp_len <= ((1 << 16) - 1):
-#                 first_part[1] = int(BYTE_1_SIZE_TWO_BYTES)
+#                 first_part[1] = Int(BYTE_1_SIZE_TWO_BYTES)
 #                 bytes_for_size = 2
 #             else:
-#                 first_part[1] = int(BYTE_1_SIZE_EIGHT_BYTES)
+#                 first_part[1] = Int(BYTE_1_SIZE_EIGHT_BYTES)
 #                 bytes_for_size = 8
 #
 #         var part_two = byte_array(bytes_for_size)  # 0, 4 or 8 bytes
@@ -236,14 +238,14 @@ fn serve_old[
 #         print(e)
 #         return False
 
-fn read_byte(inout conn: TCPConnection) raises -> UInt8:
+fn read_byte(mut conn: TCPConnection) raises -> UInt8:
     var buf = Bytes(capacity=1)
     return UInt8(conn.read(buf))
 
 
 fn receive_message[
     maximum_default_capacity: Int = 1 << 16
-](inout conn: TCPConnection) -> Optional[String]:
+](mut conn: TCPConnection) -> Optional[String]:
     # limit to 64kb by default!
     try:
         _ = read_byte(conn)  # not implemented yet
@@ -259,7 +261,7 @@ fn receive_message[
 
         if byte_size_of_message_size <= BYTE_1_SIZE_ONE_BYTE:
             # when size is <= 125, no need for more bytes
-            message_size = int(byte_size_of_message_size)
+            message_size = Int(byte_size_of_message_size)
             byte_size_of_message_size = 1
         elif (
             byte_size_of_message_size == BYTE_1_SIZE_TWO_BYTES
@@ -274,10 +276,10 @@ fn receive_message[
             # next loop is basically reading 4 or 8 bytes (big endian)
             # (theses will form a number that is the message size)
             for i in range(byte_size_of_message_size):
-                bytes |= int(read_byte(conn)) << (
-                    int(byte_size_of_message_size - 1 - i) * 8
+                bytes |= Int(read_byte(conn)) << (
+                    Int(byte_size_of_message_size - 1 - i) * 8
                 )
-            message_size = int(bytes)
+            message_size = Int(bytes)
             if bytes & (1 << 63) != 0:
                 # First bit should always be 0, see step 3:
                 # https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_servers#decoding_payload_length
@@ -304,7 +306,7 @@ fn receive_message[
             bytes_message.append(read_byte(conn) ^ mask[i & 3])
         bytes_message.append(0)
 
-        var message = String(bytes_message^)
+        var message = String(buffer=bytes_message^)
         print(message_size, len(message))
         return message^
     except e:
@@ -312,25 +314,25 @@ fn receive_message[
     return None
 
 
-fn send_message(inout conn: TCPConnection, message: String) -> Bool:
+fn send_message(mut conn: TCPConnection, message: String) -> Bool:
     # return False if an error got raised
 
     try:
         var tmp_len: Byte = len(message.as_bytes())
 
         var first_part = Bytes(capacity=2)
-        first_part[0] = int(BYTE_0_NO_FRAGMENT | BYTE_0_TEXT)
+        first_part[0] = Int(BYTE_0_NO_FRAGMENT | BYTE_0_TEXT)
 
         var bytes_for_size = 0
-        if tmp_len <= int(BYTE_1_SIZE_ONE_BYTE):
+        if tmp_len <= Int(BYTE_1_SIZE_ONE_BYTE):
             first_part[1] = tmp_len & 255
             bytes_for_size = 0
         else:
             if tmp_len <= ((1 << 16) - 1):
-                first_part[1] = int(BYTE_1_SIZE_TWO_BYTES)
+                first_part[1] = Int(BYTE_1_SIZE_TWO_BYTES)
                 bytes_for_size = 2
             else:
-                first_part[1] = int(BYTE_1_SIZE_EIGHT_BYTES)
+                first_part[1] = Int(BYTE_1_SIZE_EIGHT_BYTES)
                 bytes_for_size = 8
 
         var part_two = Bytes(capacity=bytes_for_size)  # 0, 4 or 8 bytes
@@ -338,7 +340,7 @@ fn send_message(inout conn: TCPConnection, message: String) -> Bool:
         for i in range(bytes_for_size):
             part_two[i] = (tmp_len >> (bytes_for_size - i - 1) * 8) & 255
 
-        _ = conn.write(first_part + part_two + message)
+        _ = conn.write(buf=first_part + part_two + str_to_bytes(message))
         return True
     except e:
         print(e)
@@ -391,7 +393,7 @@ struct Server:
         self.write_fds = fd_set()
         self.protocol = ServerProtocol()
 
-    fn serve_forever(inout self) raises -> None: # TODO: conditional conformance on main struct , then a default for handler e.g. WebsocketHandshake
+    fn serve_forever(mut self) raises -> None: # TODO: conditional conformance on main struct , then a default for handler e.g. WebsocketHandshake
         """
         Listen for incoming connections and serve HTTP requests.
         """
@@ -401,7 +403,7 @@ struct Server:
         print("Listening on ", self.host, ":", self.port)
         self.serve(listener, self.handler)
 
-    fn serve(inout self, ln: TCPListener, handler: ConnHandler) raises -> None:
+    fn serve(mut self, ln: TCPListener, handler: ConnHandler) raises -> None:
         """
         Serve HTTP requests.
 
@@ -419,13 +421,13 @@ struct Server:
             _ = self.read_fds.clear_all()
             _ = self.write_fds.clear_all()
 
-            self.read_fds.set(int(self.ln.fd))
+            self.read_fds.set(Int(self.ln.fd))
 
             var max_fd = self.ln.fd
             for i in range(len(self.connections)):
                 var conn = self.connections[i]
-                self.read_fds.set(int(conn.fd))
-                self.write_fds.set(int(conn.fd))
+                self.read_fds.set(Int(conn.fd))
+                self.write_fds.set(Int(conn.fd))
 
                 if conn.fd > max_fd:
                     max_fd = conn.fd
@@ -443,9 +445,9 @@ struct Server:
                 print("Select error")
                 return
 
-            if self.read_fds.is_set(int(self.ln.fd)):
+            if self.read_fds.is_set(Int(self.ln.fd)):
                 var conn = self.ln.accept()
-                print('Accepted connection from ', str(conn.raddr))
+                print('Accepted connection from ', String(conn.raddr))
                 try:
                     _ = conn.set_non_blocking(True)
                 except e:
@@ -455,15 +457,15 @@ struct Server:
                 self.connections.append(conn)
                 if conn.fd > max_fd:
                     max_fd = conn.fd
-                    self.read_fds.set(int(conn.fd))
+                    self.read_fds.set(Int(conn.fd))
 
             var i = 0
             while i < len(self.connections):
                 print("Handling connection ", i)
                 var conn = self.connections[i]
-                if self.read_fds.is_set(int(conn.fd)):
+                if self.read_fds.is_set(Int(conn.fd)):
                     _ = self.handle_read(conn, handler)
-                if self.write_fds.is_set(int(conn.fd)):
+                if self.write_fds.is_set(Int(conn.fd)):
                     _ = self.handle_write(conn)
 
                 _ = i  # Needed to avoid a bug in the compiler
@@ -473,10 +475,10 @@ struct Server:
                 else:
                     i += 1
 
-    fn address(inout self) -> String:
-        return self.host + ":" + str(self.port)
+    fn address(mut self) -> String:
+        return String(self.host, ":", self.port)
 
-    fn handle_read(inout self, inout conn: TCPConnection, handler: ConnHandler) raises -> None:
+    fn handle_read(mut self, mut conn: TCPConnection, handler: ConnHandler) raises -> None:
         var max_request_body_size = self.max_request_body_size
         if max_request_body_size <= 0:
             max_request_body_size = DEFAULT_MAX_REQUEST_BODY_SIZE
@@ -503,12 +505,12 @@ struct Server:
         # self.handler(conn, buf)
 
         # TODO: does this make sense?
-        self.write_fds.set(int(conn.fd))
+        self.write_fds.set(Int(conn.fd))
 
         if not self.tcp_keep_alive:
             conn.close()
 
-    fn handle_write(inout self, inout conn: TCPConnection) raises -> None:
+    fn handle_write(mut self, mut conn: TCPConnection) raises -> None:
         var write_buffer = conn.write_buffer()
         if write_buffer:
             var bytes_sent = conn.write(write_buffer)
@@ -524,7 +526,7 @@ struct Server:
         return self
 
     def __exit__(
-        inout self,
+        mut self,
     ) -> None:
         self.shutdown()
 
@@ -557,7 +559,7 @@ fn handshake(req: HTTPRequest) raises -> HTTPResponse:
     var accept = req.headers["Sec-WebSocket-Key"] + MAGIC_CONSTANT
     var py_sha1 = Python.import_module("hashlib").sha1
 
-    var accept_encoded = b64encode(str(py_sha1(PythonObject(accept).encode()).digest()))
+    var accept_encoded = b64encode(String(py_sha1(PythonObject(accept).encode()).digest()))
     var headers = Headers(Header("Upgrade", "websocket"), Header("Connection", "Upgrade"), Header("Sec-WebSocket-Accept", accept_encoded))
 
     return HTTPResponse(101, "Switching Protocols", headers, Bytes())

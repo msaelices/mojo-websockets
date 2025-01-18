@@ -53,7 +53,7 @@ struct MersenneTwister:
         return y
 
     fn next_ui8(mut self) -> UInt8:
-        return self.next().value & 0xFF
+        return UInt8(self.next()) & 0xFF
 
 
 @register_passable("trivial")
@@ -88,8 +88,8 @@ struct UUID(Stringable, EqualityComparableCollectionElement):
             if i == 4 or i == 6 or i == 8 or i == 10:
                 result += "-"
             result += (
-                hex_digits[int(self.bytes[i] >> 4)]
-                + hex_digits[int(self.bytes[i] & 0xF)]
+                hex_digits[Int(self.bytes[i] >> 4)]
+                + hex_digits[Int(self.bytes[i] & 0xF)]
             )
         return result
 
