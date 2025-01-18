@@ -491,8 +491,11 @@ struct Server:
         var request = HTTPRequest.from_bytes(self.address(), max_request_body_size, buf^)
         print("REQUEST:\n\n", request, "\nEND REQUEST\n")
 
-        res = handshake(request)
-        var bytes_written = conn.write(encode(res^))
+        response = self.protocol.accept(request)
+        self.protocol.send_response(response)
+        data_to_send = self.protocol.data_to_send()
+        var bytes_written = conn.write(data_to_send)
+
         print("Bytes written: ", bytes_written)
 
         # var res = handler(request)
