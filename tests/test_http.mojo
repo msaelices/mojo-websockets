@@ -9,6 +9,7 @@ from websockets.http import (
     Headers,
     encode,
 )
+from websockets.utils.bytes import str_to_bytes
 from websockets.utils.uri import URI
 from websockets.utils.string import (
     ByteReader,
@@ -86,11 +87,11 @@ fn test_encode_http_request() raises:
     var uri = URI(DEFAULT_SERVER_CONN_STRING + "/foobar?baz")
     var req = HTTPRequest(
         uri,
-        body=String("Hello world!").as_bytes(),
+        body=str_to_bytes("Hello world!"),
         headers=Headers(Header("Connection", "keep-alive")),
     )
 
-    var as_str = str(req)
+    var as_str = String(req)
     var req_encoded = to_string(encode(req^))
     assert_equal(
         req_encoded,
@@ -105,7 +106,7 @@ fn test_encode_http_request() raises:
 fn test_encode_http_response() raises:
     var res = HTTPResponse(200, "OK", Headers(), bytes("Hello, World!"))
     res.headers[HeaderKey.DATE] = "2024-06-02T13:41:50.766880+00:00"
-    var as_str = str(res)
+    var as_str = String(res)
     var res_encoded = to_string(encode(res^))
     var expected_full = "HTTP/1.1 200 OK\r\ndate: 2024-06-02T13:41:50.766880+00:00\r\n\r\nHello, World!"
 

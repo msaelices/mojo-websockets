@@ -14,7 +14,7 @@ from websockets.protocol.server import ServerProtocol
 from websockets.utils.bytes import str_to_bytes
 from websockets.utils.uri import URI
 
-from testutils import ACCEPT, KEY
+from testutils import ACCEPT, KEY, assert_bytes_equal
 
 
 fn date_func() -> String:
@@ -51,7 +51,7 @@ fn test_receive_request() raises:
     )
 
     data_to_send = server.data_to_send()
-    assert_equal(data_to_send, Bytes())
+    assert_bytes_equal(data_to_send, Bytes())
     assert_false(close_expected(server))
     assert_equal(server.get_state(), CONNECTING)
 
@@ -72,7 +72,7 @@ fn test_accept_and_send_successful_response() raises:
         "sec-websocket-accept: {}\r\n"
         "\r\n".format(ACCEPT)
     )
-    assert_equal(
+    assert_bytes_equal(
         data_to_send,
         expected,
     )
@@ -89,7 +89,7 @@ fn test_send_response_after_failed_accept() raises:
     server.send_response(response)
 
     var data_to_send = server.data_to_send()
-    assert_equal(
+    assert_bytes_equal(
         data_to_send,
         str_to_bytes(
             "HTTP/1.1 400 Bad Request\r\n"
@@ -112,7 +112,7 @@ fn test_send_response_after_reject() raises:
     server.send_response(response)
 
     var data_to_send = server.data_to_send()
-    assert_equal(
+    assert_bytes_equal(
         data_to_send,
         str_to_bytes(
             "HTTP/1.1 404 Not Found\r\n"
@@ -146,7 +146,7 @@ fn test_send_response_without_accept_or_reject() raises:
     )
 
     var data_to_send = server.data_to_send()
-    assert_equal(
+    assert_bytes_equal(
         data_to_send,
         str_to_bytes(
             "HTTP/1.1 410 Gone\r\n"
@@ -205,7 +205,7 @@ fn test_receive_no_request() raises:
     # TODO: Original Python error was
     # EOFError: connection closed while reading HTTP request line
     assert_equal(
-        str(server.get_handshake_exc().value()),
+        String(server.get_handshake_exc().value()),
         "EOFError: connection closed before handshake completed"
     )
     var events = server.events_received()
@@ -223,11 +223,11 @@ fn test_receive_truncated_request() raises:
     # TODO: Original Python error was
     # EOFError: connection closed while reading HTTP headers
     assert_equal(
-        str(server.get_handshake_exc().value()),
+        String(server.get_handshake_exc().value()),
         "EOFError: connection closed before handshake completed"
     )
     var data_to_send = server.data_to_send()
-    assert_equal(data_to_send, Bytes())
+    assert_bytes_equal(data_to_send, Bytes())
     var events = server.events_received()
     assert_equal(len(events), 1)
     assert_true(events[0].isa[HTTPRequest]())
@@ -245,7 +245,7 @@ fn test_receive_junk_request() raises:
     # TODO: Original Python error was
     # ValueError: invalid HTTP request line: HELO relay.invalid
     assert_equal(
-        str(server.get_handshake_exc().value()),
+        String(server.get_handshake_exc().value()),
         "ValueError: Failed to parse request headers: Failed to read third word from request line"
     )
     assert_equal(len(events), 2)
@@ -274,7 +274,7 @@ fn test_accept_response() raises:
             Header("Sec-WebSocket-Accept", ACCEPT),
         )
     )
-    assert_equal(response.body_raw, Bytes())
+    assert_bytes_equal(response.body_raw, Bytes())
 
 
 fn test_reject_response() raises:
@@ -293,7 +293,7 @@ fn test_reject_response() raises:
             Header("Content-Type", "text/plain; charset=utf-8"),
         )
     )
-    assert_equal(response.body_raw, str_to_bytes("Sorry folks.\n"))
+    assert_bytes_equal(response.body_raw, str_to_bytes("Sorry folks.\n"))
 
 
 fn test_reject_response_supports_int_status() raises:
@@ -316,7 +316,7 @@ fn test_reject_response_supports_int_status() raises:
 #
 #     assert_equal(response.status_code, 500)
 #     assert_true(server.get_handshake_exc())
-#     assert_equal(str(server.get_handshake_exc().value()), "Exception: BOOM")
+#     assert_equal(String(server.get_handshake_exc().value()), "Exception: BOOM")
 
 
 # ===----------------------------------------------------------------------===
@@ -347,7 +347,7 @@ fn test_missing_connection() raises:
     assert_equal(response.status_code, 400)
     assert_true(server.get_handshake_exc())
     assert_equal(
-        str(server.get_handshake_exc().value()),
+        String(server.get_handshake_exc().value()),
         'Request headers do not contain an "connection" header'
     )
 
@@ -367,7 +367,7 @@ fn test_invalid_connection() raises:
     # TODO: Original Python error was
     # Request headers do not contain an "connection" header
     assert_equal(
-        str(server.get_handshake_exc().value()),
+        String(server.get_handshake_exc().value()),
         'Request "connection" header is not "upgrade"'
     )
 
@@ -385,7 +385,7 @@ fn test_missing_upgrade() raises:
     assert_equal(response.status_code, 400)
     assert_true(server.get_handshake_exc())
     assert_equal(
-        str(server.get_handshake_exc().value()),
+        String(server.get_handshake_exc().value()),
         'Request headers do not contain an "upgrade" header'
     )
 
@@ -404,7 +404,7 @@ fn test_invalid_upgrade() raises:
     assert_equal(response.status_code, 400)
     assert_true(server.get_handshake_exc())
     assert_equal(
-        str(server.get_handshake_exc().value()),
+        String(server.get_handshake_exc().value()),
         'Request "upgrade" header is not "websocket"'
     )
 
@@ -420,7 +420,7 @@ fn test_missing_key() raises:
     assert_equal(response.status_code, 400)
     assert_true(server.get_handshake_exc())
     assert_equal(
-        str(server.get_handshake_exc().value()),
+        String(server.get_handshake_exc().value()),
         'Missing "Sec-WebSocket-Key" header.'
     )
 
@@ -438,7 +438,7 @@ fn test_missing_key() raises:
 #     assert_equal(response.status_code, 400)
 #     assert_true(server.get_handshake_exc())
 #     assert_equal(
-#         str(server.get_handshake_exc().value()),
+#         String(server.get_handshake_exc().value()),
 #         "invalid Sec-WebSocket-Key header: multiple values"
 #     )
 
@@ -455,7 +455,7 @@ fn test_invalid_key() raises:
     assert_equal(response.status_code, 400)
     assert_true(server.get_handshake_exc())
     assert_equal(
-        str(server.get_handshake_exc().value()),
+        String(server.get_handshake_exc().value()),
         "ValueError: Unexpected character encountered",
     )
 
@@ -474,7 +474,7 @@ fn test_truncated_key() raises:
     assert_equal(response.status_code, 400)
     assert_true(server.get_handshake_exc())
     assert_equal(
-        str(server.get_handshake_exc().value()),
+        String(server.get_handshake_exc().value()),
         "ValueError: Input length must be divisible by 4"
     )
 
@@ -490,7 +490,7 @@ fn test_missing_version() raises:
     assert_equal(response.status_code, 400)
     assert_true(server.get_handshake_exc())
     assert_equal(
-        str(server.get_handshake_exc().value()),
+        String(server.get_handshake_exc().value()),
         'Missing "Sec-WebSocket-Version" header.'
     )
 
@@ -507,7 +507,7 @@ fn test_invalid_version() raises:
     assert_equal(response.status_code, 400)
     assert_true(server.get_handshake_exc())
     assert_equal(
-        str(server.get_handshake_exc().value()),
+        String(server.get_handshake_exc().value()),
         'Request "Sec-WebSocket-Version" header is not "13"'
     )
 
@@ -539,7 +539,7 @@ fn test_no_origin() raises:
     assert_equal(response.status_code, 400)
     assert_true(server.get_handshake_exc())
     assert_equal(
-        str(server.get_handshake_exc().value()),
+        String(server.get_handshake_exc().value()),
         'Missing "Origin" header.'
     )
 
@@ -557,7 +557,7 @@ fn test_unexpected_origin() raises:
     assert_equal(response.status_code, 400)
     assert_true(server.get_handshake_exc())
     assert_equal(
-        str(server.get_handshake_exc().value()),
+        String(server.get_handshake_exc().value()),
         'Invalid "Origin" header: https://other.example.com'
     )
 
@@ -591,7 +591,7 @@ fn test_unsupported_origin() raises:
     assert_equal(response.status_code, 400)
     assert_true(server.get_handshake_exc())
     assert_equal(
-        str(server.get_handshake_exc().value()),
+        String(server.get_handshake_exc().value()),
         'Invalid "Origin" header: https://original.example.com'
     )
 
