@@ -1,5 +1,5 @@
 from base64 import b64encode
-from collections import Dict
+from collections import Dict, Optional
 from memory import Span
 from utils import StringSlice
 
@@ -26,11 +26,14 @@ from .utils.uri import URI
 from .net import TCPAddr, get_address_info, addrinfo_macos, addrinfo_unix
 
 struct HeaderKey:
-    alias CONNECTION = "Connection"
-    alias CONTENT_TYPE = "Content-type"
-    alias CONTENT_LENGTH = "Content-length"
-    alias CONTENT_ENCODING = "Content-encoding"
-    alias DATE = "Date"
+    alias CONNECTION = "connection"
+    alias CONTENT_TYPE = "content-type"
+    alias CONTENT_LENGTH = "content-length"
+    alias CONTENT_ENCODING = "content-encoding"
+    alias DATE = "date"
+    alias SET_COOKIE = "set-cookie"
+    alias HOST = "host"
+    alias COOKIE = "cookie"
 
 
 @value
@@ -142,129 +145,96 @@ struct Headers(Writable, Stringable):
         return key.lower() in self._inner
 
     @always_inline
-    fn __getitem__(self, key: String) -> String:
+    fn __getitem__(self, key: String) raises -> String:
         try:
             return self._inner[key.lower()]
         except:
-            return String()
+            raise Error("KeyError: Key not found in headers: " + key)
+
+    @always_inline
+    fn get(self, key: String) -> Optional[String]:
+        return self._inner.get(key.lower())
 
     @always_inline
     fn __setitem__(mut self, key: String, value: String):
         self._inner[key.lower()] = value
 
-    fn __eq__(self, other: Self) -> Bool:
-        if len(self._inner) != len(other._inner):
-            return False
-        try:
-            for item in self._inner.items():
-                key = item[].key
-                value = item[].value
-                if key not in other._inner or other._inner[key] != value:
-                    return False
-        except:
-            return False
-        return True
-
-    fn __ne__(self, other: Self) -> Bool:
-        return not self.__eq__(other)
-
     fn content_length(self) -> Int:
-        if HeaderKey.CONTENT_LENGTH not in self:
-            return 0
         try:
             return Int(self[HeaderKey.CONTENT_LENGTH])
         except:
             return 0
 
-    fn parse_raw(
-        mut self, mut r: ByteReader
-    ) raises -> (String, String, String):
+    fn parse_raw(mut self, mut r: ByteReader) raises -> (String, String, String, List[String]):
         var first_byte = r.peek()
         if not first_byte:
-            raise Error("Failed to read first byte from request line")
+            raise Error("Headers.parse_raw: Failed to read first byte from response header")
 
         var first = r.read_word()
-        if not r.has_next():
-            raise Error("Failed to read second word from request line")
         r.increment()
         var second = r.read_word()
-        if not r.has_next():
-            raise Error("Failed to read third word from request line")
         r.increment()
         var third = r.read_line()
+        var cookies = List[String]()
 
-        while not is_newline(r.peek()) and r.has_next():
+        while not is_newline(r.peek()):
             var key = r.read_until(BytesConstant.colon)
             r.increment()
             if is_space(r.peek()):
                 r.increment()
             # TODO (bgreni): Handle possible trailing whitespace
             var value = r.read_line()
-            self._inner[to_string(key^).lower()] = to_string(value^)
-        return (to_string(first^), to_string(second^), to_string(third^))
+            var k = to_string(key).lower()
+            if k == HeaderKey.SET_COOKIE:
+                cookies.append(to_string(value))
+                continue
 
-    fn write_to[W: Writer](self, mut writer: W):
+            self._inner[k] = to_string(value)
+        return (to_string(first), to_string(second), to_string(third), cookies)
+
+    fn write_to[T: Writer, //](self, mut writer: T):
         for header in self._inner.items():
             write_header(writer, header[].key, header[].value)
-
-    fn encode_to(mut self, mut writer: ByteWriter):
-        for header in self._inner.items():
-            write_header(writer, header[].key, header[].value)
-
-    fn remove(mut self, key: String) raises -> None:
-        _ = self._inner.pop(key.lower())
 
     fn __str__(self) -> String:
-        var output = String()
-        self.write_to(output)
-        return output
+        return String.write(self)
 
 
 @value
 struct HTTPRequest(Writable, Stringable):
     var headers: Headers
-    var body_raw: Bytes
     var uri: URI
+    var body_raw: Bytes
 
     var method: String
     var protocol: String
 
-    var server_is_tls: Bool
     var timeout: Duration
 
     @staticmethod
-    fn from_bytes(
-        addr: String, max_body_size: Int, owned b: Bytes
-    ) raises -> HTTPRequest:
-        var reader = ByteReader(b^)
+    fn from_bytes(addr: String, max_body_size: Int, b: Span[Byte]) raises -> HTTPRequest:
+        var reader = ByteReader(b)
         var headers = Headers()
         var method: String
         var protocol: String
-        var uri_str: String
+        var uri: String
         try:
-            method, uri_str, protocol = headers.parse_raw(reader)
+            var rest = headers.parse_raw(reader)
+            method, uri, protocol = rest[0], rest[1], rest[2]
         except e:
-            raise Error("ValueError: Failed to parse request headers: " + e.__str__())
-
-        var uri = URI.parse_raises(addr + uri_str)
+            raise Error("HTTPRequest.from_bytes: Failed to parse request headers: " + String(e))
 
         var content_length = headers.content_length()
-
-        if (
-            content_length > 0
-            and max_body_size > 0
-            and content_length > max_body_size
-        ):
-            raise Error("Request body too large")
+        if content_length > 0 and max_body_size > 0 and content_length > max_body_size:
+            raise Error("HTTPRequest.from_bytes: Request body too large.")
 
         var request = HTTPRequest(
-            uri, headers=headers, method=method, protocol=protocol
+            URI.parse(addr + uri), headers=headers, method=method, protocol=protocol,
         )
-
         try:
             request.read_body(reader, content_length, max_body_size)
         except e:
-            raise Error("Failed to read request body: " + e.__str__())
+            raise Error("HTTPRequest.from_bytes: Failed to read request body: " + String(e))
 
         return request
 
@@ -275,7 +245,6 @@ struct HTTPRequest(Writable, Stringable):
         method: String = "GET",
         protocol: String = HTTP11,
         body: Bytes = Bytes(),
-        server_is_tls: Bool = False,
         timeout: Duration = Duration(),
     ):
         self.headers = headers
@@ -283,10 +252,15 @@ struct HTTPRequest(Writable, Stringable):
         self.protocol = protocol
         self.uri = uri
         self.body_raw = body
-        self.server_is_tls = server_is_tls
         self.timeout = timeout
+        self.set_content_length(len(body))
         if HeaderKey.CONNECTION not in self.headers:
-            self.set_connection_close()
+            self.headers[HeaderKey.CONNECTION] = "keep-alive"
+        if HeaderKey.HOST not in self.headers:
+            self.headers[HeaderKey.HOST] = uri.host
+
+    fn get_body(self) -> StringSlice[__origin_of(self.body_raw)]:
+        return StringSlice(unsafe_from_utf8=Span(self.body_raw))
 
     fn set_connection_close(mut self):
         self.headers[HeaderKey.CONNECTION] = "close"
@@ -295,30 +269,35 @@ struct HTTPRequest(Writable, Stringable):
         self.headers[HeaderKey.CONTENT_LENGTH] = String(l)
 
     fn connection_close(self) -> Bool:
-        return self.headers[HeaderKey.CONNECTION] == "close"
+        var result = self.headers.get(HeaderKey.CONNECTION)
+        if not result:
+            return False
+        return result.value() == "close"
 
     @always_inline
-    fn read_body(
-        mut self, mut r: ByteReader, content_length: Int, max_body_size: Int
-    ) raises -> None:
+    fn read_body(mut self, mut r: ByteReader, content_length: Int, max_body_size: Int) raises -> None:
         if content_length > max_body_size:
             raise Error("Request body too large")
 
-        r.consume(self.body_raw)
+        self.body_raw = Bytes(r.read_bytes(content_length))
+        self.set_content_length(content_length)
 
-    fn write_to[W: Writer](self, mut writer: W):
+    fn write_to[T: Writer, //](self, mut writer: T):
+        path = self.uri.path if len(self.uri.path) > 1 else SLASH
+        if len(self.uri.query_string) > 0:
+            path.write("?", self.uri.query_string)
+
         writer.write(
             self.method,
             whitespace,
-            self.uri.get_path() if len(self.uri.path) > 1 else SLASH,
+            path,
             whitespace,
             self.protocol,
             lineBreak,
+            self.headers,
+            lineBreak,
+            to_string(self.body_raw),
         )
-
-        self.headers.write_to(writer)
-        writer.write(lineBreak)
-        writer.write(to_string(self.body_raw))
 
     fn encode(owned self) -> Bytes:
         """Encodes request as bytes.
@@ -345,9 +324,7 @@ struct HTTPRequest(Writable, Stringable):
         return writer.consume()
 
     fn __str__(self) -> String:
-        var output = String()
-        self.write_to(output)
-        return output
+        return String.write(self)
 
 
 @value

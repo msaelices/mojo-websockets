@@ -24,6 +24,9 @@ alias whitespace_byte = ord(whitespace)
 alias tab = "\t"
 alias tab_byte = ord(tab)
 
+alias EndOfReaderError = "No more bytes to read."
+alias OutOfBoundsError = "Tried to read past the end of the ByteReader."
+
 
 struct BytesConstant:
     alias whitespace = byte(whitespace)
@@ -147,61 +150,92 @@ struct ByteWriter(Writer):
         return ret^
 
 
-struct ByteReader:
-    var _inner: Bytes
+struct ByteReader[origin: Origin]:
+    var _inner: Span[Byte, origin]
     var read_pos: Int
 
-    fn __init__(out self, owned b: Bytes):
-        self._inner = b^
+    fn __init__(out self, ref b: Span[Byte, origin]):
+        self._inner = b
         self.read_pos = 0
 
     @always_inline
-    fn has_next(self) -> Bool:
+    fn available(self) -> Bool:
         return self.read_pos < len(self._inner)
 
-    fn peek(self) -> Byte:
-        if not self.has_next():
-            return 0
+    fn __len__(self) -> Int:
+        return len(self._inner) - self.read_pos
+
+    fn peek(self) raises -> Byte:
+        if not self.available():
+            raise EndOfReaderError
         return self._inner[self.read_pos]
 
-    fn read_until(mut self, char: Byte) -> Bytes:
+    fn read_bytes(mut self, n: Int = -1) raises -> Span[Byte, origin]:
+        var count = n
         var start = self.read_pos
-        while self.peek() != char and self.has_next():
+        if n == -1:
+            count = len(self)
+
+        if start + count > len(self._inner):
+            raise OutOfBoundsError
+
+        self.read_pos += count
+        return self._inner[start : start + count]
+
+    fn read_until(mut self, char: Byte) -> Span[Byte, origin]:
+        var start = self.read_pos
+        for i in range(start, len(self._inner)):
+            if self._inner[i] == char:
+                break
             self.increment()
+
         return self._inner[start : self.read_pos]
 
     @always_inline
-    fn read_word(mut self) -> Bytes:
+    fn read_word(mut self) -> Span[Byte, origin]:
         return self.read_until(BytesConstant.whitespace)
 
-    fn read_line(mut self) -> Bytes:
+    fn read_line(mut self) -> Span[Byte, origin]:
         var start = self.read_pos
-        while not is_newline(self.peek()) and self.has_next():
+        for i in range(start, len(self._inner)):
+            if is_newline(self._inner[i]):
+                break
             self.increment()
+
+        # If we are at the end of the buffer, there is no newline to check for.
         var ret = self._inner[start : self.read_pos]
-        var remaining = len(self._inner) - self.read_pos - 1
-        if self.peek() == BytesConstant.rChar:
-            self.increment(min(2, remaining))
+        if not self.available():
+            return ret
+
+        if self._inner[self.read_pos] == BytesConstant.rChar:
+            self.increment(2)
         else:
-            self.increment(min(1, remaining))
+            self.increment()
         return ret
 
     @always_inline
     fn skip_whitespace(mut self):
-        while is_space(self.peek()) and self.has_next():
-            self.increment()
+        for i in range(self.read_pos, len(self._inner)):
+            if is_space(self._inner[i]):
+                self.increment()
+            else:
+                break
+
+    @always_inline
+    fn skip_carriage_return(mut self):
+        for i in range(self.read_pos, len(self._inner)):
+            if self._inner[i] == BytesConstant.rChar:
+                self.increment(2)
+            else:
+                break
 
     @always_inline
     fn increment(mut self, v: Int = 1):
         self.read_pos += v
 
     @always_inline
-    fn consume(mut self, mut buffer: Bytes):
-        var pos = self.read_pos
-        self.read_pos = -1
-        var read_len = len(self._inner) - pos
-        buffer.resize(read_len, 0)
-        memcpy(buffer.data, self._inner.data + pos, read_len)
+    fn consume(owned self, bytes_len: Int = -1) -> Bytes:
+        return Bytes(self^._inner[self.read_pos : self.read_pos + len(self) + 1])
 
 
 fn to_string[T: Writer](mut writer: T) -> String:

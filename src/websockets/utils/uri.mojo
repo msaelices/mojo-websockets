@@ -30,20 +30,61 @@ struct URI:
     var password: String
 
     @staticmethod
-    fn parse(uri: String) -> Variant[URI, String]:
-        var u = URI(uri)
-        try:
-            u._parse()
-        except e:
-            return String("Failed to parse URI: ", e)
+    fn parse(uri: String) -> URI:
+        var proto_str = String(HTTP11)
+        var is_https = False
 
-        return u
+        var proto_end = uri.find("://")
+        var remainder_uri: String
+        if proto_end >= 0:
+            proto_str = uri[:proto_end]
+            if proto_str == HTTPS:
+                is_https = True
+            remainder_uri = uri[proto_end + 3 :]
+        else:
+            remainder_uri = uri
 
-    @staticmethod
-    fn parse_raises(uri: String) raises -> URI:
-        var u = URI(uri)
-        u._parse()
-        return u
+        var path_start = remainder_uri.find("/")
+        var host_and_port: String
+        var request_uri: String
+        var host: String
+        if path_start >= 0:
+            host_and_port = remainder_uri[:path_start]
+            request_uri = remainder_uri[path_start:]
+            host = host_and_port[:path_start]
+        else:
+            host_and_port = remainder_uri
+            request_uri = SLASH
+            host = host_and_port
+
+        var scheme: String
+        if is_https:
+            scheme = HTTPS
+        else:
+            scheme = HTTP
+
+        var n = request_uri.find("?")
+        var original_path: String
+        var query_string: String
+        if n >= 0:
+            original_path = request_uri[:n]
+            query_string = request_uri[n + 1 :]
+        else:
+            original_path = request_uri
+            query_string = ""
+
+        return URI(
+            _original_path=original_path,
+            scheme=scheme,
+            path=original_path,
+            query_string=query_string,
+            _hash="",
+            host=host,
+            full_uri=uri,
+            request_uri=request_uri,
+            username="",
+            password="",
+        )
 
     fn __init__(
         out self,

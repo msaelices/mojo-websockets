@@ -30,7 +30,7 @@ alias SOCKET_URI = "wss://example.com/test"  # for tests where the URI doesn't m
 
 fn test_send_request() raises -> None:
     """Client sends a handshake request."""
-    client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
+    client = ClientProtocol(uri=URI.parse(SOCKET_URI), key=String(KEY))
     request = client.connect()
     client.send_request(request)
 
@@ -53,7 +53,7 @@ fn test_send_request() raises -> None:
 
 fn test_receive_successful_response() raises -> None:
     """Client receives a successful handshake response."""
-    client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
+    client = ClientProtocol(uri=URI.parse(SOCKET_URI), key=String(KEY))
     # Receive HTTP response from the server
     receive_data(
         client,
@@ -74,7 +74,7 @@ fn test_receive_successful_response() raises -> None:
 
 fn test_receive_failed_response() raises -> None:
     """Client receives a failed handshake response."""
-    client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
+    client = ClientProtocol(uri=URI.parse(SOCKET_URI), key=String(KEY))
     # Receive HTTP response from the server
     receive_data(
         client,
@@ -99,7 +99,7 @@ fn test_receive_failed_response() raises -> None:
 
 fn test_connect() raises -> None:
     """Check that connect() creates an opening handshake request."""
-    client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
+    client = ClientProtocol(uri=URI.parse(SOCKET_URI), key=String(KEY))
     request = client.connect()
 
     assert_equal(request.uri.get_path(), "/test")
@@ -116,7 +116,7 @@ fn test_connect() raises -> None:
 
 fn test_path() raises -> None:
     """Check that connect() uses the path from the URI."""
-    client = ClientProtocol(uri=URI.parse_raises("wss://example.com/endpoint?test=1"), key=String(KEY))
+    client = ClientProtocol(uri=URI.parse("wss://example.com/endpoint?test=1"), key=String(KEY))
     request = client.connect()
 
     assert_equal(request.uri.get_path(), "/endpoint?test=1")
@@ -137,7 +137,7 @@ fn test_port() raises -> None:
         uri = test_cases[i][0]
         expected_host = test_cases[i][1]
 
-        client = ClientProtocol(uri=URI.parse_raises(uri), key=String(KEY))
+        client = ClientProtocol(uri=URI.parse(uri), key=String(KEY))
         request = client.connect()
 
         assert_equal(request.headers["Host"], expected_host)
@@ -145,7 +145,7 @@ fn test_port() raises -> None:
 
 fn test_user_info() raises -> None:
     """Check that connect() performs HTTP Basic Authentication with user info from the URI."""
-    client = ClientProtocol(uri=URI.parse_raises("wss://hello:iloveyou@example.com/"), key=String(KEY))
+    client = ClientProtocol(uri=URI.parse("wss://hello:iloveyou@example.com/"), key=String(KEY))
     request = client.connect()
 
     assert_equal(request.headers["Authorization"], "Basic aGVsbG86aWxvdmV5b3U=")
@@ -153,7 +153,7 @@ fn test_user_info() raises -> None:
 
 fn test_origin() raises -> None:
     """Check that connect(origin=...) generates an Origin header."""
-    client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY), origin=String("https://example.com"))
+    client = ClientProtocol(uri=URI.parse(SOCKET_URI), key=String(KEY), origin=String("https://example.com"))
     request = client.connect()
 
     assert_equal(request.headers["Origin"], "https://example.com")
@@ -177,7 +177,7 @@ fn test_subprotocols() raises -> None:
 
 fn test_receive_successful_response_with_events() raises -> None:
     """Client receives a successful handshake response and checks events."""
-    client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
+    client = ClientProtocol(uri=URI.parse(SOCKET_URI), key=String(KEY))
 
     # Receive HTTP response from the server
     receive_data(
@@ -212,7 +212,7 @@ fn test_receive_successful_response_with_events() raises -> None:
 
 fn test_receive_failed_response_with_events() raises -> None:
     """Client receives a failed handshake response and checks events."""
-    client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
+    client = ClientProtocol(uri=URI.parse(SOCKET_URI), key=String(KEY))
 
     # Receive HTTP response from the server
     receive_data(
@@ -248,7 +248,7 @@ fn test_receive_failed_response_with_events() raises -> None:
 
 fn test_receive_no_response() raises -> None:
     """Client receives no handshake response."""
-    client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
+    client = ClientProtocol(uri=URI.parse(SOCKET_URI), key=String(KEY))
     receive_eof(client)
 
     assert_equal(len(client.events_received()), 0)
@@ -264,7 +264,7 @@ fn test_receive_no_response() raises -> None:
 # TODO: Make sure it passes
 # fn test_receive_truncated_response() raises -> None:
 #     """Client receives a truncated handshake response."""
-#     client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
+#     client = ClientProtocol(uri=URI.parse(SOCKET_URI), key=String(KEY))
 #     receive_data(client, str_to_bytes("HTTP/1.1 101 Switching Protocols\r\n"))
 #     receive_eof(client)
 #
@@ -277,7 +277,7 @@ fn test_receive_no_response() raises -> None:
 
 fn test_receive_random_response() raises -> None:
     """Client receives a junk handshake response."""
-    client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
+    client = ClientProtocol(uri=URI.parse(SOCKET_URI), key=String(KEY))
     receive_data(client, str_to_bytes("220 smtp.invalid\r\n"))
     receive_data(client, str_to_bytes("250 Hello relay.invalid\r\n"))
     receive_data(client, str_to_bytes("250 Ok\r\n"))
@@ -337,7 +337,7 @@ fn test_receive_random_response() raises -> None:
 
 fn test_basic() raises -> None:
     """Handshake succeeds."""
-    client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
+    client = ClientProtocol(uri=URI.parse(SOCKET_URI), key=String(KEY))
 
     # Receive HTTP response from the server
     receive_data(
@@ -358,7 +358,7 @@ fn test_basic() raises -> None:
 
 fn test_missing_connection() raises -> None:
     """Handshake fails when the Connection header is missing."""
-    client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
+    client = ClientProtocol(uri=URI.parse(SOCKET_URI), key=String(KEY))
 
     # Receive HTTP response from the server with missing Connection header
     receive_data(
@@ -382,7 +382,7 @@ fn test_missing_connection() raises -> None:
 
 fn test_invalid_connection() raises -> None:
     """Handshake fails when the Connection header is invalid."""
-    client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
+    client = ClientProtocol(uri=URI.parse(SOCKET_URI), key=String(KEY))
 
     # Receive HTTP response from the server with invalid Connection header
     receive_data(
@@ -409,7 +409,7 @@ fn test_invalid_connection() raises -> None:
 
 fn test_missing_upgrade() raises -> None:
     """Handshake fails when the Upgrade header is missing."""
-    client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
+    client = ClientProtocol(uri=URI.parse(SOCKET_URI), key=String(KEY))
 
     # Receive HTTP response from the server with missing Upgrade header
     receive_data(
@@ -433,7 +433,7 @@ fn test_missing_upgrade() raises -> None:
 
 fn test_invalid_upgrade() raises -> None:
     """Handshake fails when the Upgrade header is invalid."""
-    client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
+    client = ClientProtocol(uri=URI.parse(SOCKET_URI), key=String(KEY))
 
     # Receive HTTP response from the server with invalid Upgrade header
     receive_data(
@@ -458,7 +458,7 @@ fn test_invalid_upgrade() raises -> None:
 
 fn test_missing_accept() raises -> None:
     """Handshake fails when the Sec-WebSocket-Accept header is missing."""
-    client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
+    client = ClientProtocol(uri=URI.parse(SOCKET_URI), key=String(KEY))
 
     # Receive HTTP response from the server with missing Sec-WebSocket-Accept header
     receive_data(
@@ -483,7 +483,7 @@ fn test_missing_accept() raises -> None:
 # TODO: Implement multiple accept logic in the future
 # fn test_multiple_accept() raises -> None:
 #     """Handshake fails when the Sec-WebSocket-Accept header is repeated."""
-#     client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
+#     client = ClientProtocol(uri=URI.parse(SOCKET_URI), key=String(KEY))
 #
 #     # Receive HTTP response from the server with repeated Sec-WebSocket-Accept header
 #     receive_data(
@@ -508,7 +508,7 @@ fn test_missing_accept() raises -> None:
 
 fn test_invalid_accept() raises -> None:
     """Handshake fails when the Sec-WebSocket-Accept header is invalid."""
-    client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
+    client = ClientProtocol(uri=URI.parse(SOCKET_URI), key=String(KEY))
 
     # Receive HTTP response from the server with invalid Sec-WebSocket-Accept header
     receive_data(
@@ -539,7 +539,7 @@ fn test_invalid_accept() raises -> None:
 
 fn test_bypass_handshake() raises -> None:
     """ClientProtocol bypasses the opening handshake if state is OPEN."""
-    client = ClientProtocol(uri=URI.parse_raises(SOCKET_URI), key=String(KEY))
+    client = ClientProtocol(uri=URI.parse(SOCKET_URI), key=String(KEY))
     client.set_state(OPEN)
     receive_data(client, str_to_bytes("\x81\x06Hello!"))
 
