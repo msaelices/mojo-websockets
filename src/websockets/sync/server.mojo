@@ -461,16 +461,15 @@ struct Server:
 
             var i = 0
             while i < len(self.connections):
-                print("Handling connection ", i)
+                print("Handling connection ", i, " of ", len(self.connections))
                 var conn = self.connections[i]
                 if self.read_fds.is_set(Int(conn.fd)):
                     _ = self.handle_read(conn, handler)
                 if self.write_fds.is_set(Int(conn.fd)):
                     _ = self.handle_write(conn)
 
-                _ = i  # Needed to avoid a bug in the compiler
-
                 if conn.is_closed():
+                    print("Connection will be removed")
                     _ = self.connections.pop(i)
                 else:
                     i += 1

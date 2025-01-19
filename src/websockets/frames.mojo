@@ -431,19 +431,19 @@ struct Frame(Writable, Stringable, EqualityComparable):
         head2 = 0b10000000 if mask else 0
 
         if length < 126:
-            output.write(pack["!BB"](head1, head2 | length))
+            output.write_bytes(pack["!BB"](head1, head2 | length))
         elif length < 65536:
-            output.write(pack["!BBH"](head1, head2 | 126, length))
+            output.write_bytes(pack["!BBH"](head1, head2 | 126, length))
         else:
-            output.write(pack["!BBQ"](head1, head2 | 127, length))
+            output.write_bytes(pack["!BBQ"](head1, head2 | 127, length))
 
         if mask:
             mask_bytes = gen_mask_func()
-            output.write(mask_bytes)
+            output.write_bytes(mask_bytes)
             data = apply_mask(self.data, mask_bytes)
         else:
             data = self.data
-        output.write(data)
+        output.write_bytes(data)
 
         return output.consume()
 

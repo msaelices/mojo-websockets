@@ -60,12 +60,12 @@ fn write_header(mut writer: ByteWriter, key: String, mut value: String):
 
 @always_inline
 fn encode(owned req: HTTPRequest) -> Bytes:
-    return req._encoded()
+    return req.encode()
 
 
 @always_inline
 fn encode(owned res: HTTPResponse) -> Bytes:
-    return res._encoded()
+    return res.encode()
 
 
 
@@ -320,26 +320,28 @@ struct HTTPRequest(Writable, Stringable):
         writer.write(lineBreak)
         writer.write(to_string(self.body_raw))
 
-    fn _encoded(mut self) -> Bytes:
+    fn encode(owned self) -> Bytes:
         """Encodes request as bytes.
 
         This method consumes the data in this request and it should
         no longer be considered valid.
         """
+        var path = self.uri.path if len(self.uri.path) > 1 else SLASH
+        if len(self.uri.query_string) > 0:
+            path.write("?", self.uri.query_string)
+
         var writer = ByteWriter()
-        writer.write(self.method)
-        writer.write(whitespace)
-        var path = self.uri.get_path() if len(self.uri.path) > 1 else SLASH
-        writer.write(path)
-        writer.write(whitespace)
-        writer.write(self.protocol)
-        writer.write(lineBreak)
-
-        self.headers.encode_to(writer)
-        writer.write(lineBreak)
-
-        writer.write(self.body_raw)
-
+        writer.write(
+            self.method,
+            whitespace,
+            path,
+            whitespace,
+            self.protocol,
+            lineBreak,
+            self.headers,
+            lineBreak,
+        )
+        writer.consuming_write(self^.body_raw)
         return writer.consume()
 
     fn __str__(self) -> String:
@@ -451,30 +453,27 @@ struct HTTPResponse(Writable, Stringable):
         writer.write(lineBreak)
         writer.write(to_string(self.body_raw))
 
-    fn _encoded(mut self) -> Bytes:
+    fn encode(owned self) -> Bytes:
         """Encodes response as bytes.
 
         This method consumes the data in this request and it should
         no longer be considered valid.
         """
         var writer = ByteWriter()
-        writer.write(self.protocol)
-        writer.write(whitespace)
-        writer.write(bytes(String(self.status_code)))
-        writer.write(whitespace)
-        writer.write(self.status_text)
-        writer.write(lineBreak)
+        writer.write(
+            self.protocol,
+            whitespace,
+            String(self.status_code),
+            whitespace,
+            self.status_text,
+            lineBreak,
+        )
+        writer.write(self.headers, lineBreak)
 
-        if HeaderKey.DATE not in self.headers:
-            # TODO: Use UTC time
-            var current_time = get_date_timestamp()
-            write_header(writer, HeaderKey.DATE, current_time)
-
-        self.headers.encode_to(writer)
-
-        writer.write(lineBreak)
-        writer.write(self.body_raw)
-
+        # TODO: Changed line from taken code from lightbug_http
+        # as it was causing a segfault. The original code was:
+        # writer.consuming_write(self^.body_raw)
+        writer.write_bytes(self.body_raw)
         return writer.consume()
 
     fn __str__(self) -> String:

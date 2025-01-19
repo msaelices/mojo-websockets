@@ -121,7 +121,7 @@ struct ServerProtocol(Protocol):
 
     fn write_data(mut self, data: Bytes) -> None:
         """Write data to the protocol."""
-        self.writes += data
+        self.writes.extend(data)
 
     fn events_received(mut self) -> List[Event]:
         """
@@ -262,6 +262,7 @@ struct ServerProtocol(Protocol):
         Args:
             request: The HTTP request to accept.
         """
+        print("Accepting WebSocket connection")
         try:
             if "Upgrade" not in request.headers:
                 raise Error('Request headers do not contain an "upgrade" header')
@@ -304,6 +305,7 @@ struct ServerProtocol(Protocol):
 
         var key = request.headers["Sec-WebSocket-Key"]
         var accept_encoded = ws_accept_key(key)
+        print("Accept encoded: ", accept_encoded)
         var headers = Headers(
             Header("Date", date_func()),
             Header("Upgrade", "websocket"),

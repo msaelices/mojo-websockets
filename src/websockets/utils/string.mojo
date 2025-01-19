@@ -95,30 +95,50 @@ struct Message:
     alias http_start = Message("http.response.start")
 
 
-struct ByteWriter:
+struct ByteWriter(Writer):
     var _inner: Bytes
 
     fn __init__(out self, capacity: Int = DEFAULT_BUFFER_SIZE):
         self._inner = Bytes(capacity=capacity)
 
     @always_inline
-    fn write(mut self, owned b: Bytes):
+    fn write_bytes(mut self, bytes: Span[Byte]) -> None:
+        """Writes the contents of `bytes` into the internal buffer.
+
+        Args:
+            bytes: The bytes to write.
+        """
+        self._inner.extend(bytes)
+
+    fn write[*Ts: Writable](mut self, *args: *Ts) -> None:
+        """Write data to the `Writer`.
+
+        Parameters:
+            Ts: The types of data to write.
+
+        Args:
+            args: The data to write.
+        """
+
+        @parameter
+        fn write_arg[T: Writable](arg: T):
+            arg.write_to(self)
+
+        args.each[write_arg]()
+
+    @always_inline
+    fn consuming_write(mut self, owned b: Bytes):
         self._inner.extend(b^)
 
     @always_inline
-    fn write(mut self, mut s: String):
+    fn consuming_write(mut self, owned s: String):
         # kind of cursed but seems to work?
         _ = s._buffer.pop()
         self._inner.extend(s._buffer^)
         s._buffer = s._buffer_type()
 
     @always_inline
-    fn write(mut self, s: StringLiteral):
-        var str = String(s)
-        self.write(str)
-
-    @always_inline
-    fn write(mut self, b: Byte):
+    fn write_byte(mut self, b: Byte):
         self._inner.append(b)
 
     fn consume(mut self) -> Bytes:
