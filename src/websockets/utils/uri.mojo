@@ -1,8 +1,8 @@
 from collections import Optional
 from utils import StringSlice, Variant
-from libc import Bytes
 
-from .string import (
+from websockets.aliases import Bytes
+from websockets.utils.string import (
     bytes,
     bytes_equal,
     HTTP,

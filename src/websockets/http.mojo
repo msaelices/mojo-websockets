@@ -3,10 +3,11 @@ from collections import Dict, Optional
 from memory import Span
 from utils import StringSlice
 
-from libc import Bytes, AF_INET6
+from websockets.aliases import Bytes
+from websockets.libc import AF_INET6
 
-from .aliases import Duration
-from .utils.string import (
+from websockets.aliases import Duration
+from websockets.utils.string import (
     ByteReader,
     ByteWriter,
     BytesConstant,
@@ -21,9 +22,10 @@ from .utils.string import (
     to_string,
     whitespace,
 )
-from .utils.time import now
-from .utils.uri import URI
-from .net import TCPAddr, get_address_info, addrinfo_macos, addrinfo_unix
+from websockets.utils.time import now
+from websockets.utils.uri import URI
+from websockets.net import TCPAddr, get_address_info, addrinfo_macos, addrinfo_unix
+
 
 struct HeaderKey:
     alias CONNECTION = "connection"

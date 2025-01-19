@@ -119,16 +119,17 @@ trait Connection(CollectionElement):
         ...
 
 
-trait Addr(StringableCollectionElement):
+trait Addr(Stringable, Representable, Writable, EqualityComparableCollectionElement):
+    alias _type: StringLiteral
+
     fn __init__(out self):
         ...
 
-    fn __init__(out self, ip: String, port: Int):
+    fn __init__(out self, ip: String, port: UInt16):
         ...
 
     fn network(self) -> String:
         ...
-
 
 
 @value
@@ -150,6 +151,7 @@ struct NetworkType:
 
 @value
 struct TCPAddr(Addr):
+    alias _type = "TCPAddr"
     var ip: String
     var port: Int
     var zone: String  # IPv6 addressing zone
@@ -360,37 +362,40 @@ fn split_host_port(hostport: String) raises -> HostPort:
     return HostPort(host, port)
 
 
-fn convert_binary_port_to_int(port: UInt16) -> Int:
+fn binary_port_to_int(port: UInt16) -> Int:
+    """Convert a binary port to an integer.
+
+    Args:
+        port: The binary port.
+
+    Returns:
+        The port as an integer.
+    """
     return Int(ntohs(port))
 
 
-fn convert_binary_ip_to_string(
-    owned ip_address: UInt32, address_family: Int32, address_length: UInt32
-) -> String:
-    """Convert a binary IP address to a string by calling inet_ntop.
+fn binary_ip_to_string[address_family: Int32](owned ip_address: UInt32) raises -> String:
+    """Convert a binary IP address to a string by calling `inet_ntop`.
+
+    Parameters:
+        address_family: The address family of the IP address.
 
     Args:
         ip_address: The binary IP address.
-        address_family: The address family of the IP address.
-        address_length: The length of the address.
 
     Returns:
         The IP address as a string.
     """
-    # It seems like the len of the buffer depends on the length of the string IP.
-    # Allocating 10 works for localhost (127.0.0.1) which I suspect is 9 bytes + 1 null terminator byte. So max should be 16 (15 + 1).
-    var ip_buffer = UnsafePointer[c_char].alloc(16)
-    var ip_address_ptr = UnsafePointer.address_of(ip_address).bitcast[Byte]()
-    _ = inet_ntop(address_family, ip_address_ptr, ip_buffer, 16)
+    constrained[int(address_family) in [AF_INET, AF_INET6], "Address family must be either AF_INET or AF_INET6."]()
+    var ip: String
 
-    var string_buf = ip_buffer.bitcast[Int8]()
-    var index = 0
-    while True:
-        if string_buf[index] == 0:
-            break
-        index += 1
+    @parameter
+    if address_family == AF_INET:
+        ip = inet_ntop[address_family, INET_ADDRSTRLEN](ip_address)
+    else:
+        ip = inet_ntop[address_family, INET6_ADDRSTRLEN](ip_address)
 
-    return String(StringRef(ptr=string_buf, len=index))
+    return ip
 
 
 fn get_sock_name(fd: Int32) raises -> HostPort:
@@ -407,8 +412,8 @@ fn get_sock_name(fd: Int32) raises -> HostPort:
     var addr_in = local_address_ptr.bitcast[sockaddr_in]()[]
 
     return HostPort(
-        host=convert_binary_ip_to_string(addr_in.sin_addr.s_addr, AF_INET, 16),
-        port=convert_binary_port_to_int(addr_in.sin_port).__str__(),
+        host=binary_ip_to_string(addr_in.sin_addr.s_addr, AF_INET, 16),
+        port=binary_port_to_int(addr_in.sin_port).__str__(),
     )
 
 
@@ -429,8 +434,8 @@ fn get_peer_name(fd: Int32) raises -> HostPort:
     var addr_in = remote_address_ptr.bitcast[sockaddr_in]()[]
 
     return HostPort(
-        host=convert_binary_ip_to_string(addr_in.sin_addr.s_addr, AF_INET, 16),
-        port=convert_binary_port_to_int(addr_in.sin_port).__str__(),
+        host=binary_ip_to_string(addr_in.sin_addr.s_addr, AF_INET, 16),
+        port=binary_port_to_int(addr_in.sin_port).__str__(),
     )
 
 
