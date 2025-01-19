@@ -31,6 +31,7 @@ This software is in a early stage of development, using the Mojo nightly version
 ## TODO
 
 - [ ] Implement automatic reconnection for clients
+- [ ] Get rid of Python dependencies and logic (e.g. no more `from python import ...`)
 - [ ] Make sure it passes all the tests in [Autobahn|Testsuite](https://github.com/crossbario/autobahn-testsuite/)
 - [ ] Implement subprotocols and extensions
 - [ ] Optimize performance for high-concurrency scenarios
