@@ -405,6 +405,15 @@ struct Server:
         # self.write_fds = other.write_fds
         self.protocol = other.protocol^
 
+    fn __copyinit__(mut self, other: Self):
+        self.host = other.host
+        self.port = other.port
+        self.handler = other.handler
+        self.max_request_body_size = other.max_request_body_size
+        self.tcp_keep_alive = other.tcp_keep_alive
+        self.ln = other.ln
+        self.protocol = other.protocol
+
     # fn serve_forever(mut self) raises -> None: # TODO: conditional conformance on main struct , then a default for handler e.g. WebsocketHandshake
     #     """
     #     Listen for incoming connections and serve HTTP requests.
@@ -618,8 +627,8 @@ struct Server:
     fn shutdown(mut self) raises -> None:
         self.ln.close()
 
-    fn __enter__(owned self) -> Self:
-        return self^
+    fn __enter__(self) -> Self:
+        return self
 
     fn __exit__(
         mut self,

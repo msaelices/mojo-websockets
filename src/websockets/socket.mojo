@@ -10,6 +10,7 @@ from websockets.libc import (
     accept,
     socket,
     connect,
+    dup,
     recv,
     send,
     sendto,
@@ -163,6 +164,20 @@ struct Socket[AddrType: Addr, address_family: Int = AF_INET](Representable, Stri
         self._closed = existing._closed
         self._connected = existing._connected
 
+    fn __copyinit__(out self, existing: Self):
+        """Initialize a new socket object by copying the data from an existing socket object.
+
+        Args:
+            existing: The existing socket object to move the data from.
+        """
+        self.fd = dup(existing.fd)
+        self.socket_type = existing.socket_type
+        self.protocol = existing.protocol
+        self._local_address = existing._local_address
+        self._remote_address = existing._remote_address
+        self._closed = existing._closed
+        self._connected = existing._connected
+
     fn teardown(mut self) raises:
         """Close the socket and free the file descriptor."""
         if self._connected:
@@ -178,8 +193,8 @@ struct Socket[AddrType: Addr, address_family: Int = AF_INET](Representable, Stri
                 logger.error("Socket.teardown: Failed to close socket.")
                 raise e
 
-    fn __enter__(owned self) -> Self:
-        return self^
+    fn __enter__(self) -> Self:
+        return self
 
     fn __exit__(mut self) raises:
         self.teardown()

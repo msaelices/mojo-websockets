@@ -1890,6 +1890,25 @@ fn _shutdown(socket: c_int, how: c_int) -> c_int:
     return external_call["shutdown", c_int, c_int, c_int](socket, how)
 
 
+fn dup(fd: c_int) -> c_int:
+    """Libc POSIX `dup2` function.
+
+    Args:
+        fd: The file descriptor to duplicate.
+
+    Returns:
+        The new file descriptor, -1 on error.
+
+    #### C Function
+    ```c
+    int dup(int oldfd);
+    ```
+
+    #### Notes:
+    * Reference: https://man7.org/linux/man-pages/man2/dup.2.html.
+    """
+    return external_call["dup", c_int](fd)
+
 alias ShutdownInvalidDescriptorError = "ShutdownError (EBADF): The argument `socket` is an invalid descriptor."
 alias ShutdownInvalidArgumentError = "ShutdownError (EINVAL): Invalid argument passed."
 alias ShutdownNotConnectedError = "ShutdownError (ENOTCONN): The socket is not connected."

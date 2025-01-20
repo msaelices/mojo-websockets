@@ -581,6 +581,9 @@ struct TCPListener:
     fn __moveinit__(out self, owned existing: Self):
         self.socket = existing.socket^
 
+    fn __copyinit__(out self, existing: Self):
+        self.socket = existing.socket
+
     fn accept(self) raises -> TCPConnection:
         return TCPConnection(self.socket.accept())
 
