@@ -541,9 +541,10 @@ struct Socket[AddrType: Addr, address_family: Int = AF_INET](Representable, Stri
         """
         var bytes_received: Int
         try:
+            var buff_size = buffer.size
             bytes_received = recv(
                 self.fd,
-                buffer.unsafe_ptr().offset(buffer.size),
+                buffer.unsafe_ptr().offset(buff_size),
                 buffer.capacity - buffer.size,
                 0,
             )
