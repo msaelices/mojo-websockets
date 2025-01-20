@@ -13,7 +13,7 @@ from websockets.aliases import Bytes, DEFAULT_BUFFER_SIZE, DEFAULT_MAX_REQUEST_B
 from websockets.http import Header, Headers, HTTPRequest, HTTPResponse, encode
 from websockets.logger import logger
 from websockets.net import ListenConfig, TCPConnection, TCPListener
-from websockets.protocol import SERVER
+from websockets.protocol import CONNECTING, SERVER
 from websockets.protocol.server import ServerProtocol
 from websockets.protocol.client import ClientProtocol
 from websockets.utils.bytes import str_to_bytes
@@ -393,6 +393,18 @@ struct Server:
         # self.write_fds = fd_set()
         self.protocol = ServerProtocol()
 
+    fn __moveinit__(mut self, owned other: Self):
+        self.host = other.host
+        self.port = other.port
+        self.handler = other.handler
+        self.max_request_body_size = other.max_request_body_size
+        self.tcp_keep_alive = other.tcp_keep_alive
+        self.ln = other.ln^
+        # self.connections = other.connections
+        # self.read_fds = other.read_fds
+        # self.write_fds = other.write_fds
+        self.protocol = other.protocol
+
     # fn serve_forever(mut self) raises -> None: # TODO: conditional conformance on main struct , then a default for handler e.g. WebsocketHandshake
     #     """
     #     Listen for incoming connections and serve HTTP requests.
@@ -523,52 +535,36 @@ struct Server:
             except e:
                 conn.teardown()
                 # 0 bytes were read from the peer, which indicates their side of the connection was closed.
-                if str(e) == "EOF":
+                if String(e) == "EOF":
                     break
                 else:
                     logger.error(e)
                     raise Error("Server.serve_connection: Failed to read request")
 
-            var request: HTTPRequest
-            try:
-                request = HTTPRequest.from_bytes(self.address(), max_request_body_size, b)
-            except e:
-                logger.error(e)
-                raise Error("Server.serve_connection: Failed to parse request")
-
-            var response: HTTPResponse
-            try:
-                response = self.handler(conn, request)
-            except:
-                if not conn.is_closed():
-                    # Try to send back an internal server error, but always attempt to teardown the connection.
-                    try:
-                        # TODO: Move InternalError response to an alias when Mojo can support Dict operations at compile time. (@thatstoasty)
-                        _ = conn.write(encode(InternalError()))
-                    except e:
-                        logger.error(e)
-                        raise Error("Failed to send InternalError response")
-                    finally:
-                        conn.teardown()
-                return
-
             # If the server is set to not support keep-alive connections, or the client requests a connection close, we mark the connection to be closed.
-            var close_connection = (not self.tcp_keep_alive) or request.connection_close()
-            if close_connection:
-                response.set_connection_close()
+            var close_connection = not self.tcp_keep_alive
+
+            if self.protocol.get_state() == CONNECTING:
+                var request: HTTPRequest
+                try:
+                    request = HTTPRequest.from_bytes(self.address(), max_request_body_size, b)
+                except e:
+                    logger.error(e)
+                    raise Error("Server.serve_connection: Failed to parse request")
+
+                response = self.protocol.accept(request)
+                self.protocol.send_response(response)
+                data_to_send = self.protocol.data_to_send()
+        
+                bytes_written = conn.write(data_to_send)
+                logger.debug("Bytes written: ", bytes_written)
+            else:
+                logger.debug("Received data: ", len(b))
 
             logger.debug(
                 conn.socket._remote_address.ip,
-                str(conn.socket._remote_address.port),
-                request.method,
-                request.uri.path,
-                response.status_code,
+                String(conn.socket._remote_address.port),
             )
-            try:
-                _ = conn.write(encode(response^))
-            except e:
-                conn.teardown()
-                break
 
             if close_connection:
                 conn.teardown()
@@ -618,15 +614,15 @@ struct Server:
     #         else:
     #             conn.set_write_buffer(Bytes())
 
-    def shutdown(self) -> None:
+    fn shutdown(mut self) raises -> None:
         self.ln.close()
 
-    def __enter__(self) -> Self:
-        return self
+    fn __enter__(mut self) -> Self:
+        return self^
 
-    def __exit__(
+    fn __exit__(
         mut self,
-    ) -> None:
+    ) raises -> None:
         self.shutdown()
 
 
