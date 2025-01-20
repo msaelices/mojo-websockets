@@ -618,7 +618,7 @@ struct Server:
     fn shutdown(mut self) raises -> None:
         self.ln.close()
 
-    fn __enter__(mut self) -> Self:
+    fn __enter__(owned self) -> Self:
         return self^
 
     fn __exit__(
