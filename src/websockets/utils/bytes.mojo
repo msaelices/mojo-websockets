@@ -13,7 +13,7 @@ from memory import bitcast, memcpy, Span, UnsafePointer
 from random import randint
 from utils import StringRef
 
-from ..aliases import Bytes
+from websockets.aliases import Bytes
 
 alias MODIFIERS = List[String]('>', '<', '!', '=')
 alias EOL = Byte(10)

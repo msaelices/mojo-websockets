@@ -1,7 +1,7 @@
 from base64 import b64encode
 from python import Python, PythonObject
 
-from ..aliases import Bytes, MAGIC_CONSTANT
+from websockets.aliases import Bytes, MAGIC_CONSTANT
 
 
 def ws_accept_key(key: String) -> String:

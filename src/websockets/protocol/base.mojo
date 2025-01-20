@@ -18,7 +18,7 @@ from websockets.frames import (
 )
 from websockets.streams import StreamReader
 from websockets.utils.bytes import gen_mask
-from . import CONNECTING, Protocol, Event
+from websockets.protocol import CONNECTING, Protocol, Event
 
 
 fn receive_data[

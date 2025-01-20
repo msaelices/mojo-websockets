@@ -16,8 +16,8 @@ from websockets.streams import StreamReader
 from websockets.utils.bytes import b64decode, gen_mask, str_to_bytes
 from websockets.utils.handshake import ws_accept_key
 
-from . import CONNECTING, SERVER, Protocol, Event
-from .base import (
+from websockets.protocol import CONNECTING, SERVER, Protocol, Event
+from websockets.protocol.base import (
     discard,
     parse_buffer,
     receive_data,

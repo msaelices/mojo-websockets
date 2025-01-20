@@ -14,19 +14,19 @@ from websockets.http import (
     HTTPRequest,
 )
 from websockets.frames import Frame, Close
-from websockets.streams import StreamReader
-from websockets.utils.bytes import b64decode, gen_token, str_to_bytes,gen_mask
-from websockets.utils.handshake import ws_accept_key
-from websockets.utils.uri import URI
-
-from . import CONNECTING, CLIENT, Protocol, Event
-from .base import (
+from websockets.protocol import CONNECTING, CLIENT, Protocol, Event
+from websockets.protocol.base import (
     discard,
     parse_buffer,
     receive_data,
     receive_frame,
     send_eof,
 )
+from websockets.streams import StreamReader
+from websockets.utils.bytes import b64decode, gen_token, str_to_bytes,gen_mask
+from websockets.utils.handshake import ws_accept_key
+from websockets.utils.uri import URI
+
 
 
 struct ClientProtocol[side_param: Int = CLIENT](Protocol):
