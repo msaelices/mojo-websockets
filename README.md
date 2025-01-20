@@ -45,6 +45,8 @@ Contributions are welcome! If you'd like to contribute, please follow the contri
 
 We have taken a lot of code from the amazing [lightbug_http](https://github.com/saviorand/lightbug_http) project.
 
+Also, we took inspiration and some code from the [python-websockets](https://github.com/websockets) project, specially for implementing the [WebSocket Sans/IO layer](https://websockets.readthedocs.io/en/stable/howto/sansio.html) and their tests.
+
 ## License
 
 mojo-websockets is licensed under the [MIT license](LICENSE).
