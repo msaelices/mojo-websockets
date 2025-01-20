@@ -525,7 +525,7 @@ struct Server:
         Raises:
             If there is an error while serving the connection.
         """
-        remote_addr = conn.socket._remote_address.value()
+        remote_addr = conn.socket.remote_address()
         logger.debug(
             "Connection accepted! IP:", remote_addr.ip, "Port:", remote_addr.port
         )
