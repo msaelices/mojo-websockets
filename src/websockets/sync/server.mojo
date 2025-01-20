@@ -403,7 +403,7 @@ struct Server:
         # self.connections = other.connections
         # self.read_fds = other.read_fds
         # self.write_fds = other.write_fds
-        self.protocol = other.protocol
+        self.protocol = other.protocol^
 
     # fn serve_forever(mut self) raises -> None: # TODO: conditional conformance on main struct , then a default for handler e.g. WebsocketHandshake
     #     """
@@ -516,8 +516,9 @@ struct Server:
         Raises:
             If there is an error while serving the connection.
         """
+        remote_addr = conn.socket._remote_address.value()
         logger.debug(
-            "Connection accepted! IP:", conn.socket._remote_address.ip, "Port:", conn.socket._remote_address.port
+            "Connection accepted! IP:", remote_addr.ip, "Port:", remote_addr.port
         )
         var max_request_body_size = self.max_request_body_size
         if max_request_body_size <= 0:
@@ -562,8 +563,8 @@ struct Server:
                 logger.debug("Received data: ", len(b))
 
             logger.debug(
-                conn.socket._remote_address.ip,
-                String(conn.socket._remote_address.port),
+                remote_addr.ip,
+                String(remote_addr.port),
             )
 
             if close_connection:

@@ -1,5 +1,5 @@
 # Code adapted from lightbug_http
-
+from collections import Optional
 from memory import Span, stack_allocation
 from utils import StaticTuple
 from sys import sizeof, external_call
@@ -91,7 +91,7 @@ struct Socket[AddrType: Addr, address_family: Int = AF_INET](Representable, Stri
     """The protocol."""
     var _local_address: AddrType
     """The local address of the socket (local address if bound)."""
-    var _remote_address: AddrType
+    var _remote_address: Optional[AddrType]
     """The remote address of the socket (peer's address if connected)."""
     var _closed: Bool
     """Whether the socket is closed."""
@@ -121,7 +121,7 @@ struct Socket[AddrType: Addr, address_family: Int = AF_INET](Representable, Stri
 
         self.fd = socket(address_family, socket_type, 0)
         self._local_address = local_address
-        self._remote_address = remote_address
+        self._remote_address = None
         self._closed = False
         self._connected = False
 
@@ -131,7 +131,6 @@ struct Socket[AddrType: Addr, address_family: Int = AF_INET](Representable, Stri
         socket_type: Int32,
         protocol: Byte,
         local_address: AddrType,
-        remote_address: AddrType = AddrType(),
     ):
         """
         Create a new socket object when you already have a socket file descriptor. Typically through socket.accept().
@@ -141,13 +140,12 @@ struct Socket[AddrType: Addr, address_family: Int = AF_INET](Representable, Stri
             socket_type: The socket type.
             protocol: The protocol.
             local_address: The local address of the socket (local address if bound).
-            remote_address: The remote address of the socket (peer's address if connected).
         """
         self.fd = fd
         self.socket_type = socket_type
         self.protocol = protocol
         self._local_address = local_address
-        self._remote_address = remote_address
+        self._remote_address = None
         self._closed = False
         self._connected = True
 
@@ -220,8 +218,6 @@ struct Socket[AddrType: Addr, address_family: Int = AF_INET](Representable, Stri
             String(self.fd),
             ", _local_address=",
             repr(self._local_address),
-            ", _remote_address=",
-            repr(self._remote_address),
             ", _closed=",
             String(self._closed),
             ", _connected=",
@@ -245,7 +241,7 @@ struct Socket[AddrType: Addr, address_family: Int = AF_INET](Representable, Stri
         """
         self._local_address = address
 
-    fn remote_address(ref self) -> ref [self._remote_address] AddrType:
+    fn remote_address(ref self) -> Optional[AddrType]:
         """Return the remote address of the socket as a UDP address.
 
         Returns:

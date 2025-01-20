@@ -1,3 +1,4 @@
+from collections import Optional
 from sys.info import alignof, sizeof
 from sys import external_call, os_is_macos
 from memory import UnsafePointer, Pointer, Span
@@ -211,7 +212,7 @@ struct TCPConnection:
     fn local_addr(self) -> TCPAddr:
         return self.socket.local_address()
 
-    fn remote_addr(self) -> TCPAddr:
+    fn remote_addr(self) -> Optional[TCPAddr]:
         return self.socket.remote_address()
 
 
