@@ -1,12 +1,16 @@
 from sys.info import alignof, sizeof
 from sys import external_call, os_is_macos
-from memory import UnsafePointer, Pointer
+from memory import UnsafePointer, Pointer, Span
+from time import sleep
 from utils import StaticTuple, StringRef, Variant
 
-from libc import (
+from websockets.aliases import Bytes, Duration
+from websockets.libc import (
     AF_INET,
     AF_INET6,
     AI_PASSIVE,
+    INET_ADDRSTRLEN,
+    INET6_ADDRSTRLEN,
     SHUT_RDWR,
     SOCK_STREAM,
     SOL_SOCKET,
@@ -19,8 +23,6 @@ from libc import (
     c_uint,
     c_void,
     close,
-    fcntl,
-    getaddrinfo,
     getpeername,
     getsockname,
     getsockopt,
@@ -39,12 +41,15 @@ from libc import (
     socket,
     socklen_t,
 )
-
-from .aliases import Bytes, Duration
-from .utils.string import to_string
+from websockets.logger import logger
+from websockets.socket import Socket
+from websockets.utils.string import to_string
 
 alias default_buffer_size = 4096
 alias default_tcp_keep_alive = Duration(15 * 1000 * 1000 * 1000)  # 15 seconds
+
+alias MissingPortError = Error("missing port in address")
+alias TooManyColonsError = Error("too many colons in address")
 
 
 trait AddrInfo:
@@ -68,32 +73,6 @@ trait Net:
     # fn listen(mut self, network: String, addr: String) raises -> Listener:
     #    ...
 
-
-trait ListenConfig:
-    fn __init__(out self, keep_alive: Duration) raises:
-        ...
-
-    # A listen method should be implemented on structs that implement ListenConfig.
-    # Signature is not enforced for now.
-    # fn listen(mut self, network: String, address: String) raises -> Listener:
-    #    ...
-
-
-trait Listener(Movable):
-    fn __init__(out self) raises:
-        ...
-
-    fn __init__(out self, addr: TCPAddr) raises:
-        ...
-
-    fn accept(self) raises -> TCPConnection:
-        ...
-
-    fn close(self) raises:
-        ...
-
-    fn addr(self) -> TCPAddr:
-        ...
 
 
 trait Connection(CollectionElement):
@@ -153,15 +132,15 @@ struct NetworkType:
 struct TCPAddr(Addr):
     alias _type = "TCPAddr"
     var ip: String
-    var port: Int
+    var port: UInt16
     var zone: String  # IPv6 addressing zone
 
     fn __init__(out self):
-        self.ip = String("127.0.0.1")
+        self.ip = "127.0.0.1"
         self.port = 8000
         self.zone = ""
 
-    fn __init__(out self, ip: String, port: Int):
+    fn __init__(out self, ip: String, port: UInt16):
         self.ip = ip
         self.port = port
         self.zone = ""
@@ -169,106 +148,71 @@ struct TCPAddr(Addr):
     fn network(self) -> String:
         return NetworkType.tcp.value
 
+    fn __eq__(self, other: Self) -> Bool:
+        return self.ip == other.ip and self.port == other.port and self.zone == other.zone
+
+    fn __ne__(self, other: Self) -> Bool:
+        return not self == other
+
     fn __str__(self) -> String:
         if self.zone != "":
-            return join_host_port(
-                self.ip + "%" + self.zone, self.port.__str__()
-            )
-        return join_host_port(self.ip, self.port.__str__())
+            return join_host_port(self.ip + "%" + self.zone, String(self.port))
+        return join_host_port(self.ip, String(self.port))
+
+    fn __repr__(self) -> String:
+        return String.write(self)
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        writer.write("TCPAddr(", "ip=", repr(self.ip), ", port=", String(self.port), ", zone=", repr(self.zone), ")")
 
 
-@value
-struct TCPConnection(Connection):
-    var fd: c_int
-    var raddr: TCPAddr
-    var laddr: TCPAddr
-    var _write_buffer: Bytes
+struct TCPConnection:
+    var socket: Socket[TCPAddr]
 
-    fn __init__(out self, laddr: String, raddr: String) raises:
-        self.raddr = resolve_internet_addr(NetworkType.tcp4.value, raddr)
-        self.laddr = resolve_internet_addr(NetworkType.tcp4.value, laddr)
-        self.fd = socket(AF_INET, SOCK_STREAM, 0)
-        self._write_buffer = Bytes()
+    fn __init__(out self, owned socket: Socket[TCPAddr]):
+        self.socket = socket^
 
-    fn __init__(out self, laddr: TCPAddr, raddr: TCPAddr) raises:
-        self.raddr = raddr
-        self.laddr = laddr
-        self.fd = socket(AF_INET, SOCK_STREAM, 0)
-        self._write_buffer = Bytes()
+    fn __moveinit__(out self, owned existing: Self):
+        self.socket = existing.socket^
 
-    fn __init__(out self, fd: c_int, laddr: TCPAddr, raddr: TCPAddr) raises:
-        self.raddr = raddr
-        self.laddr = laddr
-        self.fd = fd
-        self._write_buffer = Bytes()
+    fn read(self, mut buf: Bytes) raises -> Int:
+        try:
+            return self.socket.receive(buf)
+        except e:
+            if String(e) == "EOF":
+                raise e
+            else:
+                logger.error(e)
+                raise Error("TCPConnection.read: Failed to read data from connection.")
 
-    fn write_buffer(self) -> Bytes:
-        return self._write_buffer
+    fn write(self, buf: Span[Byte]) raises -> Int:
+        if buf[-1] == 0:
+            raise Error("TCPConnection.write: Buffer must not be null-terminated.")
 
-    fn set_write_buffer(mut self, buf: Bytes):
-        self._write_buffer = buf
+        try:
+            return self.socket.send(buf)
+        except e:
+            logger.error("TCPConnection.write: Failed to write data to connection.")
+            raise e
 
-    fn read(self,mut buf: Bytes) raises -> Int:
-        var idx = buf.size
-        var bytes_recv = recv(
-            self.fd,
-            buf.unsafe_ptr().offset(idx),
-            buf.capacity - buf.size,
-            0,
-        )
-        if bytes_recv == -1:
-            return 0
-        buf.size += bytes_recv
-        if bytes_recv == 0:
-            return 0
-        if bytes_recv < buf.capacity:
-            return bytes_recv
-        return bytes_recv
+    fn close(mut self) raises:
+        self.socket.close()
 
-    fn write(self, owned msg: String) raises -> Int:
-        var bytes_sent = send(self.fd, msg.unsafe_ptr(), len(msg), 0)
-        if bytes_sent == -1:
-            print("Failed to send response")
-        return bytes_sent
+    fn shutdown(mut self) raises:
+        self.socket.shutdown()
 
-    fn write(self, buf: Bytes) raises -> Int:
-        var content = to_string(buf)
-        var bytes_sent = send(self.fd, content.unsafe_ptr(), len(content), 0)
-        if bytes_sent == -1:
-            print("Failed to send response")
-        _ = content
-        return bytes_sent
-
-    fn close(self) raises:
-        _ = shutdown(self.fd, SHUT_RDWR)
-        var close_status = close(self.fd)
-        if close_status == -1:
-            print("Failed to close new_sockfd")
+    fn teardown(mut self) raises:
+        self.socket.teardown()
 
     fn is_closed(self) -> Bool:
-        var error: UInt8 = 0
-        var len = socklen_t(sizeof[Int]())
-        var result = getsockopt(self.fd, SOL_SOCKET, SO_ERROR, UnsafePointer.address_of(error), UnsafePointer.address_of(len))
-        return result == -1 or error != 0
+        return self.socket._closed
 
-    fn set_non_blocking(self, non_blocking: Bool) raises:
-        var flags = fcntl(self.fd, 3)
-        if flags == -1:
-            print("Failed to get flags")
-            return
-        if non_blocking:
-            flags |= 2048
-        else:
-            flags &= ~2048
-        var result = fcntl(self.fd, 4, flags)
-        if result == -1:
-            print("Failed to set flags")
+    # TODO: Switch to property or return ref when trait supports attributes.
+    fn local_addr(self) -> TCPAddr:
+        return self.socket.local_address()
 
-    fn local_addr(mut self) raises -> TCPAddr:
-        return self.laddr
-
-    fn remote_addr(self) raises -> TCPAddr:
-        return self.raddr
+    fn remote_addr(self) -> TCPAddr:
+        return self.socket.remote_address()
 
 
 fn resolve_internet_addr(network: String, address: String) raises -> TCPAddr:
@@ -362,6 +306,57 @@ fn split_host_port(hostport: String) raises -> HostPort:
     return HostPort(host, port)
 
 
+fn parse_address(address: String) raises -> (String, UInt16):
+    """Parse an address string into a host and port.
+
+    Args:
+        address: The address string.
+
+    Returns:
+        A tuple containing the host and port.
+    """
+    var colon_index = address.rfind(":")
+    if colon_index == -1:
+        raise MissingPortError
+
+    var host: String = ""
+    var port: String = ""
+    var j: Int = 0
+    var k: Int = 0
+
+    if address[0] == "[":
+        var end_bracket_index = address.find("]")
+        if end_bracket_index == -1:
+            raise Error("missing ']' in address")
+
+        if end_bracket_index + 1 == len(address):
+            raise MissingPortError
+        elif end_bracket_index + 1 == colon_index:
+            host = address[1:end_bracket_index]
+            j = 1
+            k = end_bracket_index + 1
+        else:
+            if address[end_bracket_index + 1] == ":":
+                raise TooManyColonsError
+            else:
+                raise MissingPortError
+    else:
+        host = address[:colon_index]
+        if host.find(":") != -1:
+            raise TooManyColonsError
+
+    if address[j:].find("[") != -1:
+        raise Error("unexpected '[' in address")
+    if address[k:].find("]") != -1:
+        raise Error("unexpected ']' in address")
+
+    port = address[colon_index + 1 :]
+    if port == "":
+        raise MissingPortError
+    if host == "":
+        raise Error("missing host")
+    return host, UInt16(Int(port))
+
 fn binary_port_to_int(port: UInt16) -> Int:
     """Convert a binary port to an integer.
 
@@ -386,7 +381,7 @@ fn binary_ip_to_string[address_family: Int32](owned ip_address: UInt32) raises -
     Returns:
         The IP address as a string.
     """
-    constrained[int(address_family) in [AF_INET, AF_INET6], "Address family must be either AF_INET or AF_INET6."]()
+    constrained[Int(address_family) in [AF_INET, AF_INET6], "Address family must be either AF_INET or AF_INET6."]()
     var ip: String
 
     @parameter
@@ -396,47 +391,6 @@ fn binary_ip_to_string[address_family: Int32](owned ip_address: UInt32) raises -
         ip = inet_ntop[address_family, INET6_ADDRSTRLEN](ip_address)
 
     return ip
-
-
-fn get_sock_name(fd: Int32) raises -> HostPort:
-    """Return the address of the socket."""
-    var local_address_ptr = UnsafePointer[sockaddr].alloc(1)
-    var local_address_ptr_size = socklen_t(sizeof[sockaddr]())
-    var status = getsockname(
-        fd,
-        local_address_ptr,
-        UnsafePointer[socklen_t].address_of(local_address_ptr_size),
-    )
-    if status == -1:
-        raise Error("get_sock_name: Failed to get address of local socket.")
-    var addr_in = local_address_ptr.bitcast[sockaddr_in]()[]
-
-    return HostPort(
-        host=binary_ip_to_string(addr_in.sin_addr.s_addr, AF_INET, 16),
-        port=binary_port_to_int(addr_in.sin_port).__str__(),
-    )
-
-
-fn get_peer_name(fd: Int32) raises -> HostPort:
-    """Return the address of the peer connected to the socket."""
-    var remote_address_ptr = UnsafePointer[sockaddr].alloc(1)
-    var remote_address_ptr_size = socklen_t(sizeof[sockaddr]())
-
-    var status = getpeername(
-        fd,
-        remote_address_ptr,
-        UnsafePointer[socklen_t].address_of(remote_address_ptr_size),
-    )
-    if status == -1:
-        raise Error("get_peer_name: Failed to get address of remote socket.")
-
-    # Cast sockaddr struct to sockaddr_in to convert binary IP to string.
-    var addr_in = remote_address_ptr.bitcast[sockaddr_in]()[]
-
-    return HostPort(
-        host=binary_ip_to_string(addr_in.sin_addr.s_addr, AF_INET, 16),
-        port=binary_port_to_int(addr_in.sin_port).__str__(),
-    )
 
 
 @value
@@ -610,107 +564,95 @@ struct addrinfo_unix(AddrInfo):
         return addr_in.sin_addr
 
 
-@value
-struct TCPListener(Listener):
+struct TCPListener:
     """
     A TCP listener that listens for incoming connections and can accept them.
     """
 
-    var fd: c_int
-    var _addr: TCPAddr
+    var socket: Socket[TCPAddr]
+
+    fn __init__(out self, owned socket: Socket[TCPAddr]):
+        self.socket = socket^
 
     fn __init__(out self) raises:
-        self._addr = TCPAddr("localhost", 8080)
-        self.fd = socket(AF_INET, SOCK_STREAM, 0)
+        self.socket = Socket[TCPAddr]()
 
-    fn __init__(out self, addr: TCPAddr) raises:
-        self._addr = addr
-        self.fd = socket(AF_INET, SOCK_STREAM, 0)
-
-    fn __init__(out self, addr: TCPAddr, fd: c_int) raises:
-        self._addr = addr
-        self.fd = fd
-
-    fn listen(mut self) raises:
-        var address_family = AF_INET
-        var ip_buf_size = 4
-        var addr = self._addr
-
-        var sockfd = self.fd
-        if sockfd == -1:
-            print("Socket creation error")
-
-        var yes = 1
-        _ = setsockopt(
-            sockfd,
-            SOL_SOCKET,
-            SO_REUSEADDR,
-            UnsafePointer[Int].address_of(yes).bitcast[c_void](),
-            sizeof[Int](),
-        )
-
-        var ip_buf = UnsafePointer[c_void].alloc(ip_buf_size)
-        _ = inet_pton(
-            address_family, addr.ip.unsafe_cstr_ptr(), ip_buf
-        )
-        var raw_ip = ip_buf.bitcast[c_uint]()[]
-        var bin_port = htons(UInt16(addr.port))
-
-        var ai = sockaddr_in(
-            address_family, bin_port, in_addr(raw_ip), StaticTuple[c_char, 8]()
-        )
-        var ai_ptr = Pointer.address_of(ai)
-
-        # var bind = bind(sockfd, ai_ptr, sizeof[sockaddr_in]())
-        var bind = external_call["bind", c_int](
-            sockfd, ai_ptr, sizeof[sockaddr_in]()
-        )
-        if bind != 0:
-            print(
-                "Bind attempt failed: {}. The address might be in use or"
-                " the socket might not be available.".format(bind)
-            )
-            _ = shutdown(sockfd, SHUT_RDWR)
-
-        if listen(sockfd, c_int(128)) == -1:
-            print("Listen failed.\n on sockfd " + sockfd.__str__())
-
-        print(
-            "\nServer is listening on "
-            + addr.ip
-            + ":"
-            + addr.port.__str__()
-        )
-        print("Ready to accept connections...")
+    fn __moveinit__(out self, owned existing: Self):
+        self.socket = existing.socket^
 
     fn accept(self) raises -> TCPConnection:
-        var their_addr = sockaddr(0, StaticTuple[c_char, 14]())
-        var their_addr_ptr = UnsafePointer.address_of(their_addr)
-        var sin_size = socklen_t(sizeof[socklen_t]())
+        return TCPConnection(self.socket.accept())
 
-        var new_sockfd = accept(
-            self.fd, their_addr_ptr, UnsafePointer[socklen_t].address_of(sin_size)
-        )
-        if new_sockfd == -1:
-            print(
-                "Failed to accept connection, system accept() returned an"
-                " error."
-            )
-        var peer = get_peer_name(new_sockfd)
-        print("Got connection from " + peer.host + ":" + peer.port)
+    fn close(mut self) raises -> None:
+        return self.socket.close()
 
-        return TCPConnection(
-            new_sockfd, self._addr, TCPAddr(peer.host, atol(peer.port)),
-        )
+    fn shutdown(mut self) raises -> None:
+        return self.socket.shutdown()
 
-    fn close(self) raises:
-        _ = shutdown(self.fd, SHUT_RDWR)
-        var close_status = close(self.fd)
-        if close_status == -1:
-            print("Failed to close new_sockfd")
+    fn teardown(mut self) raises:
+        self.socket.teardown()
 
     fn addr(self) -> TCPAddr:
-        return self._addr
+        return self.socket.local_address()
+
+
+struct ListenConfig:
+    var _keep_alive: Duration
+
+    fn __init__(out self, keep_alive: Duration = default_tcp_keep_alive):
+        self._keep_alive = keep_alive
+
+    fn listen[address_family: Int = AF_INET](mut self, host: String, port: Int) raises -> TCPListener:
+        constrained[address_family in [AF_INET, AF_INET6], "Address family must be either AF_INET or AF_INET6."]()
+        var addr = TCPAddr(host, port)
+        var socket: Socket[TCPAddr]
+        try:
+            socket = Socket[TCPAddr]()
+        except e:
+            logger.error(e)
+            raise Error("ListenConfig.listen: Failed to create listener due to socket creation failure.")
+
+        try:
+
+            @parameter
+            # TODO: do we want to reuse port on linux? currently doesn't work
+            if os_is_macos():
+                socket.set_socket_option(SO_REUSEADDR, 1)
+        except e:
+            logger.warn("ListenConfig.listen: Failed to set socket as reusable", e)
+
+        var bind_success = False
+        var bind_fail_logged = False
+        while not bind_success:
+            try:
+                socket.bind(addr.ip, addr.port)
+                bind_success = True
+            except e:
+                if not bind_fail_logged:
+                    print("Bind attempt failed: ", e)
+                    print("Retrying. Might take 10-15 seconds.")
+                    bind_fail_logged = True
+                print(".", end="", flush=True)
+
+                try:
+                    socket.shutdown()
+                except e:
+                    logger.error("ListenConfig.listen: Failed to shutdown socket:", e)
+                    # TODO: Should shutdown failure be a hard failure? We can still ungracefully close the socket.
+                sleep(UInt(1))
+
+        try:
+            socket.listen(128)
+        except e:
+            logger.error(e)
+            raise Error("ListenConfig.listen: Listen failed on sockfd: " + String(socket.fd))
+
+        var listener = TCPListener(socket^)
+        var msg = String.write("\n🔥🐝 Lightbug is listening on ", "http://", addr.ip, ":", String(addr.port))
+        print(msg)
+        print("Ready to accept connections...")
+
+        return listener^
 
 
 fn get_address_info(host: String) raises -> Variant[addrinfo_macos, addrinfo_unix]:
@@ -728,57 +670,57 @@ fn get_address_info(host: String) raises -> Variant[addrinfo_macos, addrinfo_uni
     return addrinfo_unix().get_from_host(host)
 
 
-fn create_connection(
-    host: String, port: UInt16
-) raises -> TCPConnection:
-    """
-    Connect to a server using a socket.
+# fn create_connection(
+#     host: String, port: UInt16
+# ) raises -> TCPConnection:
+#     """
+#     Connect to a server using a socket.
+#
+#     Args:
+#         host: String - The host to connect to.
+#         port: UInt16 - The port to connect to.
+#
+#     Returns:
+#         Int32 - The socket file descriptor.
+#     """
+#     var ip: in_addr
+#     print("Connecting to " + host + " on port " + port.__str__())
+#     if os_is_macos():
+#         ip = addrinfo_macos().get_ip_address(host)
+#     else:
+#         ip = addrinfo_unix().get_ip_address(host)
+#
+#     # Convert ip address to network byte order.
+#     var addr: sockaddr_in = sockaddr_in(
+#         AF_INET, htons(port), ip, StaticTuple[c_char, 8](0, 0, 0, 0, 0, 0, 0, 0)
+#     )
+#     var addr_ptr = Pointer[sockaddr_in].address_of(addr)
+#     var sock = socket(AF_INET, SOCK_STREAM, 0)
+#
+#     if (
+#         external_call["connect", c_int](sock, addr_ptr, sizeof[sockaddr_in]())
+#         == -1
+#     ):
+#         _ = shutdown(sock, SHUT_RDWR)
+#         raise Error("Failed to connect to server")
+#
+#     var laddr = TCPAddr()
+#     var raddr = TCPAddr(host, Int(port))
+#     var conn = TCPConnection(sock, laddr, raddr)
+#
+#     return conn
 
-    Args:
-        host: String - The host to connect to.
-        port: UInt16 - The port to connect to.
 
-    Returns:
-        Int32 - The socket file descriptor.
-    """
-    var ip: in_addr
-    print("Connecting to " + host + " on port " + port.__str__())
-    if os_is_macos():
-        ip = addrinfo_macos().get_ip_address(host)
-    else:
-        ip = addrinfo_unix().get_ip_address(host)
-
-    # Convert ip address to network byte order.
-    var addr: sockaddr_in = sockaddr_in(
-        AF_INET, htons(port), ip, StaticTuple[c_char, 8](0, 0, 0, 0, 0, 0, 0, 0)
-    )
-    var addr_ptr = Pointer[sockaddr_in].address_of(addr)
-    var sock = socket(AF_INET, SOCK_STREAM, 0)
-
-    if (
-        external_call["connect", c_int](sock, addr_ptr, sizeof[sockaddr_in]())
-        == -1
-    ):
-        _ = shutdown(sock, SHUT_RDWR)
-        raise Error("Failed to connect to server")
-
-    var laddr = TCPAddr()
-    var raddr = TCPAddr(host, Int(port))
-    var conn = TCPConnection(sock, laddr, raddr)
-
-    return conn
-
-
-fn create_listener(host: String, port: UInt16) raises -> TCPListener:
-    """
-    Create a listener that listens for incoming connections.
-
-    Args:
-        host: String - The host to listen on.
-        port: UInt16 - The port to listen on.
-
-    Returns:
-        TCPListener - The listener.
-    """
-    var addr = TCPAddr(host, Int(port))
-    return TCPListener(addr)
+# fn create_listener(host: String, port: UInt16) raises -> TCPListener:
+#     """
+#     Create a listener that listens for incoming connections.
+#
+#     Args:
+#         host: String - The host to listen on.
+#         port: UInt16 - The port to listen on.
+#
+#     Returns:
+#         TCPListener - The listener.
+#     """
+#     var addr = TCPAddr(host, Int(port))
+#     return TCPListener(addr)

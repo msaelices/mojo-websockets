@@ -3,8 +3,6 @@ from utils import StringSlice, Variant
 
 from websockets.aliases import Bytes
 from websockets.utils.string import (
-    bytes,
-    bytes_equal,
     HTTP,
     HTTP10,
     HTTP11,

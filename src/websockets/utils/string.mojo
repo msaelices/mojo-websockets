@@ -1,6 +1,7 @@
 from memory import memcpy, Span
 
-from ..aliases import Bytes, DEFAULT_BUFFER_SIZE
+from websockets.aliases import Bytes, DEFAULT_BUFFER_SIZE
+from websockets.utils.bytes import byte
 
 
 alias SLASH = "/"
@@ -265,16 +266,6 @@ fn to_string(owned bytes: List[UInt8, True]) -> String:
     if bytes[-1] != 0:
         bytes.append(0)
     return String(bytes^)
-
-
-@always_inline
-fn byte(s: String) -> Byte:
-    return ord(s)
-
-
-@always_inline
-fn bytes(s: String) -> Bytes:
-    return Bytes(s.as_bytes())
 
 
 @always_inline

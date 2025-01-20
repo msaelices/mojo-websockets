@@ -348,7 +348,9 @@ struct ServerProtocol(Protocol):
         Fail the WebSocket connection.
 
         Args:
-            exc: The exception to raise.
+            status_code: The status code to send.
+            status_text: The status text to send.
+            body: The body of the response.
 
         Returns:
             The HTTP response to send to the client.

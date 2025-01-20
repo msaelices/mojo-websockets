@@ -3,15 +3,14 @@ from collections import Dict, Optional
 from memory import Span
 from utils import StringSlice
 
-from websockets.aliases import Bytes
+from websockets.aliases import Bytes, Duration, DEFAULT_BUFFER_SIZE
 from websockets.libc import AF_INET6
-
-from websockets.aliases import Duration
+from websockets.logger import logger
+from websockets.utils.bytes import byte, bytes
 from websockets.utils.string import (
     ByteReader,
     ByteWriter,
     BytesConstant,
-    bytes,
     is_newline,
     is_space,
     lineBreak,
@@ -24,7 +23,7 @@ from websockets.utils.string import (
 )
 from websockets.utils.time import now
 from websockets.utils.uri import URI
-from websockets.net import TCPAddr, get_address_info, addrinfo_macos, addrinfo_unix
+from websockets.net import TCPAddr, TCPConnection, get_address_info, addrinfo_macos, addrinfo_unix
 
 
 struct HeaderKey:
@@ -32,10 +31,23 @@ struct HeaderKey:
     alias CONTENT_TYPE = "content-type"
     alias CONTENT_LENGTH = "content-length"
     alias CONTENT_ENCODING = "content-encoding"
+    alias TRANSFER_ENCODING = "transfer-encoding"
     alias DATE = "date"
-    alias SET_COOKIE = "set-cookie"
+    alias LOCATION = "location"
     alias HOST = "host"
+    alias SERVER = "server"
+    alias SET_COOKIE = "set-cookie"
     alias COOKIE = "cookie"
+
+
+struct StatusCode:
+    alias OK = 200
+    alias MOVED_PERMANENTLY = 301
+    alias FOUND = 302
+    alias TEMPORARY_REDIRECT = 307
+    alias PERMANENT_REDIRECT = 308
+    alias NOT_FOUND = 404
+    alias INTERNAL_ERROR = 500
 
 
 @value
@@ -167,7 +179,7 @@ struct Headers(Writable, Stringable):
         except:
             return 0
 
-    fn parse_raw(mut self, mut r: ByteReader) raises -> (String, String, String, List[String]):
+    fn parse_raw(mut self, mut r: ByteReader) raises -> (String, String, String):
         var first_byte = r.peek()
         if not first_byte:
             raise Error("Headers.parse_raw: Failed to read first byte from response header")
@@ -177,7 +189,6 @@ struct Headers(Writable, Stringable):
         var second = r.read_word()
         r.increment()
         var third = r.read_line()
-        var cookies = List[String]()
 
         while not is_newline(r.peek()):
             var key = r.read_until(BytesConstant.colon)
@@ -188,11 +199,10 @@ struct Headers(Writable, Stringable):
             var value = r.read_line()
             var k = to_string(key).lower()
             if k == HeaderKey.SET_COOKIE:
-                cookies.append(to_string(value))
                 continue
 
             self._inner[k] = to_string(value)
-        return (to_string(first), to_string(second), to_string(third), cookies)
+        return (to_string(first), to_string(second), to_string(third))
 
     fn write_to[T: Writer, //](self, mut writer: T):
         for header in self._inner.items():
@@ -333,28 +343,52 @@ struct HTTPRequest(Writable, Stringable):
 struct HTTPResponse(Writable, Stringable):
     var headers: Headers
     var body_raw: Bytes
-    var skip_reading_writing_body: Bool
-    var raddr: TCPAddr
-    var laddr: TCPAddr
-    var __is_upgrade: Bool
 
     var status_code: Int
     var status_text: String
     var protocol: String
 
     @staticmethod
-    fn from_bytes(owned b: Bytes) raises -> HTTPResponse:
-        var reader = ByteReader(b^)
-
+    fn from_bytes(b: Span[Byte]) raises -> HTTPResponse:
+        var reader = ByteReader(b)
         var headers = Headers()
         var protocol: String
         var status_code: String
         var status_text: String
 
         try:
-            protocol, status_code, status_text = headers.parse_raw(reader)
+            var properties = headers.parse_raw(reader)
+            protocol, status_code, status_text = properties[0], properties[1], properties[2]
+            reader.skip_carriage_return()
         except e:
-            raise Error("Failed to parse response headers: " + e.__str__())
+            raise Error("Failed to parse response headers: " + String(e))
+
+        try:
+            return HTTPResponse(
+                reader=reader,
+                headers=headers,
+                protocol=protocol,
+                status_code=Int(status_code),
+                status_text=status_text,
+            )
+        except e:
+            logger.error(e)
+            raise Error("Failed to read request body")
+
+    @staticmethod
+    fn from_bytes(b: Span[Byte], conn: TCPConnection) raises -> HTTPResponse:
+        var reader = ByteReader(b)
+        var headers = Headers()
+        var protocol: String
+        var status_code: String
+        var status_text: String
+
+        try:
+            var properties = headers.parse_raw(reader)
+            protocol, status_code, status_text = properties[0], properties[1], properties[2]
+            reader.skip_carriage_return()
+        except e:
+            raise Error("Failed to parse response headers: " + String(e))
 
         var response = HTTPResponse(
             status_code=Int(status_code),
@@ -364,73 +398,146 @@ struct HTTPResponse(Writable, Stringable):
             protocol=protocol,
         )
 
+        var transfer_encoding = response.headers.get(HeaderKey.TRANSFER_ENCODING)
+        if transfer_encoding and transfer_encoding.value() == "chunked":
+            var b = Bytes(reader.read_bytes())
+            var buff = Bytes(capacity=DEFAULT_BUFFER_SIZE)
+            try:
+                while conn.read(buff) > 0:
+                    b += buff
+
+                    if (
+                        buff[-5] == byte("0")
+                        and buff[-4] == byte("\r")
+                        and buff[-3] == byte("\n")
+                        and buff[-2] == byte("\r")
+                        and buff[-1] == byte("\n")
+                    ):
+                        break
+
+                    buff.resize(0)
+                response.read_chunks(b)
+                return response
+            except e:
+                logger.error(e)
+                raise Error("Failed to read chunked response.")
+
         try:
             response.read_body(reader)
             return response
         except e:
-            raise Error("Failed to read request body: " + e.__str__())
+            logger.error(e)
+            raise Error("Failed to read request body: ")
 
     fn __init__(
-        out self,
+        mut self,
         status_code: Int,
         status_text: String,
         headers: Headers,
-        body_bytes: Bytes,
+        body_bytes: Span[Byte],
         protocol: String = HTTP11,
     ):
         self.headers = headers
+        if HeaderKey.CONTENT_TYPE not in self.headers:
+            self.headers[HeaderKey.CONTENT_TYPE] = "application/octet-stream"
         self.status_code = status_code
         self.status_text = status_text
         self.protocol = protocol
-        self.body_raw = body_bytes
-        self.skip_reading_writing_body = False
-        self.__is_upgrade = False
-        self.raddr = TCPAddr()
-        self.laddr = TCPAddr()
+        self.body_raw = Bytes(body_bytes)
+        if HeaderKey.CONNECTION not in self.headers:
+            self.set_connection_keep_alive()
+        if HeaderKey.CONTENT_LENGTH not in self.headers:
+            self.set_content_length(len(body_bytes))
+        if HeaderKey.DATE not in self.headers:
+            try:
+                var current_time = String(now(utc=True))
+                self.headers[HeaderKey.DATE] = current_time
+            except:
+                logger.debug("DATE header not set, unable to get current time and it was instead omitted.")
 
-    fn get_body_bytes(self) -> Bytes:
-        return self.body_raw
+    fn __init__(
+        mut self,
+        mut reader: ByteReader,
+        headers: Headers = Headers(),
+        status_code: Int = 200,
+        status_text: String = "OK",
+        protocol: String = HTTP11,
+    ) raises:
+        self.headers = headers
+        if HeaderKey.CONTENT_TYPE not in self.headers:
+            self.headers[HeaderKey.CONTENT_TYPE] = "application/octet-stream"
+        self.status_code = status_code
+        self.status_text = status_text
+        self.protocol = protocol
+        self.body_raw = Bytes(reader.read_bytes())
+        self.set_content_length(len(self.body_raw))
+        if HeaderKey.CONNECTION not in self.headers:
+            self.set_connection_keep_alive()
+        if HeaderKey.CONTENT_LENGTH not in self.headers:
+            self.set_content_length(len(self.body_raw))
+        if HeaderKey.DATE not in self.headers:
+            try:
+                var current_time = String(now(utc=True))
+                self.headers[HeaderKey.DATE] = current_time
+            except:
+                pass
 
     fn get_body(self) -> StringSlice[__origin_of(self.body_raw)]:
-        return StringSlice(unsafe_from_utf8=self.body_raw)
+        return StringSlice(unsafe_from_utf8=Span(self.body_raw))
 
     @always_inline
     fn set_connection_close(mut self):
         self.headers[HeaderKey.CONNECTION] = "close"
 
+    fn connection_close(self) -> Bool:
+        var result = self.headers.get(HeaderKey.CONNECTION)
+        if not result:
+            return False
+        return result.value() == "close"
+
     @always_inline
     fn set_connection_keep_alive(mut self):
         self.headers[HeaderKey.CONNECTION] = "keep-alive"
-
-    fn connection_close(self) -> Bool:
-        return self.headers[HeaderKey.CONNECTION] == "close"
 
     @always_inline
     fn set_content_length(mut self, l: Int):
         self.headers[HeaderKey.CONTENT_LENGTH] = String(l)
 
     @always_inline
-    fn read_body(mut self, mut r: ByteReader) raises -> None:
-        r.consume(self.body_raw)
+    fn content_length(self) -> Int:
+        try:
+            return Int(self.headers[HeaderKey.CONTENT_LENGTH])
+        except:
+            return 0
 
-    fn write_to[W: Writer](self, mut writer: W):
-        writer.write(
-            self.protocol,
-            whitespace,
-            self.status_code,
-            whitespace,
-            self.status_text,
-            lineBreak,
+    @always_inline
+    fn is_redirect(self) -> Bool:
+        return (
+            self.status_code == StatusCode.MOVED_PERMANENTLY
+            or self.status_code == StatusCode.FOUND
+            or self.status_code == StatusCode.TEMPORARY_REDIRECT
+            or self.status_code == StatusCode.PERMANENT_REDIRECT
         )
 
-        if HeaderKey.DATE not in self.headers:
-            var current_time = get_date_timestamp()
-            write_header(writer, HeaderKey.DATE, current_time)
+    @always_inline
+    fn read_body(mut self, mut r: ByteReader) raises -> None:
+        self.body_raw = Bytes(r.read_bytes(self.content_length()))
+        self.set_content_length(len(self.body_raw))
 
-        self.headers.write_to(writer)
+    fn read_chunks(mut self, chunks: Span[Byte]) raises:
+        var reader = ByteReader(chunks)
+        while True:
+            var size = atol(StringSlice(unsafe_from_utf8=reader.read_line()), 16)
+            if size == 0:
+                break
+            var data = reader.read_bytes(size)
+            reader.skip_carriage_return()
+            self.set_content_length(self.content_length() + len(data))
+            self.body_raw += Bytes(data)
 
-        writer.write(lineBreak)
-        writer.write(to_string(self.body_raw))
+    fn write_to[T: Writer](self, mut writer: T):
+        writer.write(self.protocol, whitespace, self.status_code, whitespace, self.status_text, lineBreak)
+        writer.write(self.headers, lineBreak, to_string(self.body_raw))
 
     fn encode(owned self) -> Bytes:
         """Encodes response as bytes.
@@ -446,17 +553,150 @@ struct HTTPResponse(Writable, Stringable):
             whitespace,
             self.status_text,
             lineBreak,
+            "server: lightbug_http",
+            lineBreak,
         )
+        if HeaderKey.DATE not in self.headers:
+            try:
+                write_header(writer, HeaderKey.DATE, String(now(utc=True)))
+            except:
+                pass
         writer.write(self.headers, lineBreak)
-
-        # TODO: Changed line from taken code from lightbug_http
-        # as it was causing a segfault. The original code was:
-        # writer.consuming_write(self^.body_raw)
-        writer.write_bytes(self.body_raw)
+        writer.consuming_write(self^.body_raw)
         return writer.consume()
 
     fn __str__(self) -> String:
-        output = String()
-        self.write_to(output)
-        return output
+        return String.write(self)
 
+
+# @value
+# struct HTTPResponse(Writable, Stringable):
+#     var headers: Headers
+#     var body_raw: Bytes
+#     var skip_reading_writing_body: Bool
+#     var raddr: TCPAddr
+#     var laddr: TCPAddr
+#     var __is_upgrade: Bool
+#
+#     var status_code: Int
+#     var status_text: String
+#     var protocol: String
+#
+#     @staticmethod
+#     fn from_bytes(owned b: Span[Byte]) raises -> HTTPResponse:
+#         var reader = ByteReader(b)
+#
+#         var headers = Headers()
+#         var protocol: String
+#         var status_code: String
+#         var status_text: String
+#
+#         try:
+#             protocol, status_code, status_text = headers.parse_raw(reader)
+#         except e:
+#             raise Error("Failed to parse response headers: " + e.__str__())
+#
+#         var response = HTTPResponse(
+#             status_code=Int(status_code),
+#             status_text=status_text,
+#             headers=headers,
+#             body_bytes=Bytes(),
+#             protocol=protocol,
+#         )
+#
+#         try:
+#             response.read_body(reader)
+#             return response
+#         except e:
+#             raise Error("Failed to read request body: " + e.__str__())
+#
+#     fn __init__(
+#         out self,
+#         status_code: Int,
+#         status_text: String,
+#         headers: Headers,
+#         body_bytes: Bytes,
+#         protocol: String = HTTP11,
+#     ):
+#         self.headers = headers
+#         self.status_code = status_code
+#         self.status_text = status_text
+#         self.protocol = protocol
+#         self.body_raw = body_bytes
+#         self.skip_reading_writing_body = False
+#         self.__is_upgrade = False
+#         self.raddr = TCPAddr()
+#         self.laddr = TCPAddr()
+#
+#     fn get_body_bytes(self) -> Bytes:
+#         return self.body_raw
+#
+#     fn get_body(self) -> StringSlice[__origin_of(self.body_raw)]:
+#         return StringSlice(unsafe_from_utf8=self.body_raw)
+#
+#     @always_inline
+#     fn set_connection_close(mut self):
+#         self.headers[HeaderKey.CONNECTION] = "close"
+#
+#     @always_inline
+#     fn set_connection_keep_alive(mut self):
+#         self.headers[HeaderKey.CONNECTION] = "keep-alive"
+#
+#     fn connection_close(self) -> Bool:
+#         return self.headers[HeaderKey.CONNECTION] == "close"
+#
+#     @always_inline
+#     fn set_content_length(mut self, l: Int):
+#         self.headers[HeaderKey.CONTENT_LENGTH] = String(l)
+#
+#     @always_inline
+#     fn read_body(mut self, mut r: ByteReader) raises -> None:
+#         r.consume(self.body_raw)
+#
+#     fn write_to[W: Writer](self, mut writer: W):
+#         writer.write(
+#             self.protocol,
+#             whitespace,
+#             self.status_code,
+#             whitespace,
+#             self.status_text,
+#             lineBreak,
+#         )
+#
+#         if HeaderKey.DATE not in self.headers:
+#             var current_time = get_date_timestamp()
+#             write_header(writer, HeaderKey.DATE, current_time)
+#
+#         self.headers.write_to(writer)
+#
+#         writer.write(lineBreak)
+#         writer.write(to_string(self.body_raw))
+#
+#     fn encode(owned self) -> Bytes:
+#         """Encodes response as bytes.
+#
+#         This method consumes the data in this request and it should
+#         no longer be considered valid.
+#         """
+#         var writer = ByteWriter()
+#         writer.write(
+#             self.protocol,
+#             whitespace,
+#             String(self.status_code),
+#             whitespace,
+#             self.status_text,
+#             lineBreak,
+#         )
+#         writer.write(self.headers, lineBreak)
+#
+#         # TODO: Changed line from taken code from lightbug_http
+#         # as it was causing a segfault. The original code was:
+#         # writer.consuming_write(self^.body_raw)
+#         writer.write_bytes(self.body_raw)
+#         return writer.consume()
+#
+#     fn __str__(self) -> String:
+#         output = String()
+#         self.write_to(output)
+#         return output
+#

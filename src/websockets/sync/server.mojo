@@ -7,15 +7,16 @@ from memory import UnsafePointer
 from python import Python, PythonObject
 from time import sleep
 
-from libc import FD, c_int, fd_set, timeval, select
+from websockets.libc import c_int
 
-from ..aliases import Bytes, DEFAULT_BUFFER_SIZE, DEFAULT_MAX_REQUEST_BODY_SIZE, MAGIC_CONSTANT
-from ..http import Header, Headers, HTTPRequest, HTTPResponse, encode
-from ..net import create_listener, TCPConnection, TCPListener
-from ..protocol import SERVER
-from ..protocol.server import ServerProtocol
-from ..protocol.client import ClientProtocol
-from ..utils.bytes import str_to_bytes
+from websockets.aliases import Bytes, DEFAULT_BUFFER_SIZE, DEFAULT_MAX_REQUEST_BODY_SIZE, MAGIC_CONSTANT
+from websockets.http import Header, Headers, HTTPRequest, HTTPResponse, encode
+from websockets.logger import logger
+from websockets.net import ListenConfig, TCPConnection, TCPListener
+from websockets.protocol import SERVER
+from websockets.protocol.server import ServerProtocol
+from websockets.protocol.client import ClientProtocol
+from websockets.utils.bytes import str_to_bytes
 
 alias BYTE_0_TEXT: UInt8 = 1
 alias BYTE_0_NO_FRAGMENT: UInt8 = 128
@@ -29,102 +30,102 @@ alias BYTE_1_SIZE_EIGHT_BYTES: UInt8 = 127
 alias ConnHandler = fn (conn: TCPConnection, data: Bytes) raises -> None
 
 
-fn serve_old[
-    host: StringLiteral = "127.0.0.1", port: Int = 8000
-]() -> Optional[TCPConnection]:
-    """
-    1. Open server
-    2. Upgrade first HTTP client to websocket
-    3. Close server
-    4. return the websocket.
-    """
-    # TODO: Use the code from the net module instead of `Python.import_module("socket")`
-
-    try:
-        var py_sha1 = Python.import_module("hashlib").sha1
-
-        var listener = create_listener(host, port)
-        print('Listening on ', host, ':', port)
-        listener.listen()
-
-        var conn = listener.accept()
-        print('Accepted connection from ', String(conn.raddr))
-        print("ws://" + String(host) + ":" + String(port))
-
-        if conn.raddr.ip != "127.0.0.1":
-            print("Exit, request from: " + String(conn.raddr.ip))
-            conn.close()
-            listener.close()
-            return None
-
-        # Close server
-        listener.close()
-
-        # Get request
-        var buf = Bytes(capacity=1024)
-        var bytes_read = conn.read(buf)
-        var request = String(buf[:bytes_read])
-        # TODO: why find("\r\n\r\n") does not work?
-        # var end_header = request.find("\r\n\r\n")
-        var end_header = request.find("\r\n\r")
-        if end_header == -1:
-            raise "end_header == -1, no \\r\\n\\r\\n"
-        var request_split = String(request)[:end_header].split("\r\n")
-        if len(request_split) == 0:
-            raise "error: len(request_split) == 0"
-        if request_split[0] != "GET / HTTP/1.1":
-            raise "request_split[0] not GET / HTTP/1.1"
-        _ = request_split.pop(0)
-
-        if len(request_split) == 0:
-            raise "error: no headers"
-
-        var request_header = Dict[String, String]()
-        for e in request_split:
-            var header_pos = e[].find(":")
-            if header_pos == -1:
-                raise "header_pos == -1"
-            if len(e[]) == header_pos + 2:
-                raise "len(e[]) == header_pos+2"
-            var k = e[][:header_pos]
-            var v = e[][header_pos + 2 :]
-            request_header[k^] = v^
-
-        print('Request headers:')
-
-        for h in request_header:
-            print(h[], request_header[h[]])
-
-        # Upgrade to websocket
-        if "Upgrade" not in request_header:
-            raise "Not upgrade to websocket"
-
-        if request_header["Upgrade"] != "websocket":
-            raise "Not an upgrade to websocket"
-
-        if "Sec-WebSocket-Key" not in request_header:
-            raise "No Sec-WebSocket-Key for upgrading to websocket"
-
-        var accept = request_header["Sec-WebSocket-Key"]
-        accept += MAGIC_CONSTANT
-        accept = b64encode(String(py_sha1(PythonObject(accept).encode()).digest()))
-
-        var response = String("HTTP/1.1 101 Switching Protocols\r\n")
-        response += "Upgrade: websocket\r\n"
-        response += "Connection: Upgrade\r\n"
-        response += "Sec-WebSocket-Accept: "
-        response += accept
-        response += String("\r\n\r\n")
-
-        print(response)
-
-        _ = conn.write(response)
-        return conn^
-
-    except e:
-        print(e)
-
-    return None
+# fn serve_old[
+#     host: StringLiteral = "127.0.0.1", port: Int = 8000
+# ]() -> Optional[TCPConnection]:
+#     """
+#     1. Open server
+#     2. Upgrade first HTTP client to websocket
+#     3. Close server
+#     4. return the websocket.
+#     """
+#     # TODO: Use the code from the net module instead of `Python.import_module("socket")`
+#
+#     try:
+#         var py_sha1 = Python.import_module("hashlib").sha1
+#
+#         var listener = create_listener(host, port)
+#         print('Listening on ', host, ':', port)
+#         listener.listen()
+#
+#         var conn = listener.accept()
+#         print('Accepted connection from ', String(conn.raddr))
+#         print("ws://" + String(host) + ":" + String(port))
+#
+#         if conn.raddr.ip != "127.0.0.1":
+#             print("Exit, request from: " + String(conn.raddr.ip))
+#             conn.close()
+#             listener.close()
+#             return None
+#
+#         # Close server
+#         listener.close()
+#
+#         # Get request
+#         var buf = Bytes(capacity=1024)
+#         var bytes_read = conn.read(buf)
+#         var request = String(buf[:bytes_read])
+#         # TODO: why find("\r\n\r\n") does not work?
+#         # var end_header = request.find("\r\n\r\n")
+#         var end_header = request.find("\r\n\r")
+#         if end_header == -1:
+#             raise "end_header == -1, no \\r\\n\\r\\n"
+#         var request_split = String(request)[:end_header].split("\r\n")
+#         if len(request_split) == 0:
+#             raise "error: len(request_split) == 0"
+#         if request_split[0] != "GET / HTTP/1.1":
+#             raise "request_split[0] not GET / HTTP/1.1"
+#         _ = request_split.pop(0)
+#
+#         if len(request_split) == 0:
+#             raise "error: no headers"
+#
+#         var request_header = Dict[String, String]()
+#         for e in request_split:
+#             var header_pos = e[].find(":")
+#             if header_pos == -1:
+#                 raise "header_pos == -1"
+#             if len(e[]) == header_pos + 2:
+#                 raise "len(e[]) == header_pos+2"
+#             var k = e[][:header_pos]
+#             var v = e[][header_pos + 2 :]
+#             request_header[k^] = v^
+#
+#         print('Request headers:')
+#
+#         for h in request_header:
+#             print(h[], request_header[h[]])
+#
+#         # Upgrade to websocket
+#         if "Upgrade" not in request_header:
+#             raise "Not upgrade to websocket"
+#
+#         if request_header["Upgrade"] != "websocket":
+#             raise "Not an upgrade to websocket"
+#
+#         if "Sec-WebSocket-Key" not in request_header:
+#             raise "No Sec-WebSocket-Key for upgrading to websocket"
+#
+#         var accept = request_header["Sec-WebSocket-Key"]
+#         accept += MAGIC_CONSTANT
+#         accept = b64encode(String(py_sha1(PythonObject(accept).encode()).digest()))
+#
+#         var response = String("HTTP/1.1 101 Switching Protocols\r\n")
+#         response += "Upgrade: websocket\r\n"
+#         response += "Connection: Upgrade\r\n"
+#         response += "Sec-WebSocket-Accept: "
+#         response += accept
+#         response += String("\r\n\r\n")
+#
+#         print(response)
+#
+#         _ = conn.write(response)
+#         return conn^
+#
+#     except e:
+#         print(e)
+#
+#     return None
 
 
 # fn read_byte(mut ws: PythonObject) raises -> UInt8:
@@ -348,7 +349,6 @@ fn send_message(mut conn: TCPConnection, message: String) -> Bool:
 
 
 
-@value
 struct Server:
     """
     A Mojo-based web server that accept incoming requests and delivers HTTP services.
@@ -363,9 +363,9 @@ struct Server:
 
     var ln: TCPListener
 
-    var connections: List[TCPConnection]
-    var read_fds: fd_set
-    var write_fds: fd_set
+    # var connections: List[TCPConnection]
+    # var read_fds: fd_set
+    # var write_fds: fd_set
     var protocol: ServerProtocol
 
     fn __init__(out self, host: String, port: Int, handler: ConnHandler, max_request_body_size: Int = 1024, tcp_keep_alive: Bool = False) raises:
@@ -388,135 +388,235 @@ struct Server:
         self.max_request_body_size = max_request_body_size
         self.tcp_keep_alive = tcp_keep_alive
         self.ln = TCPListener()
-        self.connections = List[TCPConnection]()
-        self.read_fds = fd_set()
-        self.write_fds = fd_set()
+        # self.connections = List[TCPConnection]()
+        # self.read_fds = fd_set()
+        # self.write_fds = fd_set()
         self.protocol = ServerProtocol()
 
-    fn serve_forever(mut self) raises -> None: # TODO: conditional conformance on main struct , then a default for handler e.g. WebsocketHandshake
-        """
-        Listen for incoming connections and serve HTTP requests.
-        """
-        print("Serving on ", self.host, ":", self.port)
-        var listener = create_listener(self.host, self.port)
-        listener.listen()
-        print("Listening on ", self.host, ":", self.port)
-        self.serve(listener, self.handler)
+    # fn serve_forever(mut self) raises -> None: # TODO: conditional conformance on main struct , then a default for handler e.g. WebsocketHandshake
+    #     """
+    #     Listen for incoming connections and serve HTTP requests.
+    #     """
+    #     print("Serving on ", self.host, ":", self.port)
+    #     var listener = create_listener(self.host, self.port)
+    #     listener.listen()
+    #     print("Listening on ", self.host, ":", self.port)
+    #     handler = self.handler
+    #     self.serve(listener, handler)
 
-    fn serve(mut self, ln: TCPListener, handler: ConnHandler) raises -> None:
+    # fn serve(mut self, ln: TCPListener, handler: ConnHandler) raises -> None:
+    #     """
+    #     Serve HTTP requests.
+    #
+    #     Args:
+    #         ln : TCPListener - TCP server that listens for incoming connections.
+    #         handler : HTTPService - An object that handles incoming HTTP requests.
+    #
+    #     Raises:
+    #     If there is an error while serving requests.
+    #     """
+    #     self.ln = ln
+    #     self.connections = List[TCPConnection]()
+    #
+    #     while True:
+    #         _ = self.read_fds.clear_all()
+    #         _ = self.write_fds.clear_all()
+    #
+    #         self.read_fds.set(Int(self.ln.fd))
+    #
+    #         var max_fd = self.ln.fd
+    #         for i in range(len(self.connections)):
+    #             var conn = self.connections[i]
+    #             self.read_fds.set(Int(conn.fd))
+    #             self.write_fds.set(Int(conn.fd))
+    #
+    #             if conn.fd > max_fd:
+    #                 max_fd = conn.fd
+    #
+    #         var timeout = timeval(0, 10000)
+    #
+    #         var select_result = select(
+    #             max_fd + 1,
+    #             UnsafePointer.address_of(self.read_fds),
+    #             UnsafePointer.address_of(self.write_fds),
+    #             UnsafePointer[fd_set](),
+    #             UnsafePointer.address_of(timeout)
+    #         )
+    #         if select_result == -1:
+    #             print("Select error")
+    #             return
+    #
+    #         if self.read_fds.is_set(Int(self.ln.fd)):
+    #             var conn = self.ln.accept()
+    #             print('Accepted connection from ', String(conn.raddr))
+    #             try:
+    #                 _ = conn.set_non_blocking(True)
+    #             except e:
+    #                 print("Error setting connnection to non-blocking mode: ", e)
+    #                 conn.close()
+    #                 continue
+    #             self.connections.append(conn)
+    #             if conn.fd > max_fd:
+    #                 max_fd = conn.fd
+    #                 self.read_fds.set(Int(conn.fd))
+    #
+    #         var i = 0
+    #         while i < len(self.connections):
+    #             print("Handling connection ", i, " of ", len(self.connections))
+    #             var conn = self.connections[i]
+    #             if self.read_fds.is_set(Int(conn.fd)):
+    #                 _ = self.handle_read(conn, handler)
+    #             if self.write_fds.is_set(Int(conn.fd)):
+    #                 _ = self.handle_write(conn)
+    #
+    #             if conn.is_closed():
+    #                 print("Connection will be removed")
+    #                 _ = self.connections.pop(i)
+    #             else:
+    #                 i += 1
+
+    fn serve_forever(mut self) raises:
+        """Listen for incoming connections and serve HTTP requests.
         """
-        Serve HTTP requests.
+        var net = ListenConfig()
+        var listener = net.listen(self.host, self.port)
+        self.serve(listener^)
+
+    fn serve(mut self, owned ln: TCPListener) raises:
+        """Serve HTTP requests.
 
         Args:
-            ln : TCPListener - TCP server that listens for incoming connections.
-            handler : HTTPService - An object that handles incoming HTTP requests.
+            ln: TCP server that listens for incoming connections.
 
         Raises:
-        If there is an error while serving requests.
+            If there is an error while serving requests.
         """
-        self.ln = ln
-        self.connections = List[TCPConnection]()
-
         while True:
-            _ = self.read_fds.clear_all()
-            _ = self.write_fds.clear_all()
+            var conn = ln.accept()
+            self.serve_connection(conn)
 
-            self.read_fds.set(Int(self.ln.fd))
+    fn serve_connection(mut self, mut conn: TCPConnection) raises -> None:
+        """Serve a single connection.
 
-            var max_fd = self.ln.fd
-            for i in range(len(self.connections)):
-                var conn = self.connections[i]
-                self.read_fds.set(Int(conn.fd))
-                self.write_fds.set(Int(conn.fd))
+        Args:
+            conn: A connection object that represents a client connection.
 
-                if conn.fd > max_fd:
-                    max_fd = conn.fd
-
-            var timeout = timeval(0, 10000)
-
-            var select_result = select(
-                max_fd + 1,
-                UnsafePointer.address_of(self.read_fds),
-                UnsafePointer.address_of(self.write_fds),
-                UnsafePointer[fd_set](),
-                UnsafePointer.address_of(timeout)
-            )
-            if select_result == -1:
-                print("Select error")
-                return
-
-            if self.read_fds.is_set(Int(self.ln.fd)):
-                var conn = self.ln.accept()
-                print('Accepted connection from ', String(conn.raddr))
-                try:
-                    _ = conn.set_non_blocking(True)
-                except e:
-                    print("Error setting connnection to non-blocking mode: ", e)
-                    conn.close()
-                    continue
-                self.connections.append(conn)
-                if conn.fd > max_fd:
-                    max_fd = conn.fd
-                    self.read_fds.set(Int(conn.fd))
-
-            var i = 0
-            while i < len(self.connections):
-                print("Handling connection ", i, " of ", len(self.connections))
-                var conn = self.connections[i]
-                if self.read_fds.is_set(Int(conn.fd)):
-                    _ = self.handle_read(conn, handler)
-                if self.write_fds.is_set(Int(conn.fd)):
-                    _ = self.handle_write(conn)
-
-                if conn.is_closed():
-                    print("Connection will be removed")
-                    _ = self.connections.pop(i)
-                else:
-                    i += 1
-
-    fn address(mut self) -> String:
-        return String(self.host, ":", self.port)
-
-    fn handle_read(mut self, mut conn: TCPConnection, handler: ConnHandler) raises -> None:
+        Raises:
+            If there is an error while serving the connection.
+        """
+        logger.debug(
+            "Connection accepted! IP:", conn.socket._remote_address.ip, "Port:", conn.socket._remote_address.port
+        )
         var max_request_body_size = self.max_request_body_size
         if max_request_body_size <= 0:
             max_request_body_size = DEFAULT_MAX_REQUEST_BODY_SIZE
 
-        var buf = Bytes(capacity=DEFAULT_BUFFER_SIZE)
-        var bytes_recv = conn.read(buf)
-        print("Bytes received: ", bytes_recv)
+        var req_number = 0
+        while True:
+            req_number += 1
 
-        if bytes_recv == 0:
-            return
+            # TODO: We should read until 0 bytes are received. (@thatstoasty)
+            # If we completely fill the buffer haven't read the full request, we end up processing a partial request.
+            var b = Bytes(capacity=DEFAULT_BUFFER_SIZE)
+            try:
+                _ = conn.read(b)
+            except e:
+                conn.teardown()
+                # 0 bytes were read from the peer, which indicates their side of the connection was closed.
+                if str(e) == "EOF":
+                    break
+                else:
+                    logger.error(e)
+                    raise Error("Server.serve_connection: Failed to read request")
 
-        var request = HTTPRequest.from_bytes(self.address(), max_request_body_size, buf^)
-        print("REQUEST:\n\n", request, "\nEND REQUEST\n")
+            var request: HTTPRequest
+            try:
+                request = HTTPRequest.from_bytes(self.address(), max_request_body_size, b)
+            except e:
+                logger.error(e)
+                raise Error("Server.serve_connection: Failed to parse request")
 
-        response = self.protocol.accept(request)
-        self.protocol.send_response(response)
-        data_to_send = self.protocol.data_to_send()
-        var bytes_written = conn.write(data_to_send)
+            var response: HTTPResponse
+            try:
+                response = self.handler(conn, request)
+            except:
+                if not conn.is_closed():
+                    # Try to send back an internal server error, but always attempt to teardown the connection.
+                    try:
+                        # TODO: Move InternalError response to an alias when Mojo can support Dict operations at compile time. (@thatstoasty)
+                        _ = conn.write(encode(InternalError()))
+                    except e:
+                        logger.error(e)
+                        raise Error("Failed to send InternalError response")
+                    finally:
+                        conn.teardown()
+                return
 
-        print("Bytes written: ", bytes_written)
+            # If the server is set to not support keep-alive connections, or the client requests a connection close, we mark the connection to be closed.
+            var close_connection = (not self.tcp_keep_alive) or request.connection_close()
+            if close_connection:
+                response.set_connection_close()
 
-        # var res = handler(request)
-        # var message = receive_message(conn, data)
-        # self.handler(conn, buf)
+            logger.debug(
+                conn.socket._remote_address.ip,
+                str(conn.socket._remote_address.port),
+                request.method,
+                request.uri.path,
+                response.status_code,
+            )
+            try:
+                _ = conn.write(encode(response^))
+            except e:
+                conn.teardown()
+                break
 
-        # TODO: does this make sense?
-        self.write_fds.set(Int(conn.fd))
+            if close_connection:
+                conn.teardown()
+                break
 
-        if not self.tcp_keep_alive:
-            conn.close()
+    fn address(mut self) -> String:
+        return String(self.host, ":", self.port)
 
-    fn handle_write(mut self, mut conn: TCPConnection) raises -> None:
-        var write_buffer = conn.write_buffer()
-        if write_buffer:
-            var bytes_sent = conn.write(write_buffer)
-            if bytes_sent < len(write_buffer):
-                conn.set_write_buffer(write_buffer[bytes_sent:])
-            else:
-                conn.set_write_buffer(Bytes())
+    # fn handle_read(mut self, mut conn: TCPConnection, handler: ConnHandler) raises -> None:
+    #     var max_request_body_size = self.max_request_body_size
+    #     if max_request_body_size <= 0:
+    #         max_request_body_size = DEFAULT_MAX_REQUEST_BODY_SIZE
+    #
+    #     var buf = Bytes(capacity=DEFAULT_BUFFER_SIZE)
+    #     var bytes_recv = conn.read(buf)
+    #     print("Bytes received: ", bytes_recv)
+    #
+    #     if bytes_recv == 0:
+    #         return
+    #
+    #     var request = HTTPRequest.from_bytes(self.address(), max_request_body_size, buf^)
+    #     print("REQUEST:\n\n", request, "\nEND REQUEST\n")
+    #
+    #     response = self.protocol.accept(request)
+    #     self.protocol.send_response(response)
+    #     data_to_send = self.protocol.data_to_send()
+    #     var bytes_written = conn.write(data_to_send)
+    #
+    #     print("Bytes written: ", bytes_written)
+    #
+    #     # var res = handler(request)
+    #     # var message = receive_message(conn, data)
+    #     # self.handler(conn, buf)
+    #
+    #     # TODO: does this make sense?
+    #     self.write_fds.set(Int(conn.fd))
+    #
+    #     if not self.tcp_keep_alive:
+    #         conn.close()
+
+    # fn handle_write(mut self, mut conn: TCPConnection) raises -> None:
+    #     var write_buffer = conn.write_buffer()
+    #     if write_buffer:
+    #         var bytes_sent = conn.write(write_buffer)
+    #         if bytes_sent < len(write_buffer):
+    #             conn.set_write_buffer(write_buffer[bytes_sent:])
+    #         else:
+    #             conn.set_write_buffer(Bytes())
 
     def shutdown(self) -> None:
         self.ln.close()

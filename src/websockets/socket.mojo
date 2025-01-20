@@ -56,9 +56,9 @@ from websockets.libc import (
     CloseInvalidDescriptorError,
     ShutdownInvalidArgumentError,
 )
-from .aliases import Bytes
-from .utils.string import NetworkType
-from .net import (
+from websockets.aliases import Bytes
+from websockets.utils.string import NetworkType
+from websockets.net import (
     Addr,
     default_buffer_size,
     binary_port_to_int,
@@ -66,7 +66,7 @@ from .net import (
     addrinfo_macos,
     addrinfo_unix,
 )
-from .logger import logger
+from websockets.logger import logger
 
 
 alias SocketClosedError = "Socket: Socket is already closed"

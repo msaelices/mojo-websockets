@@ -19,6 +19,16 @@ alias MODIFIERS = List[String]('>', '<', '!', '=')
 alias EOL = Byte(10)
 
 
+@always_inline
+fn byte(s: String) -> Byte:
+    return ord(s)
+
+
+@always_inline
+fn bytes(s: String) -> Bytes:
+    return Bytes(s.as_bytes())
+
+
 fn unpack(format: String, buffer: Bytes) raises -> List[Int]:
     """Unpack the buffer according to the format string.
 
