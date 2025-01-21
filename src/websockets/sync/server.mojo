@@ -14,7 +14,7 @@ from websockets.http import Header, Headers, HTTPRequest, HTTPResponse, encode
 from websockets.logger import logger
 from websockets.net import ListenConfig, TCPConnection, TCPListener
 from websockets.protocol import CONNECTING, SERVER
-from websockets.protocol.base import receive_data, receive_eof
+from websockets.protocol.base import receive_data, receive_eof, send_text, send_binary
 from websockets.protocol.server import ServerProtocol
 from websockets.protocol.client import ClientProtocol
 from websockets.utils.bytes import str_to_bytes
@@ -28,7 +28,38 @@ alias BYTE_1_SIZE_ONE_BYTE: UInt8 = 125
 alias BYTE_1_SIZE_TWO_BYTES: UInt8 = 126
 alias BYTE_1_SIZE_EIGHT_BYTES: UInt8 = 127
 
-alias ConnHandler = fn (conn: TCPConnection, data: Bytes) raises -> None
+
+alias ConnHandler = fn (conn: WSConnection, data: Bytes) raises -> None
+
+
+struct WSConnection:
+    """
+    A connection object that represents a WebSocket connection.
+    """
+    var conn_ptr: UnsafePointer[TCPConnection]
+    var protocol_ptr: UnsafePointer[ServerProtocol]
+
+    fn __init__(out self, ref conn: TCPConnection, ref protocol: ServerProtocol):
+        self.conn_ptr = UnsafePointer.address_of(conn)
+        self.protocol_ptr = UnsafePointer.address_of(protocol)
+
+    fn read(self, mut buf: Bytes) raises -> None:
+        bytes_read = self.conn_ptr[].read(buf)
+        receive_data(self.protocol_ptr[], buf)
+
+    fn write(self, buf: Bytes) raises -> Int:
+        return self.conn_ptr[].write(buf)
+
+    fn send_text(self, message: String) raises:
+        send_text(self.protocol_ptr[], str_to_bytes(message))
+        _ = self.write(self.protocol_ptr[].data_to_send())
+
+    fn send_binary(self, message: Bytes) raises:
+        send_binary(self.protocol_ptr[], message)
+        _ = self.write(self.protocol_ptr[].data_to_send())
+
+    fn close(self) raises -> None:
+        self.conn_ptr[].close()
 
 
 # fn serve_old[
@@ -525,29 +556,19 @@ struct Server:
         logger.debug(
             "Connection accepted! IP:", remote_addr.ip, "Port:", remote_addr.port
         )
+        wsconn = WSConnection(conn, self.protocol)
         while True:
-            # TODO: We should read until 0 bytes are received. (@thatstoasty)
-            # If we completely fill the buffer haven't read the full request, we end up processing a partial request.
             var b = Bytes(capacity=DEFAULT_BUFFER_SIZE)
             try:
-                _ = conn.read(b)
+                _ = wsconn.read(b)
             except e:
                 conn.teardown()
-                # 0 bytes were read from the peer, which indicates their side of the connection was closed.
-                if String(e) == "EOF":
-                    break
-                else:
-                    logger.error(e)
-                    raise Error("Server.serve_connection: Failed to read request")
+                logger.error(e)
+                raise Error("Server.serve_connection: Failed to read request")
 
             # If the server is set to not support keep-alive connections, or the client requests a connection close, we mark the connection to be closed.
             if self.protocol.get_state() == CONNECTING:
-                var request: HTTPRequest
-                try:
-                    request = HTTPRequest.from_bytes(self.address(), self.max_request_body_size, b)
-                except e:
-                    logger.error(e)
-                    raise Error("Server.serve_connection: Failed to parse request")
+                var request: HTTPRequest = self.protocol.events_received()[0][HTTPRequest]
 
                 response = self.protocol.accept(request)
                 self.protocol.send_response(response)
@@ -557,7 +578,7 @@ struct Server:
                 logger.debug("Bytes written: ", bytes_written)
             else:
                 logger.debug("Received data: ", len(b))
-                self.handle_read(conn, b)
+                self.handle_read(wsconn, b)
 
             logger.debug(
                 remote_addr.ip,
@@ -567,20 +588,18 @@ struct Server:
     fn address(mut self) -> String:
         return String(self.host, ":", self.port)
 
-    fn handle_read(mut self, mut conn: TCPConnection, data: Bytes) raises -> None:
+    fn handle_read(mut self, mut wsconn: WSConnection, data: Bytes) raises -> None:
         bytes_recv = len(data)
         if bytes_recv == 0:
             receive_eof(self.protocol)
             return
 
-        receive_data(self.protocol, data)
-
         data_to_send = self.protocol.data_to_send()
         if len(data_to_send) > 0:
-            bytes_written = conn.write(data_to_send)
+            bytes_written = wsconn.write(data_to_send)
             logger.debug("Bytes written: ", bytes_written)
     
-        self.handler(conn, data)
+        self.handler(wsconn, data)
     
     fn shutdown(mut self) raises -> None:
         self.ln.close()

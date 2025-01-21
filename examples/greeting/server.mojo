@@ -1,16 +1,16 @@
 """Server example using the threading API."""
 
 from websockets.aliases import Bytes
-from websockets.sync.server import serve
-from websockets.net import TCPConnection
+from websockets.sync.server import serve, WSConnection
 
 
-fn on_message(conn: TCPConnection, data: Bytes) raises -> None:
-    print("<<< {}".format(String(data)))
+fn on_message(conn: WSConnection, data: Bytes) raises -> None:
+    print("<<< ", String(data))
+    conn.send_text(String(data))
 
 
 fn main() raises:
-    with serve(on_message, "127.0.0.1", 8765) as server:
+    with serve(on_message, "127.0.0.1", 8766) as server:
         server.serve_forever()
 
 
