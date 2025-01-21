@@ -352,7 +352,7 @@ struct Frame(Writable, Stringable, EqualityComparable):
         opcode = Opcode(head1 & 0b00001111)
 
         if opcode not in DATA_OPCODES and opcode not in CTRL_OPCODES:
-            raise Error("ProtocolError: invalid opcode")
+            raise Error("ProtocolError: invalid opcode: {}".format(opcode))
 
         # Check if the mask bit is set correctly.
         if Bool(head2 & 0b10000000) != mask:
