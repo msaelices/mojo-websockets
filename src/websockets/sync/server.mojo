@@ -14,6 +14,7 @@ from websockets.http import Header, Headers, HTTPRequest, HTTPResponse, encode
 from websockets.logger import logger
 from websockets.net import ListenConfig, TCPConnection, TCPListener
 from websockets.protocol import CONNECTING, SERVER
+from websockets.protocol.base import receive_data, receive_eof
 from websockets.protocol.server import ServerProtocol
 from websockets.protocol.client import ClientProtocol
 from websockets.utils.bytes import str_to_bytes
@@ -367,7 +368,7 @@ struct Server:
     # var write_fds: fd_set
     var protocol: ServerProtocol
 
-    fn __init__(out self, host: String, port: Int, handler: ConnHandler, max_request_body_size: Int = 1024) raises:
+    fn __init__(out self, host: String, port: Int, handler: ConnHandler, max_request_body_size: Int = DEFAULT_MAX_REQUEST_BODY_SIZE) raises:
         """
         Initialize a new server.
 
@@ -524,10 +525,6 @@ struct Server:
         logger.debug(
             "Connection accepted! IP:", remote_addr.ip, "Port:", remote_addr.port
         )
-        var max_request_body_size = self.max_request_body_size
-        if max_request_body_size <= 0:
-            max_request_body_size = DEFAULT_MAX_REQUEST_BODY_SIZE
-
         while True:
             # TODO: We should read until 0 bytes are received. (@thatstoasty)
             # If we completely fill the buffer haven't read the full request, we end up processing a partial request.
@@ -547,7 +544,7 @@ struct Server:
             if self.protocol.get_state() == CONNECTING:
                 var request: HTTPRequest
                 try:
-                    request = HTTPRequest.from_bytes(self.address(), max_request_body_size, b)
+                    request = HTTPRequest.from_bytes(self.address(), self.max_request_body_size, b)
                 except e:
                     logger.error(e)
                     raise Error("Server.serve_connection: Failed to parse request")
@@ -560,6 +557,7 @@ struct Server:
                 logger.debug("Bytes written: ", bytes_written)
             else:
                 logger.debug("Received data: ", len(b))
+                self.handle_read(conn, b)
 
             logger.debug(
                 remote_addr.ip,
@@ -569,47 +567,21 @@ struct Server:
     fn address(mut self) -> String:
         return String(self.host, ":", self.port)
 
-    # fn handle_read(mut self, mut conn: TCPConnection, handler: ConnHandler) raises -> None:
-    #     var max_request_body_size = self.max_request_body_size
-    #     if max_request_body_size <= 0:
-    #         max_request_body_size = DEFAULT_MAX_REQUEST_BODY_SIZE
-    #
-    #     var buf = Bytes(capacity=DEFAULT_BUFFER_SIZE)
-    #     var bytes_recv = conn.read(buf)
-    #     print("Bytes received: ", bytes_recv)
-    #
-    #     if bytes_recv == 0:
-    #         return
-    #
-    #     var request = HTTPRequest.from_bytes(self.address(), max_request_body_size, buf^)
-    #     print("REQUEST:\n\n", request, "\nEND REQUEST\n")
-    #
-    #     response = self.protocol.accept(request)
-    #     self.protocol.send_response(response)
-    #     data_to_send = self.protocol.data_to_send()
-    #     var bytes_written = conn.write(data_to_send)
-    #
-    #     print("Bytes written: ", bytes_written)
-    #
-    #     # var res = handler(request)
-    #     # var message = receive_message(conn, data)
-    #     # self.handler(conn, buf)
-    #
-    #     # TODO: does this make sense?
-    #     self.write_fds.set(Int(conn.fd))
-    #
-    #     if not self.tcp_keep_alive:
-    #         conn.close()
+    fn handle_read(mut self, mut conn: TCPConnection, data: Bytes) raises -> None:
+        bytes_recv = len(data)
+        if bytes_recv == 0:
+            receive_eof(self.protocol)
+            return
 
-    # fn handle_write(mut self, mut conn: TCPConnection) raises -> None:
-    #     var write_buffer = conn.write_buffer()
-    #     if write_buffer:
-    #         var bytes_sent = conn.write(write_buffer)
-    #         if bytes_sent < len(write_buffer):
-    #             conn.set_write_buffer(write_buffer[bytes_sent:])
-    #         else:
-    #             conn.set_write_buffer(Bytes())
+        receive_data(self.protocol, data)
 
+        data_to_send = self.protocol.data_to_send()
+        if len(data_to_send) > 0:
+            bytes_written = conn.write(data_to_send)
+            logger.debug("Bytes written: ", bytes_written)
+    
+        self.handler(conn, data)
+    
     fn shutdown(mut self) raises -> None:
         self.ln.close()
 
