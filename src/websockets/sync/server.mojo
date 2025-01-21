@@ -44,7 +44,7 @@ struct WSConnection:
         self.protocol_ptr = UnsafePointer.address_of(protocol)
 
     fn read(self, mut buf: Bytes) raises -> None:
-        bytes_read = self.conn_ptr[].read(buf)
+        _ = self.conn_ptr[].read(buf)
         receive_data(self.protocol_ptr[], buf)
 
     fn write(self, buf: Bytes) raises -> Int:
@@ -157,13 +157,22 @@ struct Server:
             except e:
                 conn.teardown()
                 logger.error(e)
-                raise Error("Server.serve_connection: Failed to read request")
+                return
+
+            if self.protocol.get_parser_exc():
+                logger.error(String(self.protocol.get_parser_exc().value()))
+                conn.teardown()
+                return
 
             # If the server is set to not support keep-alive connections, or the client requests a connection close, we mark the connection to be closed.
             if self.protocol.get_state() == CONNECTING:
                 var request: HTTPRequest = self.protocol.events_received()[0][HTTPRequest]
 
                 response = self.protocol.accept(request)
+                if self.protocol.get_handshake_exc():
+                    logger.error(String(self.protocol.get_handshake_exc().value()))
+                    conn.teardown()
+                    return
                 self.protocol.send_response(response)
                 data_to_send = self.protocol.data_to_send()
         
