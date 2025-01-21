@@ -359,7 +359,6 @@ struct Server:
     var port: Int
     var handler: ConnHandler
     var max_request_body_size: Int
-    var tcp_keep_alive: Bool
 
     var ln: TCPListener
 
@@ -368,7 +367,7 @@ struct Server:
     # var write_fds: fd_set
     var protocol: ServerProtocol
 
-    fn __init__(out self, host: String, port: Int, handler: ConnHandler, max_request_body_size: Int = 1024, tcp_keep_alive: Bool = False) raises:
+    fn __init__(out self, host: String, port: Int, handler: ConnHandler, max_request_body_size: Int = 1024) raises:
         """
         Initialize a new server.
 
@@ -377,7 +376,6 @@ struct Server:
             port: Int - The port to listen on.
             handler : ConnHandler - An object that handles incoming HTTP requests.
             max_request_body_size: Int - The maximum size of the request body.
-            tcp_keep_alive: Bool - Whether to keep the connection alive after the request is handled.
 
         Raises:
             If there is an error while initializing the server.
@@ -386,7 +384,6 @@ struct Server:
         self.port = port
         self.handler = handler
         self.max_request_body_size = max_request_body_size
-        self.tcp_keep_alive = tcp_keep_alive
         self.ln = TCPListener()
         # self.connections = List[TCPConnection]()
         # self.read_fds = fd_set()
@@ -398,7 +395,6 @@ struct Server:
         self.port = other.port
         self.handler = other.handler
         self.max_request_body_size = other.max_request_body_size
-        self.tcp_keep_alive = other.tcp_keep_alive
         self.ln = other.ln^
         # self.connections = other.connections
         # self.read_fds = other.read_fds
@@ -410,7 +406,6 @@ struct Server:
         self.port = other.port
         self.handler = other.handler
         self.max_request_body_size = other.max_request_body_size
-        self.tcp_keep_alive = other.tcp_keep_alive
         self.ln = other.ln
         self.protocol = other.protocol
 
@@ -533,10 +528,7 @@ struct Server:
         if max_request_body_size <= 0:
             max_request_body_size = DEFAULT_MAX_REQUEST_BODY_SIZE
 
-        var req_number = 0
         while True:
-            req_number += 1
-
             # TODO: We should read until 0 bytes are received. (@thatstoasty)
             # If we completely fill the buffer haven't read the full request, we end up processing a partial request.
             var b = Bytes(capacity=DEFAULT_BUFFER_SIZE)
@@ -552,8 +544,6 @@ struct Server:
                     raise Error("Server.serve_connection: Failed to read request")
 
             # If the server is set to not support keep-alive connections, or the client requests a connection close, we mark the connection to be closed.
-            var close_connection = not self.tcp_keep_alive
-
             if self.protocol.get_state() == CONNECTING:
                 var request: HTTPRequest
                 try:
@@ -575,10 +565,6 @@ struct Server:
                 remote_addr.ip,
                 String(remote_addr.port),
             )
-
-            if close_connection:
-                conn.teardown()
-                break
 
     fn address(mut self) -> String:
         return String(self.host, ":", self.port)
