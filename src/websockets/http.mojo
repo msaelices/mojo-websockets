@@ -224,7 +224,7 @@ struct HTTPRequest(Writable, Stringable):
     var timeout: Duration
 
     @staticmethod
-    fn from_bytes(addr: String, max_body_size: Int, b: Span[Byte]) raises -> HTTPRequest:
+    fn from_bytes(addr: String, max_body_size: Int, b: Span[Byte]) raises -> (HTTPRequest, Int):
         var reader = ByteReader(b)
         var headers = Headers()
         var method: String
@@ -248,7 +248,7 @@ struct HTTPRequest(Writable, Stringable):
         except e:
             raise Error("HTTPRequest.from_bytes: Failed to read request body: " + String(e))
 
-        return request
+        return request, reader.read_pos
 
     fn __init__(
         out self,

@@ -102,11 +102,12 @@ fn parse_handshake[T: Protocol](mut protocol: T) raises -> Optional[HTTPRequest]
     @parameter
     if T.side == SERVER:
         try:
-            request = HTTPRequest.from_bytes(
+            request, bytes_read = HTTPRequest.from_bytes(
                 'http://localhost',   # TODO: Use actual host
                 DEFAULT_MAX_REQUEST_BODY_SIZE,
                 reader_ptr[].buffer,
             )
+            reader_ptr[].advance(bytes_read)
             protocol.add_event(request)
             return request
         except exc:

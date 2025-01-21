@@ -113,6 +113,15 @@ struct StreamReader(Streamable):
             raise Error("EOFError: stream ended")
         self.buffer += data
 
+    fn advance(mut self, n: Int) -> None:
+        """
+        Advance `n` bytes of the buffer.
+
+        Args:
+            n: Number of bytes to advance.
+        """
+        self.offset += n
+
     fn feed_eof(mut self) raises -> None:
         """
         End the stream.
