@@ -55,11 +55,7 @@ struct URI:
             request_uri = SLASH
             host = host_and_port
 
-        var scheme: String
-        if is_https:
-            scheme = HTTPS
-        else:
-            scheme = HTTP
+        scheme = proto_str
 
         var n = request_uri.find("?")
         var original_path: String
