@@ -29,11 +29,11 @@ from websockets.utils.uri import URI
 
 
 
-struct ClientProtocol[side_param: Int = CLIENT](Protocol):
+struct ClientProtocol(Protocol):
     """
     Sans-I/O implementation of a WebSocket client connection.
     """
-    alias side = side_param
+    alias side = CLIENT
 
     var key: String
     var wsuri: URI
@@ -74,6 +74,28 @@ struct ClientProtocol[side_param: Int = CLIENT](Protocol):
         self.close_rcvd_then_sent = None
         self.eof_sent = False
         self.discard_sent = False
+
+    fn __copyinit__(out self, other: ClientProtocol):
+        self.key = other.key
+        self.wsuri = other.wsuri
+        self.origin = other.origin
+
+        self.reader = StreamReader()
+        # This weirdly makes the copy to cause an error while binding the server socket
+        # self.events = other.events
+        self.events = List[Event]()
+        self.writes = Bytes(capacity=DEFAULT_BUFFER_SIZE)
+        self.state = other.state
+        self.expect_cont_frame = other.expect_cont_frame
+        self.parser_exc = other.parser_exc
+        self.handshake_exc = other.handshake_exc
+        self.curr_size = other.curr_size
+
+        self.close_rcvd = other.close_rcvd
+        self.close_sent = other.close_sent
+        self.close_rcvd_then_sent = other.close_rcvd_then_sent
+        self.eof_sent = other.eof_sent
+        self.discard_sent = other.discard_sent
 
     # ===-------------------------------------------------------------------=== #
     # Trait implementations
@@ -334,110 +356,3 @@ struct ClientProtocol[side_param: Int = CLIENT](Protocol):
             raise Error('InvalidHeader: "Sec-WebSocket-Accept" header is invalid')
 
         self.set_state(OPEN)
-
-    # fn accept[date_func: fn () -> String = get_date_timestamp](mut self, request: HTTPRequest) raises -> HTTPResponse:
-    #     """
-    #     Accept a WebSocket connection.
-    #
-    #     Args:
-    #         request: The HTTP request to accept.
-    #     """
-    #     try:
-    #         if "Upgrade" not in request.headers:
-    #             raise Error('Request headers do not contain an "upgrade" header')
-    #
-    #         if "Connection" not in request.headers:
-    #             # This should return a 426 status code (Upgrade Required) not a 400
-    #             raise Error('Request headers do not contain an "connection" header')
-    #
-    #         if request.headers["connection"].lower() != "upgrade":
-    #             raise Error('Request "connection" header is not "upgrade"')
-    #
-    #         if request.headers["upgrade"] != "websocket":
-    #             raise Error('Request "upgrade" header is not "websocket"')
-    #
-    #         if not request.headers["Sec-WebSocket-Key"]:
-    #             raise Error('Missing "Sec-WebSocket-Key" header.')
-    #
-    #         if not request.headers["Sec-WebSocket-Version"]:
-    #             raise Error('Missing "Sec-WebSocket-Version" header.')
-    #
-    #         if request.headers["Sec-WebSocket-Version"] != "13":
-    #             raise Error('Request "Sec-WebSocket-Version" header is not "13"')
-    #
-    #         if self.origins is not None and "Origin" not in request.headers:
-    #             raise Error('Missing "Origin" header.')
-    #
-    #         if self.origins is not None and "Origin" in request.headers:
-    #             if request.headers["Origin"] not in self.origins.value():
-    #                 raise Error('Invalid "Origin" header: {}'.format(request.headers["Origin"]))
-    #
-    #         # Validate the base64 encoded Sec-WebSocket-Key
-    #         _ = b64decode[validate=True](request.headers["Sec-WebSocket-Key"])
-    #     except exc:
-    #         # TODO: Handle specific exceptions with different status codes.
-    #         self.set_handshake_exc(exc)
-    #         body = exc._message()
-    #         status_code = 400
-    #         status_text = "Bad Request"
-    #         return self.reject[date_func=date_func](status_code, status_text, body)
-    #
-    #     var accept = request.headers["Sec-WebSocket-Key"] + MAGIC_CONSTANT
-    #     var py_sha1 = Python.import_module("hashlib").sha1
-    #
-    #     var accept_encoded = b64encode(str(py_sha1(PythonObject(accept).encode()).digest()))
-    #     var headers = Headers(
-    #         Header("Date", date_func()),
-    #         Header("Upgrade", "websocket"),
-    #         Header("Connection", "Upgrade"),
-    #         Header("Sec-WebSocket-Accept", accept_encoded),
-    #     )
-    #
-    #     return HTTPResponse(101, "Switching Protocols", headers, Bytes())
-
-    # fn send_response(mut self, response: HTTPResponse) raises -> None:
-    #     """
-    #     Send a handshake response to the client.
-    #
-    #     Args:
-    #         response: WebSocket handshake response event to send.
-    #
-    #     """
-    #     self.write_data(encode(response))
-    #
-    #     if response.status_code == 101:
-    #         if self.get_state() != CONNECTING:
-    #             raise Error("InvalidState: connection is not in CONNECTING state")
-    #         self.set_state(OPEN)
-    #     else:
-    #         # handshake_exc may be already set if accept() encountered an error.
-    #         # If the connection isn't open, set handshake_exc to guarantee that
-    #         # handshake_exc is None if and only if opening handshake succeeded.
-    #         if self.handshake_exc is None:
-    #             self.handshake_exc = Error("InvalidStatus: {}".format(str(response)))
-    #
-    #         send_eof(self)
-    #         discard(self)
-    #         # Equivalent to the next(self.parser) in the Python implementation
-    #         _ = parse_buffer(self)
-    #
-    # fn reject[
-    #     date_func : fn () -> String = get_date_timestamp,
-    # ](mut self, status_code: Int, status_text: String, body: String) -> HTTPResponse:
-    #     """
-    #     Fail the WebSocket connection.
-    #
-    #     Args:
-    #         exc: The exception to raise.
-    #
-    #     Returns:
-    #         The HTTP response to send to the client.
-    #     """
-    #     var headers = Headers(
-    #         Header("Date", date_func()),
-    #         Header("Connection", "close"),
-    #         Header("Content-Length", str(len(body))),
-    #         Header("Content-type", "text/plain; charset=utf-8")
-    #     )
-    #     return HTTPResponse(status_code, status_text, headers, str_to_bytes(body))
-

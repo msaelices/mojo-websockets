@@ -188,6 +188,7 @@ struct StreamReader(Streamable):
         Raises:
             EOFError: If the stream ends in less than `n` bytes.
         """
+        print("REMAINING BUFFER: ", String(self.buffer[self.offset:]))
         remaining = len(self.buffer) - self.offset
         if remaining < n:
             if self.eof:

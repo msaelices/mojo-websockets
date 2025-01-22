@@ -11,7 +11,7 @@ fn on_message(conn: WSConnection, data: Bytes) raises -> None:
 
 
 fn main() raises:
-    with serve(on_message, "127.0.0.1", 8767) as server:
+    with serve(on_message, "127.0.0.1", 8768) as server:
         server.serve_forever()
 
 

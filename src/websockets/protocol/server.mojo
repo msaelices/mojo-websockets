@@ -108,6 +108,7 @@ struct ServerProtocol(Protocol):
         Args:
             state: The state of the protocol.
         """
+        print("Setting state to: ", state)
         self.state = state
 
     fn is_masked(self) -> Bool:
@@ -311,6 +312,7 @@ struct ServerProtocol(Protocol):
             Header("Upgrade", "websocket"),
             Header("Connection", "Upgrade"),
             Header("Sec-WebSocket-Accept", accept_encoded),
+            # Header("Sec-WebSocket-Extensions", '""'),
         )
 
         return HTTPResponse(101, "Switching Protocols", headers, Bytes())
