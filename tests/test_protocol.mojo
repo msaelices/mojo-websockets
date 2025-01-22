@@ -1991,8 +1991,8 @@ fn test_client_receives_data_after_exception() raises:
     # Receive invalid frame
     receive_data(client, Bytes(255, 255))  # \xff\xff
     events = client.events_received()
-    assert_equal(client.parser_exc.value()._message(), "ProtocolError: invalid opcode")
-    close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: invalid opcode").serialize(), fin=True)
+    assert_equal(client.parser_exc.value()._message(), "ProtocolError: invalid opcode: 15")
+    close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: invalid opcode: 15").serialize(), fin=True)
     assert_equal(events[0][Frame], close_frame)
     data_to_send = client.data_to_send()
     assert_bytes_equal(data_to_send, close_frame.serialize[gen_mask_func=gen_mask](mask=client.is_masked()))
@@ -2013,8 +2013,8 @@ fn test_server_receives_data_after_exception() raises:
     # Receive invalid frame
     receive_data[gen_mask_func=gen_mask](server, Bytes(255, 255))  # \xff\xff
     events = server.events_received()
-    assert_equal(server.parser_exc.value()._message(), "ProtocolError: invalid opcode")
-    close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: invalid opcode").serialize(), fin=True)
+    assert_equal(server.parser_exc.value()._message(), "ProtocolError: invalid opcode: 15")
+    close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: invalid opcode: 15").serialize(), fin=True)
     assert_equal(events[0][Frame], close_frame)
     data_to_send = server.data_to_send()
     assert_bytes_equal(data_to_send, close_frame.serialize[gen_mask_func=gen_mask](mask=server.is_masked()))
@@ -2033,8 +2033,8 @@ fn test_client_receives_eof_after_exception() raises:
     # Receive invalid frame
     receive_data(client, Bytes(255, 255))  # \xff\xff
     events = client.events_received()
-    assert_equal(client.parser_exc.value()._message(), "ProtocolError: invalid opcode")
-    close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: invalid opcode").serialize(), fin=True)
+    assert_equal(client.parser_exc.value()._message(), "ProtocolError: invalid opcode: 15")
+    close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: invalid opcode: 15").serialize(), fin=True)
     assert_equal(events[0][Frame], close_frame)
     data_to_send = client.data_to_send()
     assert_bytes_equal(data_to_send, close_frame.serialize[gen_mask_func=gen_mask](mask=client.is_masked()))
@@ -2054,8 +2054,8 @@ fn test_server_receives_eof_after_exception() raises:
     # Receive invalid frame
     receive_data[gen_mask_func=gen_mask](server, Bytes(255, 255))  # \xff\xff
     events = server.events_received()
-    assert_equal(server.parser_exc.value()._message(), "ProtocolError: invalid opcode")
-    close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: invalid opcode").serialize(), fin=True)
+    assert_equal(server.parser_exc.value()._message(), "ProtocolError: invalid opcode: 15")
+    close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: invalid opcode: 15").serialize(), fin=True)
     assert_equal(events[0][Frame], close_frame)
     data_to_send = server.data_to_send()
     assert_bytes_equal(data_to_send, close_frame.serialize[gen_mask_func=gen_mask](mask=server.is_masked()))
@@ -2073,8 +2073,8 @@ fn test_client_receives_data_and_eof_after_exception() raises:
     # Receive invalid frame
     receive_data(client, Bytes(255, 255))  # \xff\xff
     events = client.events_received()
-    assert_equal(client.parser_exc.value()._message(), "ProtocolError: invalid opcode")
-    close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: invalid opcode").serialize(), fin=True)
+    assert_equal(client.parser_exc.value()._message(), "ProtocolError: invalid opcode: 15")
+    close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: invalid opcode: 15").serialize(), fin=True)
     assert_equal(events[0][Frame], close_frame)
     data_to_send = client.data_to_send()
     assert_bytes_equal(data_to_send, close_frame.serialize[gen_mask_func=gen_mask](mask=client.is_masked()))
@@ -2100,8 +2100,8 @@ fn test_server_receives_data_and_eof_after_exception() raises:
     # Receive invalid frame
     receive_data[gen_mask_func=gen_mask](server, Bytes(255, 255))  # \xff\xff
     events = server.events_received()
-    assert_equal(server.parser_exc.value()._message(), "ProtocolError: invalid opcode")
-    close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: invalid opcode").serialize(), fin=True)
+    assert_equal(server.parser_exc.value()._message(), "ProtocolError: invalid opcode: 15")
+    close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: invalid opcode: 15").serialize(), fin=True)
     assert_equal(events[0][Frame], close_frame)
     data_to_send = server.data_to_send()
     assert_bytes_equal(data_to_send, close_frame.serialize[gen_mask_func=gen_mask](mask=server.is_masked()))
