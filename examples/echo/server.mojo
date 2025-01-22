@@ -6,11 +6,12 @@ from websockets.sync.server import serve, WSConnection
 
 fn on_message(conn: WSConnection, data: Bytes) raises -> None:
     print("<<< ", String(data))
-    conn.send_text(String(data))
+    conn.send_binary(data)
+    print(">>> ", String(data))
 
 
 fn main() raises:
-    with serve(on_message, "127.0.0.1", 8766) as server:
+    with serve(on_message, "127.0.0.1", 8767) as server:
         server.serve_forever()
 
 
