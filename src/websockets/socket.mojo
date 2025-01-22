@@ -142,6 +142,7 @@ struct Socket[AddrType: Addr, address_family: Int = AF_INET](Representable, Stri
             socket_type: The socket type.
             protocol: The protocol.
             local_address: The local address of the socket (local address if bound).
+            remote_address: The remote address of the socket (peer's address if connected).
         """
         self.fd = fd
         self.socket_type = socket_type
@@ -565,8 +566,8 @@ struct Socket[AddrType: Addr, address_family: Int = AF_INET](Representable, Stri
             logger.error(e)
             raise Error("Socket.receive: Failed to read data from connection.")
 
-        if bytes_received == 0:
-            raise Error("EOF")
+        # if bytes_received == 0:
+        #     raise Error("EOF")
 
         return bytes_received
 
