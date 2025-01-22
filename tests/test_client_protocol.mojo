@@ -289,7 +289,7 @@ fn test_receive_random_response() raises -> None:
     # ValueError: invalid HTTP status line: 220 smtp.invalid
     assert_equal(
         String(client.get_handshake_exc().value()),
-        "Failed to parse response headers: Failed to read third word from request line",
+        "Failed to parse response headers: Failed to read second word from request line",
     )
 
 

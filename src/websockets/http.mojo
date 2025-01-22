@@ -196,12 +196,18 @@ struct Headers(Writable, Stringable):
             raise Error("Headers.parse_raw: Failed to read first byte from response header")
 
         var first = r.read_word()
+        if not r.available():
+            raise Error("Failed to read first word from request line")
         r.increment()
         var second = r.read_word()
+        if not r.available():
+            raise Error("Failed to read second word from request line")
         r.increment()
         var third = r.read_line()
+        if not r.available():
+            raise Error("Failed to read third word from request line")
 
-        while not is_newline(r.peek()):
+        while not is_newline(r.peek()) and r.available():
             var key = r.read_until(BytesConstant.colon)
             r.increment()
             if is_space(r.peek()):
@@ -381,7 +387,6 @@ struct HTTPResponse(Writable, Stringable):
         try:
             var properties = headers.parse_raw(reader)
             protocol, status_code, status_text = properties[0], properties[1], properties[2]
-            reader.skip_carriage_return()
         except e:
             raise Error("Failed to parse response headers: " + String(e))
 
