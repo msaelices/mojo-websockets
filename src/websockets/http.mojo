@@ -474,8 +474,6 @@ struct HTTPResponse(Writable, Stringable):
         protocol: String = HTTP11,
     ) raises:
         self.headers = headers
-        if HeaderKey.CONTENT_TYPE not in self.headers:
-            self.headers[HeaderKey.CONTENT_TYPE] = "application/octet-stream"
         self.status_code = status_code
         self.status_text = status_text
         self.protocol = protocol

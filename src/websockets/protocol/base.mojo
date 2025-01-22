@@ -670,7 +670,7 @@ fn close_expected[T: Protocol](protocol: T) -> Bool:
     # See https://github.com/python-websockets/websockets/blob/59d4dcf779fe7d2b0302083b072d8b03adce2f61/src/websockets/protocol.py#L514
 
     # TODO: Implement the handshake_exc logic
-    return protocol.get_state() == CLOSING  or protocol.get_handshake_exc()
+    return protocol.get_state() == CLOSING or protocol.get_handshake_exc()
 
 
 fn get_close_exc[T: Protocol](protocol: T) raises -> Error:
