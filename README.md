@@ -26,8 +26,21 @@ This software is in a early stage of development, using the Mojo nightly version
 ## Example of usage
 
 ```mojo
-# TODO
+from websockets.aliases import Bytes
+from websockets.sync.server import serve, WSConnection
+
+
+fn on_message(conn: WSConnection, data: Bytes) raises -> None:
+    print("<<< ", String(data))
+    # Echo the message back to the client
+    conn.send_binary(data)
+
+
+fn main() raises:
+    with serve(on_message, "127.0.0.1", 8766) as server:
+        server.serve_forever()# TODO
 ```
+
 ## TODO
 
 - [ ] Implement automatic reconnection for clients
