@@ -150,6 +150,17 @@ struct Headers(Writable, Stringable):
         for header in headers:
             self[header[].key.lower()] = header[].value
 
+    fn __eq__(self, other: Headers) -> Bool:
+        for item in self._inner.items():
+            key = item[].key
+            value = item[].value
+            if key not in other._inner or other._inner.get(key) != value:
+                return False
+        return True
+
+    fn __ne__(self, other: Self) -> Bool:
+        return not (self == other)
+
     @always_inline
     fn empty(self) -> Bool:
         return len(self._inner) == 0
@@ -337,6 +348,18 @@ struct HTTPRequest(Writable, Stringable):
 
     fn __str__(self) -> String:
         return String.write(self)
+
+    fn __eq__(self, other: Self) raises -> Bool:
+        return (
+            self.method == other.method
+            and self.uri == other.uri
+            and self.protocol == other.protocol
+            and self.headers == other.headers
+            and String(self.body_raw) == String(other.body_raw)
+        )
+
+    fn __ne__(self, other: Self) raises -> Bool:
+        return not (self == other)
 
 
 @value

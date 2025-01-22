@@ -194,3 +194,6 @@ struct URI:
         except:
             return (user_info, String(""))
 
+    fn __eq__(self, other: URI) -> Bool:
+        return self.full_uri == other.full_uri
+
