@@ -407,3 +407,14 @@ fn _ascii_to_value(char: String) -> Int:
         return 63
     else:
         return -1
+
+
+@always_inline
+fn bytes_equal(a: Bytes, b: Bytes) -> Bool:
+    if len(a) != len(b):
+        return False
+    for i in range(len(a)):
+        if a[i] != b[i]:
+            return False
+    return True
+

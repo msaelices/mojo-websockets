@@ -268,11 +268,6 @@ fn to_string(owned bytes: List[UInt8, True]) -> String:
     return String(bytes^)
 
 
-@always_inline
-fn bytes_equal(a: Bytes, b: Bytes) -> Bool:
-    return to_string(a) == to_string(b)
-
-
 fn compare_case_insensitive(a: Bytes, b: Bytes) -> Bool:
     if len(a) != len(b):
         return False
