@@ -276,7 +276,6 @@ struct HTTPRequest(Writable, Stringable):
         self.uri = uri
         self.body_raw = body
         self.timeout = timeout
-        self.set_content_length(len(body))
         if HeaderKey.CONNECTION not in self.headers:
             self.headers[HeaderKey.CONNECTION] = "keep-alive"
         if HeaderKey.HOST not in self.headers:
@@ -453,7 +452,7 @@ struct HTTPResponse(Writable, Stringable):
             raise Error("Failed to read request body: ")
 
     fn __init__(
-        mut self,
+        out self,
         status_code: Int,
         status_text: String,
         headers: Headers,
@@ -461,25 +460,13 @@ struct HTTPResponse(Writable, Stringable):
         protocol: String = HTTP11,
     ):
         self.headers = headers
-        if HeaderKey.CONTENT_TYPE not in self.headers:
-            self.headers[HeaderKey.CONTENT_TYPE] = "application/octet-stream"
         self.status_code = status_code
         self.status_text = status_text
         self.protocol = protocol
         self.body_raw = Bytes(body_bytes)
-        if HeaderKey.CONNECTION not in self.headers:
-            self.set_connection_keep_alive()
-        if HeaderKey.CONTENT_LENGTH not in self.headers:
-            self.set_content_length(len(body_bytes))
-        if HeaderKey.DATE not in self.headers:
-            try:
-                var current_time = String(now(utc=True))
-                self.headers[HeaderKey.DATE] = current_time
-            except:
-                logger.debug("DATE header not set, unable to get current time and it was instead omitted.")
 
     fn __init__(
-        mut self,
+        out self,
         mut reader: ByteReader,
         headers: Headers = Headers(),
         status_code: Int = 200,
@@ -493,17 +480,6 @@ struct HTTPResponse(Writable, Stringable):
         self.status_text = status_text
         self.protocol = protocol
         self.body_raw = Bytes(reader.read_bytes())
-        self.set_content_length(len(self.body_raw))
-        if HeaderKey.CONNECTION not in self.headers:
-            self.set_connection_keep_alive()
-        if HeaderKey.CONTENT_LENGTH not in self.headers:
-            self.set_content_length(len(self.body_raw))
-        if HeaderKey.DATE not in self.headers:
-            try:
-                var current_time = String(now(utc=True))
-                self.headers[HeaderKey.DATE] = current_time
-            except:
-                pass
 
     fn get_body(self) -> StringSlice[__origin_of(self.body_raw)]:
         return StringSlice(unsafe_from_utf8=Span(self.body_raw))
