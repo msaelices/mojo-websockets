@@ -275,7 +275,7 @@ struct ClientProtocol(Protocol):
             WebSocket handshake request event to send to the server.
 
         """
-        is_secure = self.wsuri.is_wss()
+        is_secure = self.wsuri.is_wss() or self.wsuri.is_https()
         host_header = build_host_header(
             self.wsuri.get_hostname(), self.wsuri.get_port(), is_secure
         )
