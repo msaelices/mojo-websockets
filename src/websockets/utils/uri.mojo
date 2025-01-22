@@ -113,46 +113,6 @@ struct URI:
                 pass
         return self.path
 
-    fn _parse(mut self) raises -> None:
-        var raw_uri = self.full_uri
-        var proto_str = String(HTTP)
-        var is_https = False
-
-        var proto_end = raw_uri.find("://")
-        var remainder_uri: String
-        if proto_end >= 0:
-            proto_str = raw_uri[:proto_end]
-            if proto_str == HTTPS:
-                is_https = True
-            remainder_uri = raw_uri[proto_end + 3:]
-        else:
-            remainder_uri = raw_uri
-
-        self.scheme = proto_str
-
-        var path_start = remainder_uri.find("/")
-        var host_and_port: String
-        var request_uri: String
-        if path_start >= 0:
-            host_and_port = remainder_uri[:path_start]
-            request_uri = remainder_uri[path_start:]
-            self.host = host_and_port[:path_start]
-        else:
-            host_and_port = remainder_uri
-            request_uri = SLASH
-            self.host = host_and_port
-
-        var n = request_uri.find("?")
-        if n >= 0:
-            self._original_path = request_uri[:n]
-            self.query_string = request_uri[n + 1 :]
-        else:
-            self._original_path = request_uri
-            self.query_string = String()
-
-        self.path = self._original_path
-        self.request_uri = request_uri
-
     fn get_hostname(self) -> String:
         """
         Returns the hostname of the URI.
