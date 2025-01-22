@@ -107,7 +107,8 @@ fn parse_handshake[T: Protocol](mut protocol: T) raises -> Optional[HTTPRequest]
                 DEFAULT_MAX_REQUEST_BODY_SIZE,
                 reader_ptr[].buffer,
             )
-            reader_ptr[].advance(bytes_read)
+            # Advance the reader by the number of bytes read plus 2 for the CRLF
+            reader_ptr[].advance(bytes_read + 2)
             protocol.add_event(request)
             return request
         except exc:
