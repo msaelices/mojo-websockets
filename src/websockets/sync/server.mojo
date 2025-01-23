@@ -75,9 +75,6 @@ struct Server:
 
     var ln: TCPListener
 
-    # var connections: List[TCPConnection]
-    # var read_fds: fd_set
-    # var write_fds: fd_set
     var protocol: ServerProtocol
 
     fn __init__(out self, host: String, port: Int, handler: ConnHandler, max_request_body_size: Int = DEFAULT_MAX_REQUEST_BODY_SIZE) raises:
