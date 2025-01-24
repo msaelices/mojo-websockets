@@ -1,4 +1,5 @@
 from collections import Dict, List
+from memory import Span
 from testing import assert_equal, assert_true
 
 from websockets.http import (
@@ -9,12 +10,11 @@ from websockets.http import (
     Headers,
     encode,
 )
-from websockets.utils.bytes import str_to_bytes
+from websockets.utils.bytes import str_to_bytes, bytes
 from websockets.utils.uri import URI
 from websockets.utils.string import (
     ByteReader,
     Bytes,
-    bytes,
     empty_string,
     to_string,
 )
@@ -42,7 +42,7 @@ fn test_parse_request_header() raises:
     )
     var header = Headers()
     var b = Bytes(headers_str)
-    var reader = ByteReader(b^)
+    var reader = ByteReader(Span(b^))
     var method: String
     var protocol: String
     var path: String
@@ -65,7 +65,7 @@ fn test_parse_response_header() raises:
     var protocol: String
     var status_code: String
     var status_text: String
-    var reader = ByteReader(headers_str^)
+    var reader = ByteReader(Span(headers_str^))
     protocol, status_code, status_text = header.parse_raw(reader)
     assert_equal(protocol, "HTTP/1.1")
     assert_equal(status_code, "200")

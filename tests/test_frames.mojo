@@ -15,7 +15,7 @@ from websockets.frames import (
     OP_TEXT, 
 )
 from websockets.streams import StreamReader
-from websockets.utils.string import bytes
+from websockets.utils.bytes import bytes
 from testutils import assert_bytes_equal
 
 
