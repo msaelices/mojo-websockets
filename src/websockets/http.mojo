@@ -311,7 +311,6 @@ struct HTTPRequest(Writable, Stringable):
             raise Error("Request body too large")
 
         self.body_raw = Bytes(r.read_bytes(content_length))
-        self.set_content_length(content_length)
 
     fn write_to[T: Writer, //](self, mut writer: T):
         path = self.uri.path if len(self.uri.path) > 1 else SLASH
