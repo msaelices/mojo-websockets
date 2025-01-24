@@ -278,10 +278,10 @@ struct ServerProtocol(Protocol):
             if request.headers["upgrade"] != "websocket":
                 raise Error('Request "upgrade" header is not "websocket"')
 
-            if not request.headers["Sec-WebSocket-Key"]:
+            if "Sec-WebSocket-Key" not in request.headers:
                 raise Error('Missing "Sec-WebSocket-Key" header.')
 
-            if not request.headers["Sec-WebSocket-Version"]:
+            if "Sec-WebSocket-Version" not in request.headers:
                 raise Error('Missing "Sec-WebSocket-Version" header.')
 
             if request.headers["Sec-WebSocket-Version"] != "13":

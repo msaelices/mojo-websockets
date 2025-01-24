@@ -171,10 +171,7 @@ struct Headers(Writable, Stringable):
 
     @always_inline
     fn __getitem__(self, key: String) raises -> String:
-        try:
-            return self._inner[key.lower()]
-        except:
-            raise Error("KeyError: Key not found in headers: " + key)
+        return self._inner[key.lower()]
 
     @always_inline
     fn get(self, key: String) -> Optional[String]:
