@@ -225,6 +225,9 @@ struct Headers(Writable, Stringable):
         for header in self._inner.items():
             write_header(writer, header[].key, header[].value)
 
+    fn remove(mut self, key: String) raises -> None:
+        _ = self._inner.pop(key.lower())
+
     fn __str__(self) -> String:
         return String.write(self)
 
