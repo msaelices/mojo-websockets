@@ -284,7 +284,7 @@ struct HTTPRequest(Writable, Stringable):
         self.timeout = timeout
         if HeaderKey.CONNECTION not in self.headers:
             self.headers[HeaderKey.CONNECTION] = "keep-alive"
-        if HeaderKey.HOST not in self.headers:
+        if HeaderKey.HOST not in self.headers and uri.host:
             self.headers[HeaderKey.HOST] = uri.host
 
     fn get_body(self) -> StringSlice[__origin_of(self.body_raw)]:
@@ -554,8 +554,6 @@ struct HTTPResponse(Writable, Stringable):
             String(self.status_code),
             whitespace,
             self.status_text,
-            lineBreak,
-            "server: lightbug_http",
             lineBreak,
         )
         if HeaderKey.DATE not in self.headers:
