@@ -201,10 +201,8 @@ struct Headers(Writable, Stringable):
             raise Error("Failed to read second word from request line")
         r.increment()
         var third = r.read_line()
-        if not r.available():
-            raise Error("Failed to read third word from request line")
 
-        while not is_newline(r.peek()) and r.available():
+        while r.available() and not is_newline(r.peek()):
             var key = r.read_until(BytesConstant.colon)
             r.increment()
             if is_space(r.peek()):

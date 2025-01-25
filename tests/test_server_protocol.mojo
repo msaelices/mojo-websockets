@@ -246,7 +246,7 @@ fn test_receive_junk_request() raises:
     # ValueError: invalid HTTP request line: HELO relay.invalid
     assert_equal(
         String(server.get_handshake_exc().value()),
-        "HTTPRequest.from_bytes: Failed to parse request headers: No more bytes to read."
+        "HTTPRequest.from_bytes: Failed to parse request headers: Failed to read second word from request line"
     )
     assert_equal(len(events), 2)
     assert_true(events[0].isa[HTTPRequest]())
