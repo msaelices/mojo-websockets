@@ -23,7 +23,7 @@ fn date_func() -> String:
 fn make_request() raises -> HTTPRequest:
     """Generate a handshake request that can be altered for testing."""
     return HTTPRequest(
-        uri=URI.parse_raises("/test"),
+        uri=URI.parse("/test"),
         headers=Headers(
             Header("Host", "example.com"),
             Header("Upgrade", "websocket"),
@@ -246,7 +246,7 @@ fn test_receive_junk_request() raises:
     # ValueError: invalid HTTP request line: HELO relay.invalid
     assert_equal(
         String(server.get_handshake_exc().value()),
-        "ValueError: Failed to parse request headers: Failed to read third word from request line"
+        "HTTPRequest.from_bytes: Failed to parse request headers: No more bytes to read."
     )
     assert_equal(len(events), 2)
     assert_true(events[0].isa[HTTPRequest]())
