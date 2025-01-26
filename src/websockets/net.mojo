@@ -658,7 +658,7 @@ struct ListenConfig:
             raise Error("ListenConfig.listen: Listen failed on sockfd: " + String(socket.fd))
 
         var listener = TCPListener(socket^)
-        var msg = String.write("\n🔥 Listening on ", "http://", addr.ip, ":", String(addr.port))
+        var msg = String.write("\n🔥 Listening on ", "ws://", addr.ip, ":", String(addr.port))
         print(msg)
         print("Ready to accept connections...")
 

@@ -37,7 +37,7 @@ struct Client:
         self.uri = other.uri
         self.conn = other.conn
 
-    fn send_binary(self, message: Bytes) raises -> None:
+    fn send_binary(mut self, message: Bytes) raises -> None:
         """
         Send a message to the server.
 
@@ -84,7 +84,7 @@ struct Client:
     # Contex manager methods
 
     fn __enter__(mut self) raises -> Self:
-        self.conn.connect(self.uri.host, self.uri.get_port())
+        self.conn.connect(self.uri.get_hostname(), self.uri.get_port())
         conn_req = self.protocol.connect()
         self.protocol.send_request(conn_req)
         data_to_send = self.protocol.data_to_send()
