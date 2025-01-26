@@ -176,6 +176,12 @@ struct TCPConnection:
     fn __moveinit__(out self, owned existing: Self):
         self.socket = existing.socket^
 
+    fn __copyinit__(out self, existing: Self):
+        self.socket = existing.socket
+
+    fn connect(mut self, host: String, port: Int) raises:
+        self.socket.connect(host, port)
+
     fn read(self, mut buf: Bytes) raises -> Int:
         try:
             return self.socket.receive(buf)
