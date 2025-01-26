@@ -273,7 +273,7 @@ fn test_client_receives_unexpected_continuation() raises:
     client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
     receive_data(client, Bytes(0, 0))
     events = client.events_received()
-    assert_equal(client.parser_exc.value()._message(), "ProtocolError: unexpected continuation frame")
+    assert_equal(String(client.parser_exc.value()), "ProtocolError: unexpected continuation frame")
     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: unexpected continuation frame").serialize(), fin=True))
 
 
@@ -283,7 +283,7 @@ fn test_server_receives_unexpected_continuation() raises:
         return Bytes(0, 0, 0, 0)
     receive_data[gen_mask_func=gen_mask](server, Bytes(0, 128, 0, 0, 0, 0))
     events = server.events_received()
-    assert_equal(server.parser_exc.value()._message(), "ProtocolError: unexpected continuation frame")
+    assert_equal(String(server.parser_exc.value()), "ProtocolError: unexpected continuation frame")
     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: unexpected continuation frame").serialize(), fin=True))
 
 
@@ -393,7 +393,7 @@ fn test_server_receives_text() raises:
 #     receive_data(client, Bytes(129, 4, 240, 159, 152, 128))
 #
 #     events = client.events_received()
-#     assert_equal(client.parser_exc.value()._message(), "PayloadTooBig: over size limit (4 > 3 bytes)")
+#     assert_equal(String(client.parser_exc.value()), "PayloadTooBig: over size limit (4 > 3 bytes)")
 #     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_MESSAGE_TOO_BIG, "over size limit (4 > 3 bytes)").serialize(), fin=True))
 
 # TODO: Implement the max_size in the protocol
@@ -404,7 +404,7 @@ fn test_server_receives_text() raises:
 #     receive_data(server, Bytes(129, 132, 0, 0, 0, 0, 240, 159, 152, 128))
 #
 #     events = server.events_received()
-#     assert_equal(server.parser_exc.value()._message(), "PayloadTooBig: over size limit (4 > 3 bytes)")
+#     assert_equal(String(server.parser_exc.value()), "PayloadTooBig: over size limit (4 > 3 bytes)")
 #     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_MESSAGE_TOO_BIG, "over size limit (4 > 3 bytes)").serialize(), fin=True))
 
 fn test_client_sends_fragmented_text() raises:
@@ -495,7 +495,7 @@ fn test_server_receives_fragmented_text() raises:
 #     # Second fragment exceeds size limit
 #     receive_data(client, Bytes(128, 2, 152, 128))
 #     events = client.events_received()
-#     assert_equal(client.parser_exc.value()._message(), "PayloadTooBig: over size limit (2 > 1 bytes)")
+#     assert_equal(String(client.parser_exc.value()), "PayloadTooBig: over size limit (2 > 1 bytes)")
 #     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_MESSAGE_TOO_BIG, "over size limit (2 > 1 bytes)").serialize(), fin=True))
 
 # TODO: Implement the max_size in the protocol
@@ -511,7 +511,7 @@ fn test_server_receives_fragmented_text() raises:
 #     # Second fragment exceeds size limit
 #     receive_data(server, Bytes(128, 130, 0, 0, 0, 0, 152, 128))
 #     events = server.events_received()
-#     assert_equal(server.parser_exc.value()._message(), "PayloadTooBig: over size limit (2 > 1 bytes)")
+#     assert_equal(String(server.parser_exc.value()), "PayloadTooBig: over size limit (2 > 1 bytes)")
 #     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_MESSAGE_TOO_BIG, "over size limit (2 > 1 bytes)").serialize(), fin=True))
 
 
@@ -545,7 +545,7 @@ fn test_client_receives_unexpected_text() raises:
     # Second unexpected text frame
     receive_data(client, Bytes(1, 0))
     events = client.events_received()
-    assert_equal(client.parser_exc.value()._message(), "ProtocolError: expected a continuation frame")
+    assert_equal(String(client.parser_exc.value()), "ProtocolError: expected a continuation frame")
     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: expected a continuation frame").serialize(), fin=True))
 
 fn test_server_receives_unexpected_text() raises:
@@ -562,7 +562,7 @@ fn test_server_receives_unexpected_text() raises:
     # Second unexpected text frame
     receive_data[gen_mask_func=gen_mask](server, Bytes(1, 128, 0, 0, 0, 0))
     events = server.events_received()
-    assert_equal(server.parser_exc.value()._message(), "ProtocolError: expected a continuation frame")
+    assert_equal(String(server.parser_exc.value()), "ProtocolError: expected a continuation frame")
     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: expected a continuation frame").serialize(), fin=True))
 
 
@@ -666,7 +666,7 @@ fn test_server_receives_binary() raises:
 #     """The test verifies that a client properly handles binary data exceeding size limits."""
 #     client = DummyProtocol[False, CLIENT, max_size=3](OPEN, StreamReader(), Bytes(), List[Event]())
 #     receive_data(client, Bytes(130, 4, 1, 2, 254, 255))
-#     assert_equal(client.parser_exc.value()._message(), "PayloadTooBig: over size limit (4 > 3 bytes)")
+#     assert_equal(String(client.parser_exc.value()), "PayloadTooBig: over size limit (4 > 3 bytes)")
 #     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_MESSAGE_TOO_BIG, "over size limit (4 > 3 bytes)").serialize(), fin=True))
 
 # TODO: Implement the max_size in the protocol
@@ -675,7 +675,7 @@ fn test_server_receives_binary() raises:
 #     server = DummyProtocol[True, SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
 #     receive_data(server, Bytes(130, 132, 0, 0, 0, 0, 1, 2, 254, 255))
 #     events = server.events_received()
-#     assert_equal(server.parser_exc.value()._message(), "PayloadTooBig: over size limit (4 > 3 bytes)")
+#     assert_equal(String(server.parser_exc.value()), "PayloadTooBig: over size limit (4 > 3 bytes)")
 #     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_MESSAGE_TOO_BIG, "over size limit (4 > 3 bytes)").serialize(), fin=True))
 
 
@@ -768,7 +768,7 @@ fn test_server_receives_fragmented_binary() raises:
 #     # Second fragment exceeds size limit
 #     receive_data(client, Bytes(128, 2, 254, 255))
 #     events = client.events_received()
-#     assert_equal(client.parser_exc.value()._message(), "PayloadTooBig: over size limit (2 > 1 bytes)")
+#     assert_equal(String(client.parser_exc.value()), "PayloadTooBig: over size limit (2 > 1 bytes)")
 #     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_MESSAGE_TOO_BIG, "over size limit (2 > 1 bytes)").serialize(), fin=True))
 
 # TODO: Implement the max_size in the protocol
@@ -784,7 +784,7 @@ fn test_server_receives_fragmented_binary() raises:
 #     # Second fragment exceeds size limit
 #     receive_data(server, Bytes(128, 130, 0, 0, 0, 0, 254, 255))
 #     events = server.events_received()
-#     assert_equal(server.parser_exc.value()._message(), "PayloadTooBig: over size limit (2 > 1 bytes)")
+#     assert_equal(String(server.parser_exc.value()), "PayloadTooBig: over size limit (2 > 1 bytes)")
 #     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_MESSAGE_TOO_BIG, "over size limit (2 > 1 bytes)").serialize(), fin=True))
 #
 
@@ -818,7 +818,7 @@ fn test_client_receives_unexpected_binary() raises:
     # Second unexpected binary frame
     receive_data(client, Bytes(2, 0))
     events = client.events_received()
-    assert_equal(client.parser_exc.value()._message(), "ProtocolError: expected a continuation frame")
+    assert_equal(String(client.parser_exc.value()), "ProtocolError: expected a continuation frame")
     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: expected a continuation frame").serialize(), fin=True))
 
 
@@ -836,7 +836,7 @@ fn test_server_receives_unexpected_binary() raises:
     # Second unexpected binary frame
     receive_data[gen_mask_func=gen_mask](server, Bytes(2, 128, 0, 0, 0, 0))
     events = server.events_received()
-    assert_equal(server.get_parser_exc().value()._message(), "ProtocolError: expected a continuation frame")
+    assert_equal(String(server.get_parser_exc().value()), "ProtocolError: expected a continuation frame")
     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: expected a continuation frame").serialize(), fin=True))
 
 
@@ -1196,7 +1196,7 @@ fn test_client_receives_close_with_truncated_code() raises:
     client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
     receive_data(client, Bytes(136, 1, 3))  # \x88\x01\x03
     events = client.events_received()
-    assert_equal(client.parser_exc.value()._message(), "ProtocolError: close frame too short")
+    assert_equal(String(client.parser_exc.value()), "ProtocolError: close frame too short")
     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: close frame too short").serialize(), fin=True))
     assert_equal(client.get_state(), 2)  # CLOSING
 
@@ -1208,7 +1208,7 @@ fn test_server_receives_close_with_truncated_code() raises:
         return Bytes(0, 0, 0, 0)
     receive_data[gen_mask_func=gen_mask](server, Bytes(136, 129, 0, 0, 0, 0, 3))  # \x88\x81\x00\x00\x00\x00\x03
     events = server.events_received()
-    assert_equal(server.parser_exc.value()._message(), "ProtocolError: close frame too short")
+    assert_equal(String(server.parser_exc.value()), "ProtocolError: close frame too short")
     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: close frame too short").serialize(), fin=True))
     assert_equal(server.get_state(), 2)  # CLOSING
 
@@ -1221,7 +1221,7 @@ fn test_server_receives_close_with_truncated_code() raises:
 #     # Send close frame with invalid UTF-8 bytes
 #     receive_data(client, Bytes(136, 4, 3, 232, 255, 255))  # \x88\x04\x03\xe8\xff\xff
 #     events = client.events_received()
-#     assert_equal(client.parser_exc.value()._message(), "UnicodeDecodeError: invalid start byte at position 0")
+#     assert_equal(String(client.parser_exc.value()), "UnicodeDecodeError: invalid start byte at position 0")
 #     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_INVALID_DATA, "invalid start byte at position 0").serialize(), fin=True))
 #     assert_equal(client.get_state(), 2)  # CLOSING
 
@@ -1236,7 +1236,7 @@ fn test_server_receives_close_with_truncated_code() raises:
 #     # Send close frame with invalid UTF-8 bytes
 #     receive_data[gen_mask_func=gen_mask](server, Bytes(136, 132, 0, 0, 0, 0, 3, 233, 255, 255))  # \x88\x84\x00\x00\x00\x00\x03\xe9\xff\xff
 #     events = server.events_received()
-#     assert_equal(server.parser_exc.value()._message(), "UnicodeDecodeError: invalid start byte at position 0")
+#     assert_equal(String(server.parser_exc.value()), "UnicodeDecodeError: invalid start byte at position 0")
 #     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_INVALID_DATA, "invalid start byte at position 0").serialize(), fin=True))
 #     assert_equal(server.get_state(), 2)  # CLOSING
 
@@ -1376,7 +1376,7 @@ fn test_client_receives_fragmented_ping_frame() raises:
     client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
     receive_data(client, Bytes(9, 0))  # \x09\x00
     events = client.events_received()
-    assert_equal(client.parser_exc.value()._message(), "ProtocolError: fragmented control frame")
+    assert_equal(String(client.parser_exc.value()), "ProtocolError: fragmented control frame")
     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: fragmented control frame").serialize(), fin=True))
 
 
@@ -1387,7 +1387,7 @@ fn test_server_receives_fragmented_ping_frame() raises:
         return Bytes(60, 60, 60, 60)  # \x3c\x3c\x3c\x3c
     receive_data[gen_mask_func=gen_mask](server, Bytes(9, 128, 60, 60, 60, 60))  # \x09\x80\x3c\x3c\x3c\x3c
     events = server.events_received()
-    assert_equal(server.parser_exc.value()._message(), "ProtocolError: fragmented control frame")
+    assert_equal(String(server.parser_exc.value()), "ProtocolError: fragmented control frame")
     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: fragmented control frame").serialize(), fin=True))
 
 
@@ -1562,7 +1562,7 @@ fn test_client_receives_fragmented_pong_frame() raises:
     client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
     receive_data(client, Bytes(10, 0))  # \x0a\x00
     events = client.events_received()
-    assert_equal(client.parser_exc.value()._message(), "ProtocolError: fragmented control frame")
+    assert_equal(String(client.parser_exc.value()), "ProtocolError: fragmented control frame")
     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: fragmented control frame").serialize(), fin=True))
 
 
@@ -1573,7 +1573,7 @@ fn test_server_receives_fragmented_pong_frame() raises:
         return Bytes(60, 60, 60, 60)  # \x3c\x3c\x3c\x3c
     receive_data[gen_mask_func=gen_mask](server, Bytes(10, 128, 60, 60, 60, 60))  # \x0a\x80\x3c\x3c\x3c\x3c
     events = server.events_received()
-    assert_equal(server.parser_exc.value()._message(), "ProtocolError: fragmented control frame")
+    assert_equal(String(server.parser_exc.value()), "ProtocolError: fragmented control frame")
     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: fragmented control frame").serialize(), fin=True))
 
 
@@ -1670,7 +1670,7 @@ fn test_client_stops_processing_frames_after_fail() raises:
     events = client.events_received()
     assert_equal(len(events), 0)
     data_to_send = client.data_to_send()
-    # assert_equal(client.parser_exc.value()._message(), "ProtocolError: invalid close code")
+    # assert_equal(String(client.parser_exc.value()), "ProtocolError: invalid close code")
     close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "").serialize(), fin=True)
     assert_bytes_equal(data_to_send, close_frame.serialize(mask=client.is_masked()))
 
@@ -1874,7 +1874,7 @@ fn test_client_receive_close_in_fragmented_message() raises:
     # Receive close frame
     receive_data(client, Bytes(136, 2, 3, 232))  # \x88\x02\x03\xe8
     events = client.events_received()
-    assert_equal(client.parser_exc.value()._message(), "ProtocolError: incomplete fragmented message")
+    assert_equal(String(client.parser_exc.value()), "ProtocolError: incomplete fragmented message")
     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: incomplete fragmented message").serialize(), fin=True))
 
 
@@ -1892,7 +1892,7 @@ fn test_server_receive_close_in_fragmented_message() raises:
     # Receive close frame
     receive_data[gen_mask_func=gen_mask](server, Bytes(136, 130, 0, 0, 0, 0, 3, 233))  # \x88\x82\x00\x00\x00\x00\x03\xe9
     events = server.events_received()
-    assert_equal(server.parser_exc.value()._message(), "ProtocolError: incomplete fragmented message")
+    assert_equal(String(server.parser_exc.value()), "ProtocolError: incomplete fragmented message")
     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: incomplete fragmented message").serialize(), fin=True))
 
 
@@ -1942,7 +1942,7 @@ fn test_client_receives_eof_between_frames() raises:
 
     # Receive EOF between frames
     receive_eof(client)
-    assert_equal(client.parser_exc.value()._message(), "EOFError: stream ends after 0 bytes, expected 2 bytes")
+    assert_equal(String(client.parser_exc.value()), "EOFError: stream ends after 0 bytes, expected 2 bytes")
     assert_equal(client.get_state(), 3)  # CLOSED
 
 
@@ -1952,7 +1952,7 @@ fn test_server_receives_eof_between_frames() raises:
 
     # Receive EOF between frames
     receive_eof(server)
-    assert_equal(server.parser_exc.value()._message(), "EOFError: stream ends after 0 bytes, expected 2 bytes")
+    assert_equal(String(server.parser_exc.value()), "EOFError: stream ends after 0 bytes, expected 2 bytes")
     assert_equal(server.get_state(), 3)  # CLOSED
 
 
@@ -1966,7 +1966,7 @@ fn test_client_receives_eof_inside_frame() raises:
     # Receive EOF
     receive_eof(client)
 
-    assert_equal(client.parser_exc.value()._message(), "EOFError: stream ends after 1 bytes, expected 2 bytes")
+    assert_equal(String(client.parser_exc.value()), "EOFError: stream ends after 1 bytes, expected 2 bytes")
     assert_equal(client.get_state(), 3)  # CLOSED
 
 
@@ -1980,7 +1980,7 @@ fn test_server_receives_eof_inside_frame() raises:
     # Receive EOF
     receive_eof(server)
 
-    assert_equal(server.parser_exc.value()._message(), "EOFError: stream ends after 1 bytes, expected 2 bytes")
+    assert_equal(String(server.parser_exc.value()), "EOFError: stream ends after 1 bytes, expected 2 bytes")
     assert_equal(server.get_state(), 3)  # CLOSED
 
 
@@ -1991,7 +1991,7 @@ fn test_client_receives_data_after_exception() raises:
     # Receive invalid frame
     receive_data(client, Bytes(255, 255))  # \xff\xff
     events = client.events_received()
-    assert_equal(client.parser_exc.value()._message(), "ProtocolError: invalid opcode: 15")
+    assert_equal(String(client.parser_exc.value()), "ProtocolError: invalid opcode: 15")
     close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: invalid opcode: 15").serialize(), fin=True)
     assert_equal(events[0][Frame], close_frame)
     data_to_send = client.data_to_send()
@@ -2013,7 +2013,7 @@ fn test_server_receives_data_after_exception() raises:
     # Receive invalid frame
     receive_data[gen_mask_func=gen_mask](server, Bytes(255, 255))  # \xff\xff
     events = server.events_received()
-    assert_equal(server.parser_exc.value()._message(), "ProtocolError: invalid opcode: 15")
+    assert_equal(String(server.parser_exc.value()), "ProtocolError: invalid opcode: 15")
     close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: invalid opcode: 15").serialize(), fin=True)
     assert_equal(events[0][Frame], close_frame)
     data_to_send = server.data_to_send()
@@ -2033,7 +2033,7 @@ fn test_client_receives_eof_after_exception() raises:
     # Receive invalid frame
     receive_data(client, Bytes(255, 255))  # \xff\xff
     events = client.events_received()
-    assert_equal(client.parser_exc.value()._message(), "ProtocolError: invalid opcode: 15")
+    assert_equal(String(client.parser_exc.value()), "ProtocolError: invalid opcode: 15")
     close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: invalid opcode: 15").serialize(), fin=True)
     assert_equal(events[0][Frame], close_frame)
     data_to_send = client.data_to_send()
@@ -2054,7 +2054,7 @@ fn test_server_receives_eof_after_exception() raises:
     # Receive invalid frame
     receive_data[gen_mask_func=gen_mask](server, Bytes(255, 255))  # \xff\xff
     events = server.events_received()
-    assert_equal(server.parser_exc.value()._message(), "ProtocolError: invalid opcode: 15")
+    assert_equal(String(server.parser_exc.value()), "ProtocolError: invalid opcode: 15")
     close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: invalid opcode: 15").serialize(), fin=True)
     assert_equal(events[0][Frame], close_frame)
     data_to_send = server.data_to_send()
@@ -2073,7 +2073,7 @@ fn test_client_receives_data_and_eof_after_exception() raises:
     # Receive invalid frame
     receive_data(client, Bytes(255, 255))  # \xff\xff
     events = client.events_received()
-    assert_equal(client.parser_exc.value()._message(), "ProtocolError: invalid opcode: 15")
+    assert_equal(String(client.parser_exc.value()), "ProtocolError: invalid opcode: 15")
     close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: invalid opcode: 15").serialize(), fin=True)
     assert_equal(events[0][Frame], close_frame)
     data_to_send = client.data_to_send()
@@ -2100,7 +2100,7 @@ fn test_server_receives_data_and_eof_after_exception() raises:
     # Receive invalid frame
     receive_data[gen_mask_func=gen_mask](server, Bytes(255, 255))  # \xff\xff
     events = server.events_received()
-    assert_equal(server.parser_exc.value()._message(), "ProtocolError: invalid opcode: 15")
+    assert_equal(String(server.parser_exc.value()), "ProtocolError: invalid opcode: 15")
     close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: invalid opcode: 15").serialize(), fin=True)
     assert_equal(events[0][Frame], close_frame)
     data_to_send = server.data_to_send()
@@ -2286,7 +2286,7 @@ fn test_close_exc_if_client_sends_close_then_receives_close() raises:
     assert_equal(client.get_close_rcvd_then_sent().value(), False)
 
     close_exc = get_close_exc(client)
-    assert_equal(close_exc._message(), "ConnectionClosedOK: 1000, 1000")
+    assert_equal(String(close_exc), "ConnectionClosedOK: 1000, 1000")
 
 
 fn test_close_exc_if_server_sends_close_then_receives_close() raises:
@@ -2313,7 +2313,7 @@ fn test_close_exc_if_server_sends_close_then_receives_close() raises:
     assert_equal(server.get_close_rcvd_then_sent().value(), False)
 
     close_exc = get_close_exc(server)
-    assert_equal(close_exc._message(), "ConnectionClosedOK: 1000, 1000")
+    assert_equal(String(close_exc), "ConnectionClosedOK: 1000, 1000")
 
 
 fn test_close_exc_if_client_receives_close_then_sends_close() raises:
@@ -2334,7 +2334,7 @@ fn test_close_exc_if_client_receives_close_then_sends_close() raises:
     assert_equal(client.get_close_rcvd_then_sent().value(), True)
 
     close_exc = get_close_exc(client)
-    assert_equal(close_exc._message(), "ConnectionClosedOK: 1000, 1000")
+    assert_equal(String(close_exc), "ConnectionClosedOK: 1000, 1000")
 
 
 fn test_close_exc_if_server_receives_close_then_sends_close() raises:
@@ -2357,7 +2357,7 @@ fn test_close_exc_if_server_receives_close_then_sends_close() raises:
     assert_equal(server.get_close_rcvd_then_sent().value(), True)
 
     close_exc = get_close_exc(server)
-    assert_equal(close_exc._message(), "ConnectionClosedOK: 1000, 1000")
+    assert_equal(String(close_exc), "ConnectionClosedOK: 1000, 1000")
 
 
 fn test_close_exc_if_client_sends_close_then_receives_eof() raises:
@@ -2376,7 +2376,7 @@ fn test_close_exc_if_client_sends_close_then_receives_eof() raises:
     assert_equal(Bool(client.get_close_rcvd_then_sent()), False)
 
     close_exc = get_close_exc(client)
-    assert_equal(close_exc._message(), "ConnectionClosedError: False, True, False")
+    assert_equal(String(close_exc), "ConnectionClosedError: False, True, False")
 
 
 fn test_close_exc_if_server_sends_close_then_receives_eof() raises:
@@ -2392,7 +2392,7 @@ fn test_close_exc_if_server_sends_close_then_receives_eof() raises:
     assert_equal(Bool(server.get_close_rcvd_then_sent()), False)
 
     close_exc = get_close_exc(server)
-    assert_equal(close_exc._message(), "ConnectionClosedError: False, True, False")
+    assert_equal(String(close_exc), "ConnectionClosedError: False, True, False")
 
 
 fn test_close_exc_if_client_receives_eof() raises:
@@ -2406,7 +2406,7 @@ fn test_close_exc_if_client_receives_eof() raises:
     assert_equal(Bool(client.get_close_rcvd_then_sent()), False)
 
     close_exc = get_close_exc(client)
-    assert_equal(close_exc._message(), "ConnectionClosedError: False, False, False")
+    assert_equal(String(close_exc), "ConnectionClosedError: False, False, False")
 
 
 fn test_close_exc_if_server_receives_eof() raises:
@@ -2420,4 +2420,4 @@ fn test_close_exc_if_server_receives_eof() raises:
     assert_equal(Bool(server.get_close_rcvd_then_sent()), False)
 
     close_exc = get_close_exc(server)
-    assert_equal(close_exc._message(), "ConnectionClosedError: False, False, False")
+    assert_equal(String(close_exc), "ConnectionClosedError: False, False, False")

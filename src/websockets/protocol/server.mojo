@@ -299,7 +299,7 @@ struct ServerProtocol(Protocol):
         except exc:
             # TODO: Handle specific exceptions with different status codes.
             self.set_handshake_exc(exc)
-            body = exc._message()
+            body = String(exc)
             status_code = 400
             status_text = "Bad Request"
             return self.reject[date_func=date_func](status_code, status_text, body)

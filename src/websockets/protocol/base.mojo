@@ -183,7 +183,7 @@ fn parse_buffer[
         err = error
         # TODO: Differentiate between protocol errors, connection and other kind of errors
         code = CLOSE_CODE_PROTOCOL_ERROR
-        reason = error._message()
+        reason = String(error)
         event = Frame(OP_CLOSE, Close(code, reason).serialize(), fin=True)
 
         # Fail the WebSocket Connection
