@@ -86,9 +86,14 @@ struct Client:
     fn __enter__(mut self) raises -> Self:
         self.conn.connect(self.uri.get_hostname(), self.uri.get_port())
         conn_req = self.protocol.connect()
+        logger.debug("Sending connection request:\n{}".format(String(conn_req)))
         self.protocol.send_request(conn_req)
         data_to_send = self.protocol.data_to_send()
         _ = self.conn.write(data_to_send)
+        response_bytes = Bytes(capacity=DEFAULT_BUFFER_SIZE)
+        bytes_received = self.conn.read(response_bytes)
+        logger.debug("Bytes received: ", bytes_received)
+        receive_data(self.protocol, response_bytes)
         # TODO: Handle handshake exceptions
         return self
 

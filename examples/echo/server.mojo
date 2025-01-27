@@ -6,7 +6,7 @@ from websockets.sync.server import serve, WSConnection
 
 fn on_message(conn: WSConnection, data: Bytes) raises -> None:
     print("<<< ", String(data))
-    conn.send_binary(data)
+    conn.send_text(String(data))
     print(">>> ", String(data))
 
 

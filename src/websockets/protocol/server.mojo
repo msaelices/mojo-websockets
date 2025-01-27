@@ -12,6 +12,7 @@ from websockets.http import (
     HTTPRequest,
 )
 from websockets.frames import Frame, Close
+from websockets.logger import logger
 from websockets.streams import StreamReader
 from websockets.utils.bytes import b64decode, gen_mask, str_to_bytes
 from websockets.utils.handshake import ws_accept_key
@@ -108,7 +109,7 @@ struct ServerProtocol(Protocol):
         Args:
             state: The state of the protocol.
         """
-        print("Setting state to: ", state)
+        logger.debug("Setting state to: ", state)
         self.state = state
 
     fn is_masked(self) -> Bool:
@@ -263,7 +264,6 @@ struct ServerProtocol(Protocol):
         Args:
             request: The HTTP request to accept.
         """
-        print("Accepting WebSocket connection")
         try:
             if "Upgrade" not in request.headers:
                 raise Error('Request headers do not contain an "upgrade" header')
@@ -306,7 +306,6 @@ struct ServerProtocol(Protocol):
 
         var key = request.headers["Sec-WebSocket-Key"]
         var accept_encoded = ws_accept_key(key)
-        print("Accept encoded: ", accept_encoded)
         var headers = Headers(
             Header("Date", date_func()),
             Header("Upgrade", "websocket"),

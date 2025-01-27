@@ -155,6 +155,7 @@ struct Server:
                 conn.teardown()
                 logger.error(e)
                 return
+            logger.debug("Bytes received:", len(b))
 
             if self.protocol.get_parser_exc():
                 logger.error(String(self.protocol.get_parser_exc().value()))
@@ -165,18 +166,21 @@ struct Server:
             if self.protocol.get_state() == CONNECTING:
                 var request: HTTPRequest = self.protocol.events_received()[0][HTTPRequest]
 
+                logger.debug("Starting handshake")
+
                 response = self.protocol.accept(request)
                 if self.protocol.get_handshake_exc():
                     logger.error(String(self.protocol.get_handshake_exc().value()))
                     conn.teardown()
                     return
+
+                logger.debug("Sending handshake response")
                 self.protocol.send_response(response)
                 data_to_send = self.protocol.data_to_send()
         
                 bytes_written = conn.write(data_to_send)
-                logger.debug("Bytes written: ", bytes_written)
+                logger.debug("Bytes written:", bytes_written)
             else:
-                logger.debug("Received data: ", len(b))
                 self.handle_read(wsconn, b)
 
             logger.debug(
