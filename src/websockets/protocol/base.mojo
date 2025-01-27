@@ -171,8 +171,9 @@ fn parse_buffer[
     var err: Optional[Error] = None
     var optional_frame: Optional[Frame] = None
     try:
+        is_masked = T.side == SERVER
         optional_frame = Frame.parse(
-            reader_ptr, mask=protocol.is_masked(),
+            reader_ptr, mask=is_masked,
         )
         if optional_frame:
             receive_frame[gen_mask_func=gen_mask_func](protocol, optional_frame.value())
@@ -350,7 +351,7 @@ fn send_frame[
 
     protocol.write_data(
         frame.serialize[gen_mask_func=gen_mask_func](
-            mask=protocol.is_masked(),
+            mask=T.side == CLIENT,
         )
     )
 

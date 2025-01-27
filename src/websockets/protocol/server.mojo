@@ -112,15 +112,6 @@ struct ServerProtocol(Protocol):
         logger.debug("Setting state to: ", state)
         self.state = state
 
-    fn is_masked(self) -> Bool:
-        """
-        Check if the connection is masked.
-
-        Returns:
-            Whether the connection is masked.
-        """
-        return True  # Server connections are always masked
-
     fn write_data(mut self, data: Bytes) -> None:
         """Write data to the protocol."""
         self.writes.extend(data)

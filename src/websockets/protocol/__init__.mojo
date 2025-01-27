@@ -93,10 +93,6 @@ trait Protocol:
         """Set the expectation of a continuation frame."""
         ...
 
-    fn is_masked(self) -> Bool:
-        """Check if the protocol is masked."""
-        ...
-
     fn get_curr_size(self) -> Optional[Int]:
         """Get the current size of the protocol."""
         ...

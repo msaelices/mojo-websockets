@@ -122,15 +122,6 @@ struct ClientProtocol(Protocol):
         """
         self.state = state
 
-    fn is_masked(self) -> Bool:
-        """
-        Check if the connection is masked.
-
-        Returns:
-            Whether the connection is masked.
-        """
-        return False  # Client connections are always non-masked
-
     fn write_data(mut self, data: Bytes) -> None:
         """Write data to the protocol."""
         self.writes += data
