@@ -217,6 +217,8 @@ fn test_client_receives_unmasked_frame() raises:
 
 fn test_client_sends_masked_frame() raises:
     client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 255, 0, 255)
     send_text[gen_mask_func=gen_mask](client, str_to_bytes("Spam"), True)
     assert_bytes_equal(client.data_to_send(), masked_text_frame_data)
 
@@ -856,7 +858,7 @@ fn test_server_receives_binary_after_receiving_close() raises:
     events = server.events_received()
     close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_GOING_AWAY, "").serialize(), fin=True)
     assert_equal(events[0][Frame], close_frame)
-    assert_bytes_equal(server.data_to_send(), close_frame.serialize[gen_mask_func=gen_mask](mask=True))
+    assert_bytes_equal(server.data_to_send(), close_frame.serialize[gen_mask_func=gen_mask](mask=False))
 
     # Receive binary frame after close
     receive_data(server, Bytes(130, 128, 0, 255, 0, 255))
@@ -932,7 +934,7 @@ fn test_client_sends_close() raises:
     """Test that client properly sends a close frame."""
     client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
     send_close[gen_mask_func=gen_mask](client)
-    assert_bytes_equal(client.data_to_send(), Bytes(136, 128, 60, 60, 60, 60))  # \x88\x80\x3c\x3c\x3c\x3c
+    assert_bytes_equal(client.data_to_send(), Bytes(136, 128, 0, 0, 0, 0))  # \x88\x80\x00\x00\x00\x00
     assert_equal(client.get_state(), 2)  # CLOSING
 
 
@@ -950,14 +952,14 @@ fn test_client_receives_close() raises:
     receive_data[gen_mask_func=gen_mask](client, Bytes(136, 0))  # \x88\x00
     events = client.events_received()
     assert_equal(events[0][Frame], Frame(OP_CLOSE, Bytes(), fin=True))
-    assert_bytes_equal(client.data_to_send(), Frame(OP_CLOSE, Bytes(), fin=True).serialize(mask=True))
+    assert_bytes_equal(client.data_to_send(), Frame(OP_CLOSE, Bytes(), fin=True).serialize[gen_mask_func=gen_mask](mask=True))
     assert_equal(client.get_state(), 2)  # CLOSING
 
 
 fn test_server_receives_close() raises:
     """Test that server properly receives a close frame."""
     server = DummyProtocol[SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
-    receive_data[gen_mask_func=gen_mask](server, Bytes(136, 128, 60, 60, 60, 60))  # \x88\x80\x3c\x3c\x3c\x3c
+    receive_data[gen_mask_func=gen_mask](server, Bytes(136, 128, 0, 0, 0, 0))  # \x88\x80\x00\x00\x00\x00
     events = server.events_received()
     assert_equal(events[0][Frame], Frame(OP_CLOSE, Bytes(), fin=True))
     assert_bytes_equal(server.data_to_send(), Frame(OP_CLOSE, Bytes(), fin=True).serialize[gen_mask_func=gen_mask](mask=False))
@@ -968,10 +970,12 @@ fn test_client_sends_close_then_receives_close() raises:
     """Test client-initiated close handshake on the client side."""
     client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
 
-    send_close(client)
+    send_close[gen_mask_func=gen_mask](client)
     events = client.events_received()
     assert_equal(len(events), 0)
-    assert_bytes_equal(client.data_to_send(), Frame(OP_CLOSE, Bytes(), fin=True).serialize(mask=False))
+    expected = Frame(OP_CLOSE, Bytes(), fin=True).serialize[gen_mask_func=gen_mask](mask=True)
+    data_to_send = client.data_to_send()
+    assert_bytes_equal(data_to_send, expected)
 
     # Receive close
     receive_data[gen_mask_func=gen_mask](client, Bytes(136, 0))  # \x88\x00
@@ -994,10 +998,10 @@ fn test_server_sends_close_then_receives_close() raises:
     send_close[gen_mask_func=gen_mask](server)
     events = server.events_received()
     assert_equal(len(events), 0)
-    assert_bytes_equal(server.data_to_send(), Frame(OP_CLOSE, Bytes(), fin=True).serialize[gen_mask_func=gen_mask](mask=True))
+    assert_bytes_equal(server.data_to_send(), Frame(OP_CLOSE, Bytes(), fin=True).serialize[gen_mask_func=gen_mask](mask=False))
 
     # Receive close
-    receive_data[gen_mask_func=gen_mask](server, Bytes(136, 128, 60, 60, 60, 60))  # \x88\x80\x3c\x3c\x3c\x3c
+    receive_data[gen_mask_func=gen_mask](server, Bytes(136, 128, 0, 0, 0, 0))  # \x88\x80\x00\x00\x00\x00
     events = server.events_received()
     assert_equal(events[0][Frame], Frame(OP_CLOSE, Bytes(), fin=True))
     assert_bytes_equal(server.data_to_send(), Bytes())
@@ -1015,10 +1019,10 @@ fn test_client_receives_close_then_sends_close() raises:
     client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
 
     # Receive close
-    receive_data(client, Bytes(136, 0))  # \x88\x00
+    receive_data[gen_mask_func=gen_mask](client, Bytes(136, 0))  # \x88\x00
     events = client.events_received()
     assert_equal(events[0][Frame], Frame(OP_CLOSE, Bytes(), fin=True))
-    assert_bytes_equal(client.data_to_send(), Frame(OP_CLOSE, Bytes(), fin=True).serialize(mask=False))
+    assert_bytes_equal(client.data_to_send(), Frame(OP_CLOSE, Bytes(), fin=True).serialize[gen_mask_func=gen_mask](mask=True))
 
     # Receive EOF
     client.set_eof_sent(True)
@@ -1031,10 +1035,10 @@ fn test_server_receives_close_then_sends_close() raises:
     server = DummyProtocol[SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
 
     # Receive close
-    receive_data[gen_mask_func=gen_mask](server, Bytes(136, 128, 60, 60, 60, 60))  # \x88\x80\x3c\x3c\x3c\x3c
+    receive_data[gen_mask_func=gen_mask](server, Bytes(136, 128, 0, 0, 0, 0))  # \x88\x80\x00\x00\x00\x00
     events = server.events_received()
     assert_equal(events[0][Frame], Frame(OP_CLOSE, Bytes(), fin=True))
-    assert_bytes_equal(server.data_to_send(), Frame(OP_CLOSE, Bytes(), fin=True).serialize[gen_mask_func=gen_mask](mask=True))
+    assert_bytes_equal(server.data_to_send(), Frame(OP_CLOSE, Bytes(), fin=True).serialize[gen_mask_func=gen_mask](mask=False))
     assert_equal(server.get_state(), 2)  # CLOSING
 
     # Receive EOF
@@ -1063,11 +1067,11 @@ fn test_server_sends_close_with_code() raises:
 fn test_client_receives_close_with_code() raises:
     """Test that client properly receives a close frame with code."""
     client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
-    receive_data(client, Bytes(136, 2, 3, 232))  # \x88\x02\x03\xe8
+    receive_data[gen_mask_func=gen_mask](client, Bytes(136, 2, 3, 232))  # \x88\x02\x03\xe8
     events = client.events_received()
     close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_NORMAL_CLOSURE, "").serialize(), fin=True)
     assert_equal(events[0][Frame], close_frame)
-    assert_bytes_equal(client.data_to_send(), close_frame.serialize[gen_mask_func=gen_mask](mask=False))
+    assert_bytes_equal(client.data_to_send(), close_frame.serialize[gen_mask_func=gen_mask](mask=True))
     assert_equal(client.get_state(), 2)  # CLOSING
 
 
@@ -1078,7 +1082,7 @@ fn test_server_receives_close_with_code() raises:
     events = server.events_received()
     close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_GOING_AWAY, "").serialize(), fin=True)
     assert_equal(events[0][Frame], close_frame)
-    assert_bytes_equal(server.data_to_send(), close_frame.serialize[gen_mask_func=gen_mask](mask=True))
+    assert_bytes_equal(server.data_to_send(), close_frame.serialize[gen_mask_func=gen_mask](mask=False))
     assert_equal(server.get_state(), 2)  # CLOSING
 
 
@@ -1101,11 +1105,11 @@ fn test_server_sends_close_with_code_and_reason() raises:
 fn test_client_receives_close_with_code_and_reason() raises:
     """Test that client properly receives a close frame with code and reason."""
     client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
-    receive_data(client, Bytes(136, 4, 3, 232) + str_to_bytes("OK"))
+    receive_data[gen_mask_func=gen_mask](client, Bytes(136, 4, 3, 232) + str_to_bytes("OK"))
     events = client.events_received()
     close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_NORMAL_CLOSURE, "OK").serialize(), fin=True)
     assert_equal(events[0][Frame], close_frame)
-    assert_bytes_equal(client.data_to_send(), close_frame.serialize[gen_mask_func=gen_mask](mask=False))
+    assert_bytes_equal(client.data_to_send(), close_frame.serialize[gen_mask_func=gen_mask](mask=True))
     assert_equal(client.get_state(), 2)  # CLOSING
 
 
@@ -1116,7 +1120,7 @@ fn test_server_receives_close_with_code_and_reason() raises:
     events = server.events_received()
     close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_GOING_AWAY, "going away").serialize(), fin=True)
     assert_equal(events[0][Frame], close_frame)
-    assert_bytes_equal(server.data_to_send(), close_frame.serialize[gen_mask_func=gen_mask](mask=True))
+    assert_bytes_equal(server.data_to_send(), close_frame.serialize[gen_mask_func=gen_mask](mask=False))
     assert_equal(server.get_state(), 2)  # CLOSING
 
 
@@ -1222,7 +1226,7 @@ fn test_client_sends_ping() raises:
     """Test that client properly sends a ping frame."""
     client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
     send_ping[gen_mask_func=gen_mask](client, Bytes())
-    assert_bytes_equal(client.data_to_send(), Bytes(137, 128, 0, 68, 136, 204))  # \x89\x80\x00\x44\x88\xcc
+    assert_bytes_equal(client.data_to_send(), Bytes(137, 128, 0, 0, 0, 0))  # \x89\x80\x00\x00\x00\x00
 
 
 fn test_server_sends_ping() raises:
@@ -1235,10 +1239,10 @@ fn test_server_sends_ping() raises:
 fn test_client_receives_ping() raises:
     """Test that client properly receives a ping frame and responds with a pong frame."""
     client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
-    receive_data(client, Bytes(137, 0))  # \x89\x00
+    receive_data[gen_mask_func=gen_mask](client, Bytes(137, 0))  # \x89\x00
     events = client.events_received()
     assert_equal(events[0][Frame], Frame(OP_PING, Bytes()))
-    assert_bytes_equal(client.data_to_send(), Frame(OP_PONG, Bytes()).serialize[gen_mask_func=gen_mask](mask=False))
+    assert_bytes_equal(client.data_to_send(), Frame(OP_PONG, Bytes()).serialize[gen_mask_func=gen_mask](mask=True))
 
 
 fn test_server_receives_ping() raises:
@@ -1247,14 +1251,14 @@ fn test_server_receives_ping() raises:
     receive_data[gen_mask_func=gen_mask](server, Bytes(137, 128, 0, 68, 136, 204))  # \x89\x80\x00\x44\x88\xcc
     events = server.events_received()
     assert_equal(events[0][Frame], Frame(OP_PING, Bytes()))
-    assert_bytes_equal(server.data_to_send(), Frame(OP_PONG, Bytes()).serialize[gen_mask_func=gen_mask](mask=True))
+    assert_bytes_equal(server.data_to_send(), Frame(OP_PONG, Bytes()).serialize[gen_mask_func=gen_mask](mask=False))
 
 
 fn test_client_sends_ping_with_data() raises:
     """Test that client properly sends a ping frame with data."""
     client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
     send_ping[gen_mask_func=gen_mask](client, Bytes(34, 102, 170, 238))  # \x22\x66\xaa\xee
-    assert_bytes_equal(client.data_to_send(), Bytes(137, 132, 0, 68, 136, 204, 34, 34, 34, 34))  # \x89\x84\x00\x44\x88\xcc\x22\x22\x22\x22
+    assert_bytes_equal(client.data_to_send(), Bytes(137, 132, 0, 0, 0, 0, 34, 102, 170, 238))  # \x89\x84\x00\x00\x00\x00\x22\x66\xaa\xee
 
 
 fn test_server_sends_ping_with_data() raises:
@@ -1267,10 +1271,10 @@ fn test_server_sends_ping_with_data() raises:
 fn test_client_receives_ping_with_data() raises:
     """Test that client properly receives a ping frame with data and responds with a pong frame."""
     client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
-    receive_data(client, Bytes(137, 4, 34, 102, 170, 238))  # \x89\x04\x22\x66\xaa\xee
+    receive_data[gen_mask_func=gen_mask](client, Bytes(137, 4, 34, 102, 170, 238))  # \x89\x04\x22\x66\xaa\xee
     events = client.events_received()
     assert_equal(events[0][Frame], Frame(OP_PING, Bytes(34, 102, 170, 238)))
-    assert_bytes_equal(client.data_to_send(), Frame(OP_PONG, Bytes(34, 102, 170, 238)).serialize[gen_mask_func=gen_mask](mask=False))
+    assert_bytes_equal(client.data_to_send(), Frame(OP_PONG, Bytes(34, 102, 170, 238)).serialize[gen_mask_func=gen_mask](mask=True))
 
 
 fn test_server_receives_ping_with_data() raises:
@@ -1279,7 +1283,7 @@ fn test_server_receives_ping_with_data() raises:
     receive_data[gen_mask_func=gen_mask](server, Bytes(137, 132, 0, 68, 136, 204, 34, 34, 34, 34))  # \x89\x84\x00\x44\x88\xcc\x22\x22\x22\x22
     events = server.events_received()
     assert_equal(events[0][Frame], Frame(OP_PING, Bytes(34, 102, 170, 238)))
-    assert_bytes_equal(server.data_to_send(), Frame(OP_PONG, Bytes(34, 102, 170, 238)).serialize[gen_mask_func=gen_mask](mask=True))
+    assert_bytes_equal(server.data_to_send(), Frame(OP_PONG, Bytes(34, 102, 170, 238)).serialize[gen_mask_func=gen_mask](mask=False))
 
 
 fn test_client_sends_fragmented_ping_frame() raises:
@@ -1308,7 +1312,7 @@ fn test_client_receives_fragmented_ping_frame() raises:
 fn test_server_receives_fragmented_ping_frame() raises:
     """Test that server properly handles receiving fragmented ping frames."""
     server = DummyProtocol[SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
-    receive_data[gen_mask_func=gen_mask](server, Bytes(9, 128, 60, 60, 60, 60))  # \x09\x80\x3c\x3c\x3c\x3c
+    receive_data[gen_mask_func=gen_mask](server, Bytes(9, 128, 0, 0, 0, 0))  # \x89\x80\x00\x00\x00\x00
     events = server.events_received()
     assert_equal(String(server.parser_exc.value()), "ProtocolError: fragmented control frame")
     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: fragmented control frame").serialize(), fin=True))
@@ -1341,11 +1345,11 @@ fn test_client_receives_ping_after_receiving_close() raises:
     client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
 
     # Receive close frame
-    receive_data(client, Bytes(136, 2, 3, 232))
+    receive_data[gen_mask_func=gen_mask](client, Bytes(136, 2, 3, 232))
     events = client.events_received()
     close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_NORMAL_CLOSURE, "").serialize(), fin=True)
     assert_equal(events[0][Frame], close_frame)
-    assert_bytes_equal(client.data_to_send(), close_frame.serialize[gen_mask_func=gen_mask](mask=False))
+    assert_bytes_equal(client.data_to_send(), close_frame.serialize[gen_mask_func=gen_mask](mask=True))
 
     # Receive ping frame after close - should be ignored
     receive_data(client, Bytes(137, 4, 34, 102, 170, 238))
@@ -1363,7 +1367,7 @@ fn test_server_receives_ping_after_receiving_close() raises:
     events = server.events_received()
     close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_GOING_AWAY, "").serialize(), fin=True)
     assert_equal(events[0][Frame], close_frame)
-    assert_bytes_equal(server.data_to_send(), close_frame.serialize[gen_mask_func=gen_mask](mask=True))
+    assert_bytes_equal(server.data_to_send(), close_frame.serialize[gen_mask_func=gen_mask](mask=False))
 
     # Receive ping frame after close - should be ignored
     receive_data[gen_mask_func=gen_mask](server, Bytes(137, 132, 0, 68, 136, 204, 34, 34, 34, 34))
@@ -1396,7 +1400,7 @@ fn test_client_sends_pong() raises:
     """Test that client properly sends a pong frame."""
     client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
     send_frame[gen_mask_func=gen_mask](client, Frame(OP_PONG, Bytes()))
-    assert_bytes_equal(client.data_to_send(), Bytes(138, 128, 0, 68, 136, 204))  # \x8a\x80\x00\x44\x88\xcc
+    assert_bytes_equal(client.data_to_send(), Bytes(138, 128, 0, 0, 0, 0))  # \x8a\x80\x00\x00\x00\x00
 
 
 fn test_server_sends_pong() raises:
@@ -1425,6 +1429,8 @@ fn test_server_receives_pong() raises:
 fn test_client_sends_pong_with_data() raises:
     """Test that client properly sends a pong frame with data."""
     client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 68, 136, 204)
     send_frame[gen_mask_func=gen_mask](client, Frame(OP_PONG, Bytes(34, 102, 170, 238)))  # \x22\x66\xaa\xee
     assert_bytes_equal(client.data_to_send(), Bytes(138, 132, 0, 68, 136, 204, 34, 34, 34, 34))  # \x8a\x84\x00\x44\x88\xcc\x22\x22\x22\x22
 
@@ -1478,7 +1484,7 @@ fn test_client_receives_fragmented_pong_frame() raises:
 fn test_server_receives_fragmented_pong_frame() raises:
     """Test that server properly handles receiving fragmented pong frames."""
     server = DummyProtocol[SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
-    receive_data[gen_mask_func=gen_mask](server, Bytes(10, 128, 60, 60, 60, 60))  # \x0a\x80\x3c\x3c\x3c\x3c
+    receive_data[gen_mask_func=gen_mask](server, Bytes(10, 128, 0, 0, 0, 0))  # \x8a\x80\x00\x00\x00\x00
     events = server.events_received()
     assert_equal(String(server.parser_exc.value()), "ProtocolError: fragmented control frame")
     assert_equal(events[0][Frame], Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: fragmented control frame").serialize(), fin=True))
@@ -1511,11 +1517,11 @@ fn test_client_receives_pong_after_receiving_close() raises:
     client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
 
     # Receive close frame
-    receive_data(client, Bytes(136, 2, 3, 232))
+    receive_data[gen_mask_func=gen_mask](client, Bytes(136, 2, 3, 232))
     events = client.events_received()
     close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_NORMAL_CLOSURE, "").serialize(), fin=True)
     assert_equal(events[0][Frame], close_frame)
-    assert_bytes_equal(client.data_to_send(), close_frame.serialize[gen_mask_func=gen_mask](mask=False))
+    assert_bytes_equal(client.data_to_send(), close_frame.serialize[gen_mask_func=gen_mask](mask=True))
 
     # Receive pong frame after close - should be ignored
     receive_data(client, Bytes(138, 4, 34, 102, 170, 238))
@@ -1533,7 +1539,7 @@ fn test_server_receives_pong_after_receiving_close() raises:
     events = server.events_received()
     close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_GOING_AWAY, "").serialize(), fin=True)
     assert_equal(events[0][Frame], close_frame)
-    assert_bytes_equal(server.data_to_send(), close_frame.serialize[gen_mask_func=gen_mask](mask=True))
+    assert_bytes_equal(server.data_to_send(), close_frame.serialize[gen_mask_func=gen_mask](mask=False))
 
     # Receive pong frame after close - should be ignored
     receive_data[gen_mask_func=gen_mask](server, Bytes(138, 132, 0, 68, 136, 204, 34, 34, 34, 34))
@@ -1569,13 +1575,13 @@ fn test_client_stops_processing_frames_after_fail() raises:
     client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
 
     # Fail the connection with protocol error
-    fail(client, CLOSE_CODE_PROTOCOL_ERROR)
+    fail[gen_mask_func=gen_mask](client, CLOSE_CODE_PROTOCOL_ERROR)
     events = client.events_received()
     assert_equal(len(events), 0)
     data_to_send = client.data_to_send()
     # assert_equal(String(client.parser_exc.value()), "ProtocolError: invalid close code")
     close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "").serialize(), fin=True)
-    assert_bytes_equal(data_to_send, close_frame.serialize(mask=False))
+    assert_bytes_equal(data_to_send, close_frame.serialize[gen_mask_func=gen_mask](mask=True))
 
     # Try to receive more data after failure - should be ignored
     receive_data(client, Bytes(136, 2, 3, 234))  # \x88\x02\x03\xea
@@ -1594,7 +1600,7 @@ fn test_server_stops_processing_frames_after_fail() raises:
     assert_equal(len(events), 0)
     data_to_send = server.data_to_send()
     close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "").serialize(), fin=True)
-    assert_bytes_equal(data_to_send, close_frame.serialize[gen_mask_func=gen_mask](mask=True))
+    assert_bytes_equal(data_to_send, close_frame.serialize[gen_mask_func=gen_mask](mask=False))
 
     # Try to receive more data after failure - should be ignored
     receive_data[gen_mask_func=gen_mask](server, Bytes(136, 130, 0, 0, 0, 0, 3, 234))  # \x88\x82\x00\x00\x00\x00\x03\xea
@@ -1664,15 +1670,15 @@ fn test_client_receive_ping_pong_in_fragmented_message() raises:
     client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
 
     # Receive initial text frame
-    receive_data(client, Bytes(1, 4) + str_to_bytes("Spam"))  # \x01\x04Spam
+    receive_data[gen_mask_func=gen_mask](client, Bytes(1, 4) + str_to_bytes("Spam"))  # \x01\x04Spam
     events = client.events_received()
     assert_equal(events[0][Frame], Frame(OP_TEXT, str_to_bytes("Spam"), fin=False))
 
     # Receive ping frame
-    receive_data(client, Bytes(137, 4) + str_to_bytes("Ping"))  # \x89\x04Ping
+    receive_data[gen_mask_func=gen_mask](client, Bytes(137, 4) + str_to_bytes("Ping"))  # \x89\x04Ping
     events = client.events_received()
     assert_equal(events[0][Frame], Frame(OP_PING, str_to_bytes("Ping")))
-    assert_bytes_equal(client.data_to_send(), Frame(OP_PONG, str_to_bytes("Ping")).serialize[gen_mask_func=gen_mask](mask=False))
+    assert_bytes_equal(client.data_to_send(), Frame(OP_PONG, str_to_bytes("Ping")).serialize[gen_mask_func=gen_mask](mask=True))
 
     # Receive continuation frame
     receive_data(client, Bytes(0, 3) + str_to_bytes("Ham"))  # \x00\x03Ham
@@ -1703,7 +1709,7 @@ fn test_server_receive_ping_pong_in_fragmented_message() raises:
     receive_data[gen_mask_func=gen_mask](server, Bytes(137, 132, 0, 0, 0, 0) + str_to_bytes("Ping"))  # \x89\x84\x00\x00\x00\x00Ping
     events = server.events_received()
     assert_equal(events[0][Frame], Frame(OP_PING, str_to_bytes("Ping")))
-    assert_bytes_equal(server.data_to_send(), Frame(OP_PONG, str_to_bytes("Ping")).serialize[gen_mask_func=gen_mask](mask=True))
+    assert_bytes_equal(server.data_to_send(), Frame(OP_PONG, str_to_bytes("Ping")).serialize[gen_mask_func=gen_mask](mask=False))
 
     # Receive continuation frame
     receive_data[gen_mask_func=gen_mask](server, Bytes(0, 131, 0, 0, 0, 0) + str_to_bytes("Ham"))  # \x00\x83\x00\x00\x00\x00Ham
@@ -1724,6 +1730,9 @@ fn test_server_receive_ping_pong_in_fragmented_message() raises:
 fn test_client_send_close_in_fragmented_message() raises:
     """Test that client cannot send close frame in a fragmented message."""
     client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+
+    fn gen_mask() -> Bytes:
+        return Bytes(60, 60, 60, 60)
 
     # Send initial text frame
     send_text[gen_mask_func=gen_mask](client, str_to_bytes("Spam"), fin=False)
