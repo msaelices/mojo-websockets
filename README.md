@@ -25,20 +25,43 @@ This software is in a early stage of development, using the Mojo nightly version
     ```
 ## Example of usage
 
+### Server side
+
 ```mojo
 from websockets.aliases import Bytes
 from websockets.sync.server import serve, WSConnection
+from websockets.utils.bytes import bytes_to_str
 
 
 fn on_message(conn: WSConnection, data: Bytes) raises -> None:
-    print("<<< ", String(data))
-    # Echo the message back to the client
-    conn.send_binary(data)
+    str_received = bytes_to_str(data)
+    print("<<< ", str_received)
+    conn.send_text(str_received)
+    print(">>> ", str_received)
 
 
 fn main() raises:
-    with serve(on_message, "127.0.0.1", 8766) as server:
+    with serve(on_message, "127.0.0.1", 8000) as server:
         server.serve_forever()
+```
+
+### Client side
+
+```mojo
+from websockets.sync.client import connect
+from websockets.utils.bytes import bytes_to_str
+
+
+fn send_and_receive(msg: String) raises:
+    with connect("ws://127.0.0.1:8000") as websocket:
+        websocket.send_text(msg)
+        print(">>> ", msg)
+        response = websocket.recv()
+        print("<<< ", bytes_to_str(response))
+
+fn main() raises:
+    send_and_receive("Hello world!")
+
 ```
 
 ## TODO
