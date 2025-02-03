@@ -11,7 +11,6 @@ This software is in a early stage of development, using the Mojo nightly version
 ## Features
 
 - **WebSocket Server and Client**: Supports creating both WebSocket servers and clients.
-- **Asynchronous Communication**: Enables non-blocking WebSocket operations.
 - **Compatibility**: API designed to be intuitive for developers familiar with the Python websockets library.
 
 ## Installation
@@ -66,6 +65,7 @@ fn main() raises:
 
 ## TODO
 
+- [ ] Asynchronous non-blocking communication (waiting for the Mojo async/await support)
 - [ ] Implement automatic reconnection for clients
 - [ ] Get rid of Python dependencies and logic (e.g. no more `from python import ...`)
 - [ ] Make sure it passes all the tests in [Autobahn|Testsuite](https://github.com/crossbario/autobahn-testsuite/)
