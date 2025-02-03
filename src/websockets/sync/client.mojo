@@ -1,4 +1,5 @@
 from websockets.aliases import Bytes, DEFAULT_BUFFER_SIZE
+from websockets.frames import Frame
 from websockets.logger import logger
 from websockets.protocol.base import send_text, send_binary, receive_data
 from websockets.protocol.client import ClientProtocol
@@ -72,8 +73,15 @@ struct Client:
             logger.error(e)
             raise e
         receive_data(self.protocol, b)
+
+        events_received = self.protocol.events_received()
+        received = Bytes(capacity=DEFAULT_BUFFER_SIZE)
+        for event_ref in events_received:
+            event = event_ref[]
+            if event.isa[Frame]():
+                received += event[Frame].data
         # TODO: Handle parse exceptions
-        return b
+        return received
 
     fn close(mut self) raises -> None:
         """
