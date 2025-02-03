@@ -310,6 +310,18 @@ fn str_to_bytes(s: String) -> Bytes:
     return bytes
 
 
+fn bytes_to_str(bytes: Bytes) -> String:
+    """Convert a byte array to a string.
+
+    Args:
+        bytes: The byte array to convert.
+
+    Returns:
+        The string.
+    """
+    return String(StringRef(bytes.unsafe_ptr(), len(bytes)))
+
+
 @always_inline
 fn gen_token(length: Int) -> Bytes:
     """
