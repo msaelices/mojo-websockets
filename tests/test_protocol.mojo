@@ -1990,318 +1990,318 @@ fn test_client_receives_data_and_eof_after_exception() raises:
     assert_equal(client.get_state(), 3)  # CLOSED
 
 
-# fn test_server_receives_data_and_eof_after_exception() raises:
-#     """Test that server properly handles receiving data and EOF after an exception."""
-#     server = DummyProtocol[SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
-#
-#     # Receive invalid frame
-#     receive_data[gen_mask_func=gen_mask](server, Bytes(255, 255))  # \xff\xff
-#     events = server.events_received()
-#     assert_equal(String(server.parser_exc.value()), "ProtocolError: invalid opcode: 15")
-#     close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: invalid opcode: 15").serialize(), fin=True)
-#     assert_equal(events[0][Frame], close_frame)
-#     data_to_send = server.data_to_send()
-#     assert_bytes_equal(data_to_send, close_frame.serialize[gen_mask_func=gen_mask](mask=False))
-#
-#     # Receive more data after exception
-#     receive_data[gen_mask_func=gen_mask](server, Bytes(0, 0))  # \x00\x00
-#     events = server.events_received()
-#     assert_equal(len(events), 0)
-#     assert_bytes_equal(server.data_to_send(), Bytes())
-#
-#     # Receive EOF after data
-#     receive_eof(server)
-#     assert_bytes_equal(server.data_to_send(), Bytes())
-#     assert_equal(server.get_state(), 3)  # CLOSED
-#
-#
-# fn test_client_receives_data_after_eof() raises:
-#     """Test that client properly handles receiving data after EOF."""
-#     client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
-#
-#     # Receive close frame
-#     receive_data(client, Bytes(136, 0))  # \x88\x00
-#     assert_equal(client.get_state(), 2)  # CLOSING
-#
-#     # Receive EOF
-#     receive_eof(client)
-#
-#     # Try to receive data after EOF - should raise EOFError
-#     with assert_raises(contains="EOFError: stream ended"):
-#         receive_data(client, Bytes(136, 0))  # \x88\x00
-#
-#
-# fn test_server_receives_data_after_eof() raises:
-#     """Test that server properly handles receiving data after EOF."""
-#     server = DummyProtocol[SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
-#
-#     # Receive close frame
-#     receive_data[gen_mask_func=gen_mask](server, Bytes(136, 128, 60, 60, 60, 60))  # \x88\x80\x3c\x3c\x3c\x3c
-#     assert_equal(server.get_state(), 2)  # CLOSING
-#
-#     # Receive EOF
-#     receive_eof(server)
-#
-#     # Try to receive data after EOF - should raise EOFError
-#     with assert_raises(contains="EOFError: stream ended"):
-#         receive_data[gen_mask_func=gen_mask](server, Bytes(136, 128, 0, 0, 0, 0))  # \x88\x80\x00\x00\x00\x00
-#
-#
-# fn test_client_receives_eof_after_eof() raises:
-#     """Test that client properly handles receiving EOF after EOF (should be idempotent)."""
-#     client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
-#
-#     # Receive close frame
-#     receive_data(client, Bytes(136, 0))  # \x88\x00
-#     assert_equal(client.get_state(), 2)  # CLOSING
-#
-#     # Receive EOF twice - should be idempotent
-#     receive_eof(client)
-#     receive_eof(client)  # This should not raise any error
-#
-#
-# fn test_server_receives_eof_after_eof() raises:
-#     """Test that server properly handles receiving EOF after EOF (should be idempotent)."""
-#     server = DummyProtocol[SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
-#
-#     # Receive close frame
-#     receive_data[gen_mask_func=gen_mask](server, Bytes(136, 128, 60, 60, 60, 60))  # \x88\x80\x3c\x3c\x3c\x3c
-#     assert_equal(server.get_state(), 2)  # CLOSING
-#
-#     # Receive EOF twice - should be idempotent
-#     receive_eof(server)
-#     receive_eof(server)  # This should not raise any error
-#
-#
-# # ===-------------------------------------------------------------------===#
-# # Test expectation of TCP close on connection termination.
-# # ===-------------------------------------------------------------------===#
-#
-# fn test_client_default() raises:
-#     """Test that client does not expect close by default."""
-#     client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
-#     assert_equal(close_expected(client), False)
-#
-#
-# fn test_server_default() raises:
-#     """Test that server does not expect close by default."""
-#     server = DummyProtocol[SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
-#     assert_equal(close_expected(server), False)
-#
-#
-# fn test_close_expected_if_client_sends_close() raises:
-#     """Test that client expects close after sending close frame."""
-#     client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
-#     send_close[gen_mask_func=gen_mask](client)
-#     assert_equal(close_expected(client), True)
-#
-#
-# fn test_close_expected_if_server_sends_close() raises:
-#     """Test that server expects close after sending close frame."""
-#     server = DummyProtocol[SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
-#     send_close(server)
-#     assert_equal(close_expected(server), True)
-#
-#
-# fn test_close_expected_if_client_receives_close() raises:
-#     """Test that client expects close after receiving close frame."""
-#     client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
-#     receive_data(client, Bytes(136, 0))  # \x88\x00
-#     assert_equal(close_expected(client), True)
-#
-#
-# fn test_close_expected_if_client_receives_close_then_eof() raises:
-#     """Test that client does not expect close after receiving close frame and EOF."""
-#     client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
-#     receive_data(client, Bytes(136, 0))  # \x88\x00
-#     receive_eof(client)
-#     assert_equal(close_expected(client), False)
-#
-#
-# fn test_close_expected_if_server_receives_close_then_eof() raises:
-#     """Test that server does not expect close after receiving close frame and EOF."""
-#     server = DummyProtocol[SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
-#     receive_data[gen_mask_func=gen_mask](server, Bytes(136, 128, 60, 60, 60, 60))  # \x88\x80\x3c\x3c\x3c\x3c
-#     receive_eof(server)
-#     assert_equal(close_expected(server), False)
-#
-#
-# fn test_close_expected_if_server_receives_close() raises:
-#     """Test that server expects close after receiving close frame."""
-#     server = DummyProtocol[SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
-#     receive_data[gen_mask_func=gen_mask](server, Bytes(136, 128, 60, 60, 60, 60))  # \x88\x80\x3c\x3c\x3c\x3c
-#     assert_equal(close_expected(server), True)
-#
-#
-# fn test_close_expected_if_client_fails_connection() raises:
-#     """Test that client expects close after failing the connection."""
-#     client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
-#     fail(client, CLOSE_CODE_PROTOCOL_ERROR)
-#     assert_equal(close_expected(client), True)
-#
-#
-# fn test_close_expected_if_server_fails_connection() raises:
-#     """Test that server expects close after failing the connection."""
-#     server = DummyProtocol[SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
-#     fail(server, CLOSE_CODE_PROTOCOL_ERROR)
-#     assert_equal(close_expected(server), True)
-#
-#
-# # ===-------------------------------------------------------------------===#
-# # Test connection closed exception.
-# # ===-------------------------------------------------------------------===#
-#
-#
-# fn test_close_exc_if_client_sends_close_then_receives_close() raises:
-#     """Test client-initiated close handshake on the client side complete."""
-#     client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
-#
-#     # Send close frame
-#     send_close(client, CLOSE_CODE_NORMAL_CLOSURE, "")
-#
-#     # Receive close frame
-#     receive_data(client, Bytes(136, 2, 3, 232))  # \x88\x02\x03\xe8
-#
-#     # Receive EOF
-#     receive_eof(client)
-#
-#     # Verify close details
-#     assert_equal(client.get_close_rcvd().value().code, CLOSE_CODE_NORMAL_CLOSURE)
-#     assert_equal(client.get_close_rcvd().value().reason, "")
-#     assert_equal(client.get_close_sent().value().code, CLOSE_CODE_NORMAL_CLOSURE)
-#     assert_equal(client.get_close_sent().value().reason, "")
-#     assert_equal(client.get_close_rcvd_then_sent().value(), False)
-#
-#     close_exc = get_close_exc(client)
-#     assert_equal(String(close_exc), "ConnectionClosedOK: 1000, 1000")
-#
-#
-# fn test_close_exc_if_server_sends_close_then_receives_close() raises:
-#     """Test server-initiated close handshake on the server side complete."""
-#     server = DummyProtocol[SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
-#
-#     # Send close frame
-#     send_close[gen_mask_func=gen_mask](server, CLOSE_CODE_NORMAL_CLOSURE, "")
-#
-#     # Receive close frame
-#     receive_data[gen_mask_func=gen_mask](server, Bytes(136, 130, 0, 0, 0, 0, 3, 232))  # \x88\x82\x00\x00\x00\x00\x03\xe8
-#
-#     # Receive EOF
-#     receive_eof(server)
-#
-#     # Verify close details
-#     assert_equal(server.get_close_rcvd().value().code, CLOSE_CODE_NORMAL_CLOSURE)
-#     assert_equal(server.get_close_rcvd().value().reason, "")
-#     assert_equal(server.get_close_sent().value().code, CLOSE_CODE_NORMAL_CLOSURE)
-#     assert_equal(server.get_close_sent().value().reason, "")
-#     assert_equal(server.get_close_rcvd_then_sent().value(), False)
-#
-#     close_exc = get_close_exc(server)
-#     assert_equal(String(close_exc), "ConnectionClosedOK: 1000, 1000")
-#
-#
-# fn test_close_exc_if_client_receives_close_then_sends_close() raises:
-#     """Test server-initiated close handshake on the client side complete."""
-#     client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
-#
-#     # Receive close frame
-#     receive_data(client, Bytes(136, 2, 3, 232))  # \x88\x02\x03\xe8
-#
-#     # Receive EOF
-#     receive_eof(client)
-#
-#     # Verify close details
-#     assert_equal(client.get_close_rcvd().value().code, CLOSE_CODE_NORMAL_CLOSURE)
-#     assert_equal(client.get_close_rcvd().value().reason, "")
-#     assert_equal(client.get_close_sent().value().code, CLOSE_CODE_NORMAL_CLOSURE)
-#     assert_equal(client.get_close_sent().value().reason, "")
-#     assert_equal(client.get_close_rcvd_then_sent().value(), True)
-#
-#     close_exc = get_close_exc(client)
-#     assert_equal(String(close_exc), "ConnectionClosedOK: 1000, 1000")
-#
-#
-# fn test_close_exc_if_server_receives_close_then_sends_close() raises:
-#     """Test client-initiated close handshake on the server side complete."""
-#     server = DummyProtocol[SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
-#
-#     fn gen_mask() -> Bytes:
-#         return Bytes(0, 0, 0, 0)
-#     # Receive close frame
-#     receive_data[gen_mask_func=gen_mask](server, Bytes(136, 130, 0, 0, 0, 0, 3, 232))  # \x88\x82\x00\x00\x00\x00\x03\xe8
-#
-#     # Receive EOF
-#     receive_eof(server)
-#
-#     # Verify close details
-#     assert_equal(server.get_close_rcvd().value().code, CLOSE_CODE_NORMAL_CLOSURE)
-#     assert_equal(server.get_close_rcvd().value().reason, "")
-#     assert_equal(server.get_close_sent().value().code, CLOSE_CODE_NORMAL_CLOSURE)
-#     assert_equal(server.get_close_sent().value().reason, "")
-#     assert_equal(server.get_close_rcvd_then_sent().value(), True)
-#
-#     close_exc = get_close_exc(server)
-#     assert_equal(String(close_exc), "ConnectionClosedOK: 1000, 1000")
-#
-#
-# fn test_close_exc_if_client_sends_close_then_receives_eof() raises:
-#     """Test client-initiated close handshake on the client side times out."""
-#     client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
-#
-#     fn gen_mask() -> Bytes:
-#         return Bytes(0, 0, 0, 0)
-#     send_close[gen_mask_func=gen_mask](client, CLOSE_CODE_NORMAL_CLOSURE, "")
-#     receive_eof(client)
-#
-#     # Verify close details
-#     assert_equal(Bool(client.get_close_rcvd()), False)
-#     assert_equal(client.get_close_sent().value().code, CLOSE_CODE_NORMAL_CLOSURE)
-#     assert_equal(client.get_close_sent().value().reason, "")
-#     assert_equal(Bool(client.get_close_rcvd_then_sent()), False)
-#
-#     close_exc = get_close_exc(client)
-#     assert_equal(String(close_exc), "ConnectionClosedError: False, True, False")
-#
-#
-# fn test_close_exc_if_server_sends_close_then_receives_eof() raises:
-#     """Test server-initiated close handshake on the server side times out."""
-#     server = DummyProtocol[SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
-#     send_close(server, CLOSE_CODE_NORMAL_CLOSURE, "")
-#     receive_eof(server)
-#
-#     # Verify close details
-#     assert_equal(Bool(server.get_close_rcvd()), False)
-#     assert_equal(server.get_close_sent().value().code, CLOSE_CODE_NORMAL_CLOSURE)
-#     assert_equal(server.get_close_sent().value().reason, "")
-#     assert_equal(Bool(server.get_close_rcvd_then_sent()), False)
-#
-#     close_exc = get_close_exc(server)
-#     assert_equal(String(close_exc), "ConnectionClosedError: False, True, False")
-#
-#
-# fn test_close_exc_if_client_receives_eof() raises:
-#     """Test server-initiated close handshake on the client side times out."""
-#     client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
-#     receive_eof(client)
-#
-#     # Verify close details
-#     assert_equal(Bool(client.get_close_rcvd()), False)
-#     assert_equal(Bool(client.get_close_sent()), False)
-#     assert_equal(Bool(client.get_close_rcvd_then_sent()), False)
-#
-#     close_exc = get_close_exc(client)
-#     assert_equal(String(close_exc), "ConnectionClosedError: False, False, False")
-#
-#
-# fn test_close_exc_if_server_receives_eof() raises:
-#     """Test client-initiated close handshake on the server side times out."""
-#     server = DummyProtocol[SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
-#     receive_eof(server)
-#
-#     # Verify close details
-#     assert_equal(Bool(server.get_close_rcvd()), False)
-#     assert_equal(Bool(server.get_close_sent()), False)
-#     assert_equal(Bool(server.get_close_rcvd_then_sent()), False)
-#
-#     close_exc = get_close_exc(server)
-#     assert_equal(String(close_exc), "ConnectionClosedError: False, False, False")
+fn test_server_receives_data_and_eof_after_exception() raises:
+    """Test that server properly handles receiving data and EOF after an exception."""
+    server = DummyProtocol[SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+
+    # Receive invalid frame
+    receive_data[gen_mask_func=gen_mask](server, Bytes(255, 255))  # \xff\xff
+    events = server.events_received()
+    assert_equal(String(server.parser_exc.value()), "ProtocolError: invalid opcode: 15")
+    close_frame = Frame(OP_CLOSE, Close(CLOSE_CODE_PROTOCOL_ERROR, "ProtocolError: invalid opcode: 15").serialize(), fin=True)
+    assert_equal(events[0][Frame], close_frame)
+    data_to_send = server.data_to_send()
+    assert_bytes_equal(data_to_send, close_frame.serialize[gen_mask_func=gen_mask](mask=False))
+
+    # Receive more data after exception
+    receive_data[gen_mask_func=gen_mask](server, Bytes(0, 0))  # \x00\x00
+    events = server.events_received()
+    assert_equal(len(events), 0)
+    assert_bytes_equal(server.data_to_send(), Bytes())
+
+    # Receive EOF after data
+    receive_eof(server)
+    assert_bytes_equal(server.data_to_send(), Bytes())
+    assert_equal(server.get_state(), 3)  # CLOSED
+
+
+fn test_client_receives_data_after_eof() raises:
+    """Test that client properly handles receiving data after EOF."""
+    client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+
+    # Receive close frame
+    receive_data(client, Bytes(136, 0))  # \x88\x00
+    assert_equal(client.get_state(), 2)  # CLOSING
+
+    # Receive EOF
+    receive_eof(client)
+
+    # Try to receive data after EOF - should raise EOFError
+    with assert_raises(contains="EOFError: stream ended"):
+        receive_data(client, Bytes(136, 0))  # \x88\x00
+
+
+fn test_server_receives_data_after_eof() raises:
+    """Test that server properly handles receiving data after EOF."""
+    server = DummyProtocol[SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+
+    # Receive close frame
+    receive_data[gen_mask_func=gen_mask](server, Bytes(136, 128, 60, 60, 60, 60))  # \x88\x80\x3c\x3c\x3c\x3c
+    assert_equal(server.get_state(), 2)  # CLOSING
+
+    # Receive EOF
+    receive_eof(server)
+
+    # Try to receive data after EOF - should raise EOFError
+    with assert_raises(contains="EOFError: stream ended"):
+        receive_data[gen_mask_func=gen_mask](server, Bytes(136, 128, 0, 0, 0, 0))  # \x88\x80\x00\x00\x00\x00
+
+
+fn test_client_receives_eof_after_eof() raises:
+    """Test that client properly handles receiving EOF after EOF (should be idempotent)."""
+    client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+
+    # Receive close frame
+    receive_data(client, Bytes(136, 0))  # \x88\x00
+    assert_equal(client.get_state(), 2)  # CLOSING
+
+    # Receive EOF twice - should be idempotent
+    receive_eof(client)
+    receive_eof(client)  # This should not raise any error
+
+
+fn test_server_receives_eof_after_eof() raises:
+    """Test that server properly handles receiving EOF after EOF (should be idempotent)."""
+    server = DummyProtocol[SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+
+    # Receive close frame
+    receive_data[gen_mask_func=gen_mask](server, Bytes(136, 128, 60, 60, 60, 60))  # \x88\x80\x3c\x3c\x3c\x3c
+    assert_equal(server.get_state(), 2)  # CLOSING
+
+    # Receive EOF twice - should be idempotent
+    receive_eof(server)
+    receive_eof(server)  # This should not raise any error
+
+
+# ===-------------------------------------------------------------------===#
+# Test expectation of TCP close on connection termination.
+# ===-------------------------------------------------------------------===#
+
+fn test_client_default() raises:
+    """Test that client does not expect close by default."""
+    client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    assert_equal(close_expected(client), False)
+
+
+fn test_server_default() raises:
+    """Test that server does not expect close by default."""
+    server = DummyProtocol[SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    assert_equal(close_expected(server), False)
+
+
+fn test_close_expected_if_client_sends_close() raises:
+    """Test that client expects close after sending close frame."""
+    client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    send_close[gen_mask_func=gen_mask](client)
+    assert_equal(close_expected(client), True)
+
+
+fn test_close_expected_if_server_sends_close() raises:
+    """Test that server expects close after sending close frame."""
+    server = DummyProtocol[SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    send_close(server)
+    assert_equal(close_expected(server), True)
+
+
+fn test_close_expected_if_client_receives_close() raises:
+    """Test that client expects close after receiving close frame."""
+    client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    receive_data(client, Bytes(136, 0))  # \x88\x00
+    assert_equal(close_expected(client), True)
+
+
+fn test_close_expected_if_client_receives_close_then_eof() raises:
+    """Test that client does not expect close after receiving close frame and EOF."""
+    client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    receive_data(client, Bytes(136, 0))  # \x88\x00
+    receive_eof(client)
+    assert_equal(close_expected(client), False)
+
+
+fn test_close_expected_if_server_receives_close_then_eof() raises:
+    """Test that server does not expect close after receiving close frame and EOF."""
+    server = DummyProtocol[SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    receive_data[gen_mask_func=gen_mask](server, Bytes(136, 128, 60, 60, 60, 60))  # \x88\x80\x3c\x3c\x3c\x3c
+    receive_eof(server)
+    assert_equal(close_expected(server), False)
+
+
+fn test_close_expected_if_server_receives_close() raises:
+    """Test that server expects close after receiving close frame."""
+    server = DummyProtocol[SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    receive_data[gen_mask_func=gen_mask](server, Bytes(136, 128, 60, 60, 60, 60))  # \x88\x80\x3c\x3c\x3c\x3c
+    assert_equal(close_expected(server), True)
+
+
+fn test_close_expected_if_client_fails_connection() raises:
+    """Test that client expects close after failing the connection."""
+    client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    fail(client, CLOSE_CODE_PROTOCOL_ERROR)
+    assert_equal(close_expected(client), True)
+
+
+fn test_close_expected_if_server_fails_connection() raises:
+    """Test that server expects close after failing the connection."""
+    server = DummyProtocol[SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    fail(server, CLOSE_CODE_PROTOCOL_ERROR)
+    assert_equal(close_expected(server), True)
+
+
+# ===-------------------------------------------------------------------===#
+# Test connection closed exception.
+# ===-------------------------------------------------------------------===#
+
+
+fn test_close_exc_if_client_sends_close_then_receives_close() raises:
+    """Test client-initiated close handshake on the client side complete."""
+    client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+
+    # Send close frame
+    send_close(client, CLOSE_CODE_NORMAL_CLOSURE, "")
+
+    # Receive close frame
+    receive_data(client, Bytes(136, 2, 3, 232))  # \x88\x02\x03\xe8
+
+    # Receive EOF
+    receive_eof(client)
+
+    # Verify close details
+    assert_equal(client.get_close_rcvd().value().code, CLOSE_CODE_NORMAL_CLOSURE)
+    assert_equal(client.get_close_rcvd().value().reason, "")
+    assert_equal(client.get_close_sent().value().code, CLOSE_CODE_NORMAL_CLOSURE)
+    assert_equal(client.get_close_sent().value().reason, "")
+    assert_equal(client.get_close_rcvd_then_sent().value(), False)
+
+    close_exc = get_close_exc(client)
+    assert_equal(String(close_exc), "ConnectionClosedOK: 1000, 1000")
+
+
+fn test_close_exc_if_server_sends_close_then_receives_close() raises:
+    """Test server-initiated close handshake on the server side complete."""
+    server = DummyProtocol[SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+
+    # Send close frame
+    send_close[gen_mask_func=gen_mask](server, CLOSE_CODE_NORMAL_CLOSURE, "")
+
+    # Receive close frame
+    receive_data[gen_mask_func=gen_mask](server, Bytes(136, 130, 0, 0, 0, 0, 3, 232))  # \x88\x82\x00\x00\x00\x00\x03\xe8
+
+    # Receive EOF
+    receive_eof(server)
+
+    # Verify close details
+    assert_equal(server.get_close_rcvd().value().code, CLOSE_CODE_NORMAL_CLOSURE)
+    assert_equal(server.get_close_rcvd().value().reason, "")
+    assert_equal(server.get_close_sent().value().code, CLOSE_CODE_NORMAL_CLOSURE)
+    assert_equal(server.get_close_sent().value().reason, "")
+    assert_equal(server.get_close_rcvd_then_sent().value(), False)
+
+    close_exc = get_close_exc(server)
+    assert_equal(String(close_exc), "ConnectionClosedOK: 1000, 1000")
+
+
+fn test_close_exc_if_client_receives_close_then_sends_close() raises:
+    """Test server-initiated close handshake on the client side complete."""
+    client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+
+    # Receive close frame
+    receive_data(client, Bytes(136, 2, 3, 232))  # \x88\x02\x03\xe8
+
+    # Receive EOF
+    receive_eof(client)
+
+    # Verify close details
+    assert_equal(client.get_close_rcvd().value().code, CLOSE_CODE_NORMAL_CLOSURE)
+    assert_equal(client.get_close_rcvd().value().reason, "")
+    assert_equal(client.get_close_sent().value().code, CLOSE_CODE_NORMAL_CLOSURE)
+    assert_equal(client.get_close_sent().value().reason, "")
+    assert_equal(client.get_close_rcvd_then_sent().value(), True)
+
+    close_exc = get_close_exc(client)
+    assert_equal(String(close_exc), "ConnectionClosedOK: 1000, 1000")
+
+
+fn test_close_exc_if_server_receives_close_then_sends_close() raises:
+    """Test client-initiated close handshake on the server side complete."""
+    server = DummyProtocol[SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 0, 0, 0)
+    # Receive close frame
+    receive_data[gen_mask_func=gen_mask](server, Bytes(136, 130, 0, 0, 0, 0, 3, 232))  # \x88\x82\x00\x00\x00\x00\x03\xe8
+
+    # Receive EOF
+    receive_eof(server)
+
+    # Verify close details
+    assert_equal(server.get_close_rcvd().value().code, CLOSE_CODE_NORMAL_CLOSURE)
+    assert_equal(server.get_close_rcvd().value().reason, "")
+    assert_equal(server.get_close_sent().value().code, CLOSE_CODE_NORMAL_CLOSURE)
+    assert_equal(server.get_close_sent().value().reason, "")
+    assert_equal(server.get_close_rcvd_then_sent().value(), True)
+
+    close_exc = get_close_exc(server)
+    assert_equal(String(close_exc), "ConnectionClosedOK: 1000, 1000")
+
+
+fn test_close_exc_if_client_sends_close_then_receives_eof() raises:
+    """Test client-initiated close handshake on the client side times out."""
+    client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+
+    fn gen_mask() -> Bytes:
+        return Bytes(0, 0, 0, 0)
+    send_close[gen_mask_func=gen_mask](client, CLOSE_CODE_NORMAL_CLOSURE, "")
+    receive_eof(client)
+
+    # Verify close details
+    assert_equal(Bool(client.get_close_rcvd()), False)
+    assert_equal(client.get_close_sent().value().code, CLOSE_CODE_NORMAL_CLOSURE)
+    assert_equal(client.get_close_sent().value().reason, "")
+    assert_equal(Bool(client.get_close_rcvd_then_sent()), False)
+
+    close_exc = get_close_exc(client)
+    assert_equal(String(close_exc), "ConnectionClosedError: False, True, False")
+
+
+fn test_close_exc_if_server_sends_close_then_receives_eof() raises:
+    """Test server-initiated close handshake on the server side times out."""
+    server = DummyProtocol[SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    send_close(server, CLOSE_CODE_NORMAL_CLOSURE, "")
+    receive_eof(server)
+
+    # Verify close details
+    assert_equal(Bool(server.get_close_rcvd()), False)
+    assert_equal(server.get_close_sent().value().code, CLOSE_CODE_NORMAL_CLOSURE)
+    assert_equal(server.get_close_sent().value().reason, "")
+    assert_equal(Bool(server.get_close_rcvd_then_sent()), False)
+
+    close_exc = get_close_exc(server)
+    assert_equal(String(close_exc), "ConnectionClosedError: False, True, False")
+
+
+fn test_close_exc_if_client_receives_eof() raises:
+    """Test server-initiated close handshake on the client side times out."""
+    client = DummyProtocol[CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
+    receive_eof(client)
+
+    # Verify close details
+    assert_equal(Bool(client.get_close_rcvd()), False)
+    assert_equal(Bool(client.get_close_sent()), False)
+    assert_equal(Bool(client.get_close_rcvd_then_sent()), False)
+
+    close_exc = get_close_exc(client)
+    assert_equal(String(close_exc), "ConnectionClosedError: False, False, False")
+
+
+fn test_close_exc_if_server_receives_eof() raises:
+    """Test client-initiated close handshake on the server side times out."""
+    server = DummyProtocol[SERVER](OPEN, StreamReader(), Bytes(), List[Event]())
+    receive_eof(server)
+
+    # Verify close details
+    assert_equal(Bool(server.get_close_rcvd()), False)
+    assert_equal(Bool(server.get_close_sent()), False)
+    assert_equal(Bool(server.get_close_rcvd_then_sent()), False)
+
+    close_exc = get_close_exc(server)
+    assert_equal(String(close_exc), "ConnectionClosedError: False, False, False")
