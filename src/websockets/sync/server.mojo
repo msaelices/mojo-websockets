@@ -75,8 +75,6 @@ struct Server:
 
     var ln: TCPListener
 
-    var protocol: ServerProtocol
-
     fn __init__(out self, host: String, port: Int, handler: ConnHandler, max_request_body_size: Int = DEFAULT_MAX_REQUEST_BODY_SIZE) raises:
         """
         Initialize a new server.
@@ -95,7 +93,6 @@ struct Server:
         self.handler = handler
         self.max_request_body_size = max_request_body_size
         self.ln = TCPListener()
-        self.protocol = ServerProtocol()
 
     fn __moveinit__(mut self, owned other: Self):
         self.host = other.host
@@ -103,7 +100,6 @@ struct Server:
         self.handler = other.handler
         self.max_request_body_size = other.max_request_body_size
         self.ln = other.ln^
-        self.protocol = other.protocol^
 
     fn __copyinit__(mut self, other: Self):
         self.host = other.host
@@ -111,7 +107,6 @@ struct Server:
         self.handler = other.handler
         self.max_request_body_size = other.max_request_body_size
         self.ln = other.ln
-        self.protocol = other.protocol
 
     fn serve_forever(mut self) raises:
         """Listen for incoming connections and serve HTTP requests.
@@ -142,11 +137,12 @@ struct Server:
         Raises:
             If there is an error while serving the connection.
         """
+        protocol = ServerProtocol()
         remote_addr = conn.socket.remote_address()
         logger.debug(
             "Connection accepted! IP:", remote_addr.ip, "Port:", remote_addr.port
         )
-        wsconn = WSConnection(conn, self.protocol)
+        wsconn = WSConnection(conn, protocol)
         while True:
             var b = Bytes(capacity=DEFAULT_BUFFER_SIZE)
             try:
@@ -157,31 +153,31 @@ struct Server:
                 return
             logger.debug("Bytes received:", len(b))
 
-            if self.protocol.get_parser_exc():
-                logger.error(String(self.protocol.get_parser_exc().value()))
+            if protocol.get_parser_exc():
+                logger.error(String(protocol.get_parser_exc().value()))
                 conn.teardown()
                 return
 
             # If the server is set to not support keep-alive connections, or the client requests a connection close, we mark the connection to be closed.
-            if self.protocol.get_state() == CONNECTING:
-                var request: HTTPRequest = self.protocol.events_received()[0][HTTPRequest]
+            if protocol.get_state() == CONNECTING:
+                var request: HTTPRequest = protocol.events_received()[0][HTTPRequest]
 
                 logger.debug("Starting handshake")
 
-                response = self.protocol.accept(request)
-                if self.protocol.get_handshake_exc():
-                    logger.error(String(self.protocol.get_handshake_exc().value()))
+                response = protocol.accept(request)
+                if protocol.get_handshake_exc():
+                    logger.error(String(protocol.get_handshake_exc().value()))
                     conn.teardown()
                     return
 
                 logger.debug("Sending handshake response")
-                self.protocol.send_response(response)
-                data_to_send = self.protocol.data_to_send()
+                protocol.send_response(response)
+                data_to_send = protocol.data_to_send()
         
                 bytes_written = conn.write(data_to_send)
                 logger.debug("Bytes written:", bytes_written)
             else:
-                self.handle_read(wsconn, b)
+                self.handle_read(protocol, wsconn, b)
 
             logger.debug(
                 remote_addr.ip,
@@ -191,13 +187,13 @@ struct Server:
     fn address(mut self) -> String:
         return String(self.host, ":", self.port)
 
-    fn handle_read(mut self, mut wsconn: WSConnection, data: Bytes) raises -> None:
+    fn handle_read(self, mut protocol: ServerProtocol, mut wsconn: WSConnection, data: Bytes) raises -> None:
         bytes_recv = len(data)
         if bytes_recv == 0:
-            receive_eof(self.protocol)
+            receive_eof(protocol)
             return
 
-        data_to_send = self.protocol.data_to_send()
+        data_to_send = protocol.data_to_send()
         if len(data_to_send) > 0:
             bytes_written = wsconn.write(data_to_send)
             logger.debug("Bytes written: ", bytes_written)
