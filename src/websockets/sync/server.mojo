@@ -10,6 +10,7 @@ from time import sleep
 from websockets.libc import c_int
 
 from websockets.aliases import Bytes, DEFAULT_BUFFER_SIZE, DEFAULT_MAX_REQUEST_BODY_SIZE, MAGIC_CONSTANT
+from websockets.frames import Frame
 from websockets.http import Header, Headers, HTTPRequest, HTTPResponse, encode
 from websockets.logger import logger
 from websockets.net import ListenConfig, TCPConnection, TCPListener
@@ -190,15 +191,21 @@ struct Server:
     fn handle_read(self, mut protocol: ServerProtocol, mut wsconn: WSConnection, data: Bytes) raises -> None:
         bytes_recv = len(data)
         if bytes_recv == 0:
+            logger.debug("Received zero bytes. Closing connection.")
             receive_eof(protocol)
             return
+
+        events_received = protocol.events_received()
+        for event_ref in events_received:
+            event = event_ref[]
+            if event.isa[Frame]():
+                data_received = event[Frame].data
+                self.handler(wsconn, data_received)
 
         data_to_send = protocol.data_to_send()
         if len(data_to_send) > 0:
             bytes_written = wsconn.write(data_to_send)
             logger.debug("Bytes written: ", bytes_written)
-    
-        self.handler(wsconn, data)
     
     fn shutdown(mut self) raises -> None:
         self.ln.close()
