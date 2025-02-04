@@ -210,7 +210,6 @@ struct Headers(Writable, Stringable):
             r.increment()
             if is_space(r.peek()):
                 r.increment()
-            # TODO (bgreni): Handle possible trailing whitespace
             var value = r.read_line()
             var k = to_string(key).lower()
             if k == HeaderKey.SET_COOKIE:
