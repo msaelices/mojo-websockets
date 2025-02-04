@@ -14,6 +14,8 @@ This software is in a early stage of development, using the Mojo nightly version
 - **Compatibility**: API designed to be intuitive for developers familiar with the Python websockets library.
 - **Sans/IO Layer**: Implements a WebSocket Sans/IO layer pure Mojo and performs no I/O of its own.
 
+For a complete listing, see the [features](docs/features.md) document.
+
 ## Installation
 
 1. **Install [magic](https://docs.modular.com/magic#install-magic)**
@@ -73,6 +75,8 @@ fn main() raises:
 - [ ] Implement subprotocols and extensions
 - [ ] Optimize performance for high-concurrency scenarios
 - [ ] TLS support
+
+See all the remaining features in the [features](docs/features.md) document.
 
 ## Contributing
 
