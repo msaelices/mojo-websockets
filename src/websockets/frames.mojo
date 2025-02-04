@@ -230,6 +230,18 @@ struct Frame(Writable, Stringable, EqualityComparable):
     fn __ne__(self, other: Frame) -> Bool:
         return not (self == other)
 
+    fn __str__(self) -> String:
+        var s = String()
+        try:
+            self.write_repr_to(s)
+        except:
+            s = "ERROR representing frame"
+        return s
+
+    # ===-------------------------------------------------------------------=== #
+    # Methods
+    # ===-------------------------------------------------------------------=== #
+
     fn write_repr_to[W: Writer](self, mut writer: W) raises:
         """
         Return a human-readable representation of a frame.
@@ -274,14 +286,6 @@ struct Frame(Writable, Stringable, EqualityComparable):
         repr_data = "'{}'".format(data) if coding == "text" else data
         writer.write(get_op_code_name(self.opcode), " ", repr_data, " [", metadata, "]")
 
-    fn __str__(self) -> String:
-        var s = String()
-        try:
-            self.write_repr_to(s)
-        except:
-            s = "ERROR representing frame"
-        return s
-
     fn write_to[W: Writer](self, mut writer: W) -> None:
         """
         Serialize the frame to a writer.
@@ -305,6 +309,75 @@ struct Frame(Writable, Stringable, EqualityComparable):
         for byte in self.data:
             s += "{} ".format(hex(ord(String(byte))))
         return String(s.strip())
+
+    fn check(self) raises -> None:
+        """
+        Check that reserved bits and opcode have acceptable values.
+
+        Raises:
+            ProtocolError: If a reserved bit or the opcode is invalid.
+
+        """
+        if self.rsv1 or self.rsv2 or self.rsv3:
+            raise Error("ProtocolError: reserved bits must be 0")
+
+        if self.opcode in CTRL_OPCODES:
+            if len(self.data) > 125:
+                raise Error("ProtocolError: control frame too long")
+            if not self.fin:
+                raise Error("ProtocolError: fragmented control frame")
+
+    fn serialize[
+       gen_mask_func: fn () -> Bytes = gen_mask,
+    ](
+        self,
+        *,
+        mask: Bool,
+    ) raises -> Bytes:
+        """
+        Serialize a WebSocket frame.
+
+        Args:
+            mask: Whether the frame should be masked i.e. whether the write
+                happens on the client side.
+
+        Raises:
+            ProtocolError: If the frame contains incorrect values.
+
+        Returns:
+            The serialized frame.
+        """
+        self.check()
+
+        length = len(self.data)
+        output = ByteWriter(capacity=length + MAX_FRAME_OVERHEAD)
+
+        # Prepare the header.
+        head1 = (
+            (0b10000000 if self.fin else 0)
+            | (0b01000000 if self.rsv1 else 0)
+            | (0b00100000 if self.rsv2 else 0)
+            | (0b00010000 if self.rsv3 else 0)
+            | self.opcode
+        )
+        head2 = 0b10000000 if mask else 0
+
+        if length < 126:
+            output.write_bytes(pack["!BB"](head1, head2 | length))
+        elif length < 65536:
+            output.write_bytes(pack["!BBH"](head1, head2 | 126, length))
+        else:
+            output.write_bytes(pack["!BBQ"](head1, head2 | 127, length))
+
+        if mask:
+            mask_bytes = gen_mask_func()
+            output.write_bytes(mask_bytes)
+            data = apply_mask(self.data, mask_bytes)
+        else:
+            data = self.data
+        output.write_bytes(data)
+
+        return output.consume()
 
     @staticmethod
     fn parse[T: Streamable](
@@ -377,75 +450,6 @@ struct Frame(Writable, Stringable, EqualityComparable):
         frame.check()
 
         return frame
-
-    fn check(self) raises -> None:
-        """
-        Check that reserved bits and opcode have acceptable values.
-
-        Raises:
-            ProtocolError: If a reserved bit or the opcode is invalid.
-
-        """
-        if self.rsv1 or self.rsv2 or self.rsv3:
-            raise Error("ProtocolError: reserved bits must be 0")
-
-        if self.opcode in CTRL_OPCODES:
-            if len(self.data) > 125:
-                raise Error("ProtocolError: control frame too long")
-            if not self.fin:
-                raise Error("ProtocolError: fragmented control frame")
-
-    fn serialize[
-       gen_mask_func: fn () -> Bytes = gen_mask,
-    ](
-        self,
-        *,
-        mask: Bool,
-    ) raises -> Bytes:
-        """
-        Serialize a WebSocket frame.
-
-        Args:
-            mask: Whether the frame should be masked i.e. whether the write
-                happens on the client side.
-
-        Raises:
-            ProtocolError: If the frame contains incorrect values.
-
-        Returns:
-            The serialized frame.
-        """
-        self.check()
-
-        length = len(self.data)
-        output = ByteWriter(capacity=length + MAX_FRAME_OVERHEAD)
-
-        # Prepare the header.
-        head1 = (
-            (0b10000000 if self.fin else 0)
-            | (0b01000000 if self.rsv1 else 0)
-            | (0b00100000 if self.rsv2 else 0)
-            | (0b00010000 if self.rsv3 else 0)
-            | self.opcode
-        )
-        head2 = 0b10000000 if mask else 0
-
-        if length < 126:
-            output.write_bytes(pack["!BB"](head1, head2 | length))
-        elif length < 65536:
-            output.write_bytes(pack["!BBH"](head1, head2 | 126, length))
-        else:
-            output.write_bytes(pack["!BBQ"](head1, head2 | 127, length))
-
-        if mask:
-            mask_bytes = gen_mask_func()
-            output.write_bytes(mask_bytes)
-            data = apply_mask(self.data, mask_bytes)
-        else:
-            data = self.data
-        output.write_bytes(data)
-
-        return output.consume()
 
 
 @value
@@ -539,315 +543,3 @@ struct Close:
         if not (code in EXTERNAL_CLOSE_CODES or 3000 <= code < 5000):
             raise Error("ProtocolError: invalid status code: {}".format(self.code))
 
-#
-# BytesLike = bytes, bytearray, memoryview
-#
-#
-# @dataclasses.dataclass
-# class Frame:
-#     """
-#     WebSocket frame.
-#
-#     Attributes:
-#         opcode: Opcode.
-#         data: Payload data.
-#         fin: FIN bit.
-#         rsv1: RSV1 bit.
-#         rsv2: RSV2 bit.
-#         rsv3: RSV3 bit.
-#
-#     Only these fields are needed. The MASK bit, payload length and masking-key
-#     are handled on the fly when parsing and serializing frames.
-#
-#     """
-#
-#     opcode: Opcode
-#     data: Union[bytes, bytearray, memoryview]
-#     fin: bool = True
-#     rsv1: bool = False
-#     rsv2: bool = False
-#     rsv3: bool = False
-#
-#     # Configure if you want to see more in logs. Should be a multiple of 3.
-#     MAX_LOG_SIZE = int(os.environ.get("WEBSOCKETS_MAX_LOG_SIZE", "75"))
-#
-#     def __str__(self) -> str:
-#         """
-#         Return a human-readable representation of a frame.
-#
-#         """
-#         coding = None
-#         length = f"{len(self.data)} byte{'' if len(self.data) == 1 else 's'}"
-#         non_final = "" if self.fin else "continued"
-#
-#         if self.opcode is OP_TEXT:
-#             # Decoding only the beginning and the end is needlessly hard.
-#             # Decode the entire payload then elide later if necessary.
-#             data = repr(bytes(self.data).decode())
-#         elif self.opcode is OP_BINARY:
-#             # We'll show at most the first 16 bytes and the last 8 bytes.
-#             # Encode just what we need, plus two dummy bytes to elide later.
-#             binary = self.data
-#             if len(binary) > self.MAX_LOG_SIZE // 3:
-#                 cut = (self.MAX_LOG_SIZE // 3 - 1) // 3  # by default cut = 8
-#                 binary = b"".join([binary[: 2 * cut], b"\x00\x00", binary[-cut:]])
-#             data = " ".join(f"{byte:02x}" for byte in binary)
-#         elif self.opcode is OP_CLOSE:
-#             data = str(Close.parse(self.data))
-#         elif self.data:
-#             # We don't know if a Continuation frame contains text or binary.
-#             # Ping and Pong frames could contain UTF-8.
-#             # Attempt to decode as UTF-8 and display it as text; fallback to
-#             # binary. If self.data is a memoryview, it has no decode() method,
-#             # which raises AttributeError.
-#             try:
-#                 data = repr(bytes(self.data).decode())
-#                 coding = "text"
-#             except (UnicodeDecodeError, AttributeError):
-#                 binary = self.data
-#                 if len(binary) > self.MAX_LOG_SIZE // 3:
-#                     cut = (self.MAX_LOG_SIZE // 3 - 1) // 3  # by default cut = 8
-#                     binary = b"".join([binary[: 2 * cut], b"\x00\x00", binary[-cut:]])
-#                 data = " ".join(f"{byte:02x}" for byte in binary)
-#                 coding = "binary"
-#         else:
-#             data = "''"
-#
-#         if len(data) > self.MAX_LOG_SIZE:
-#             cut = self.MAX_LOG_SIZE // 3 - 1  # by default cut = 24
-#             data = data[: 2 * cut] + "..." + data[-cut:]
-#
-#         metadata = ", ".join(filter(None, [coding, length, non_final]))
-#
-#         return f"{self.opcode.name} {data} [{metadata}]"
-#
-#     @classmethod
-#     def parse(
-#         cls,
-#         read_exact: Callable[[int], Generator[None, None, bytes]],
-#         *,
-#         mask: bool,
-#         max_size: int | None = None,
-#         extensions: Sequence[extensions.Extension] | None = None,
-#     ) -> Generator[None, None, Frame]:
-#         """
-#         Parse a WebSocket frame.
-#
-#         This is a generator-based coroutine.
-#
-#         Args:
-#             read_exact: Generator-based coroutine that reads the requested
-#                 bytes or raises an exception if there isn't enough data.
-#             mask: Whether the frame should be masked i.e. whether the read
-#                 happens on the server side.
-#             max_size: Maximum payload size in bytes.
-#             extensions: List of extensions, applied in reverse order.
-#
-#         Raises:
-#             EOFError: If the connection is closed without a full WebSocket frame.
-#             UnicodeDecodeError: If the frame contains invalid UTF-8.
-#             PayloadTooBig: If the frame's payload size exceeds ``max_size``.
-#             ProtocolError: If the frame contains incorrect values.
-#
-#         """
-#         # Read the header.
-#         data = yield from read_exact(2)
-#         head1, head2 = struct.unpack("!BB", data)
-#
-#         # While not Pythonic, this is marginally faster than calling bool().
-#         fin = True if head1 & 0b10000000 else False
-#         rsv1 = True if head1 & 0b01000000 else False
-#         rsv2 = True if head1 & 0b00100000 else False
-#         rsv3 = True if head1 & 0b00010000 else False
-#
-#         try:
-#             opcode = Opcode(head1 & 0b00001111)
-#         except ValueError as exc:
-#             raise ProtocolError("invalid opcode") from exc
-#
-#         if (True if head2 & 0b10000000 else False) != mask:
-#             raise ProtocolError("incorrect masking")
-#
-#         length = head2 & 0b01111111
-#         if length == 126:
-#             data = yield from read_exact(2)
-#             (length,) = struct.unpack("!H", data)
-#         elif length == 127:
-#             data = yield from read_exact(8)
-#             (length,) = struct.unpack("!Q", data)
-#         if max_size is not None and length > max_size:
-#             raise PayloadTooBig(f"over size limit ({length} > {max_size} bytes)")
-#         if mask:
-#             mask_bytes = yield from read_exact(4)
-#
-#         # Read the data.
-#         data = yield from read_exact(length)
-#         if mask:
-#             data = apply_mask(data, mask_bytes)
-#
-#         frame = cls(opcode, data, fin, rsv1, rsv2, rsv3)
-#
-#         if extensions is None:
-#             extensions = []
-#         for extension in reversed(extensions):
-#             frame = extension.decode(frame, max_size=max_size)
-#
-#         frame.check()
-#
-#         return frame
-#
-#     def serialize(
-#         self,
-#         *,
-#         mask: bool,
-#         extensions: Sequence[extensions.Extension] | None = None,
-#     ) -> bytes:
-#         """
-#         Serialize a WebSocket frame.
-#
-#         Args:
-#             mask: Whether the frame should be masked i.e. whether the write
-#                 happens on the client side.
-#             extensions: List of extensions, applied in order.
-#
-#         Raises:
-#             ProtocolError: If the frame contains incorrect values.
-#
-#         """
-#         self.check()
-#
-#         if extensions is None:
-#             extensions = []
-#         for extension in extensions:
-#             self = extension.encode(self)
-#
-#         output = io.BytesIO()
-#
-#         # Prepare the header.
-#         head1 = (
-#             (0b10000000 if self.fin else 0)
-#             | (0b01000000 if self.rsv1 else 0)
-#             | (0b00100000 if self.rsv2 else 0)
-#             | (0b00010000 if self.rsv3 else 0)
-#             | self.opcode
-#         )
-#
-#         head2 = 0b10000000 if mask else 0
-#
-#         length = len(self.data)
-#         if length < 126:
-#             output.write(struct.pack("!BB", head1, head2 | length))
-#         elif length < 65536:
-#             output.write(struct.pack("!BBH", head1, head2 | 126, length))
-#         else:
-#             output.write(struct.pack("!BBQ", head1, head2 | 127, length))
-#
-#         if mask:
-#             mask_bytes = secrets.token_bytes(4)
-#             output.write(mask_bytes)
-#
-#         # Prepare the data.
-#         if mask:
-#             data = apply_mask(self.data, mask_bytes)
-#         else:
-#             data = self.data
-#         output.write(data)
-#
-#         return output.getvalue()
-#
-#     def check(self) -> None:
-#         """
-#         Check that reserved bits and opcode have acceptable values.
-#
-#         Raises:
-#             ProtocolError: If a reserved bit or the opcode is invalid.
-#
-#         """
-#         if self.rsv1 or self.rsv2 or self.rsv3:
-#             raise ProtocolError("reserved bits must be 0")
-#
-#         if self.opcode in CTRL_OPCODES:
-#             if len(self.data) > 125:
-#                 raise ProtocolError("control frame too long")
-#             if not self.fin:
-#                 raise ProtocolError("fragmented control frame")
-#
-#
-# @dataclasses.dataclass
-# class Close:
-#     """
-#     Code and reason for WebSocket close frames.
-#
-#     Attributes:
-#         code: Close code.
-#         reason: Close reason.
-#
-#     """
-#
-#     code: int
-#     reason: str
-#
-#     def __str__(self) -> str:
-#         """
-#         Return a human-readable representation of a close code and reason.
-#
-#         """
-#         if 3000 <= self.code < 4000:
-#             explanation = "registered"
-#         elif 4000 <= self.code < 5000:
-#             explanation = "private use"
-#         else:
-#             explanation = CLOSE_CODE_EXPLANATIONS.get(self.code, "unknown")
-#         result = f"{self.code} ({explanation})"
-#
-#         if self.reason:
-#             result = f"{result} {self.reason}"
-#
-#         return result
-#
-#     @classmethod
-#     def parse(cls, data: bytes) -> Close:
-#         """
-#         Parse the payload of a close frame.
-#
-#         Args:
-#             data: Payload of the close frame.
-#
-#         Raises:
-#             ProtocolError: If data is ill-formed.
-#             UnicodeDecodeError: If the reason isn't valid UTF-8.
-#
-#         """
-#         if len(data) >= 2:
-#             (code,) = struct.unpack("!H", data[:2])
-#             reason = data[2:].decode()
-#             close = cls(code, reason)
-#             close.check()
-#             return close
-#         elif len(data) == 0:
-#             return cls(CloseCode.NO_STATUS_RCVD, "")
-#         else:
-#             raise ProtocolError("close frame too short")
-#
-#     def serialize(self) -> bytes:
-#         """
-#         Serialize the payload of a close frame.
-#
-#         """
-#         self.check()
-#         return struct.pack("!H", self.code) + self.reason.encode()
-#
-#     def check(self) -> None:
-#         """
-#         Check that the close code has a valid value for a close frame.
-#
-#         Raises:
-#             ProtocolError: If the close code is invalid.
-#
-#         """
-#         if not (self.code in EXTERNAL_CLOSE_CODES or 3000 <= self.code < 5000):
-#             raise ProtocolError("invalid status code")
-#
-#
-# # At the bottom to break import cycles created by type annotations.
-# from . import extensions  # noqa: E402

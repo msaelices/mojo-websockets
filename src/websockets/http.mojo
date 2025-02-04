@@ -162,10 +162,6 @@ struct Headers(Writable, Stringable):
         return not (self == other)
 
     @always_inline
-    fn empty(self) -> Bool:
-        return len(self._inner) == 0
-
-    @always_inline
     fn __contains__(self, key: String) -> Bool:
         return key.lower() in self._inner
 
@@ -174,12 +170,19 @@ struct Headers(Writable, Stringable):
         return self._inner[key.lower()]
 
     @always_inline
-    fn get(self, key: String) -> Optional[String]:
-        return self._inner.get(key.lower())
-
-    @always_inline
     fn __setitem__(mut self, key: String, value: String):
         self._inner[key.lower()] = value
+
+    fn __str__(self) -> String:
+        return String.write(self)
+
+    @always_inline
+    fn empty(self) -> Bool:
+        return len(self._inner) == 0
+
+    @always_inline
+    fn get(self, key: String) -> Optional[String]:
+        return self._inner.get(key.lower())
 
     fn content_length(self) -> Int:
         try:
@@ -223,9 +226,6 @@ struct Headers(Writable, Stringable):
     fn remove(mut self, key: String) raises -> None:
         _ = self._inner.pop(key.lower())
 
-    fn __str__(self) -> String:
-        return String.write(self)
-
 
 @value
 struct HTTPRequest(Writable, Stringable):
@@ -237,33 +237,6 @@ struct HTTPRequest(Writable, Stringable):
     var protocol: String
 
     var timeout: Duration
-
-    @staticmethod
-    fn from_bytes(addr: String, max_body_size: Int, b: Span[Byte]) raises -> (HTTPRequest, Int):
-        var reader = ByteReader(b)
-        var headers = Headers()
-        var method: String
-        var protocol: String
-        var uri: String
-        try:
-            var rest = headers.parse_raw(reader)
-            method, uri, protocol = rest[0], rest[1], rest[2]
-        except e:
-            raise Error("HTTPRequest.from_bytes: Failed to parse request headers: " + String(e))
-
-        var content_length = headers.content_length()
-        if content_length > 0 and max_body_size > 0 and content_length > max_body_size:
-            raise Error("HTTPRequest.from_bytes: Request body too large.")
-
-        var request = HTTPRequest(
-            URI.parse(addr + uri), headers=headers, method=method, protocol=protocol,
-        )
-        try:
-            request.read_body(reader, content_length, max_body_size)
-        except e:
-            raise Error("HTTPRequest.from_bytes: Failed to read request body: " + String(e))
-
-        return request, reader.read_pos
 
     fn __init__(
         out self,
@@ -284,6 +257,21 @@ struct HTTPRequest(Writable, Stringable):
             self.headers[HeaderKey.CONNECTION] = "keep-alive"
         if HeaderKey.HOST not in self.headers and uri.host:
             self.headers[HeaderKey.HOST] = uri.host
+
+    fn __str__(self) -> String:
+        return String.write(self)
+
+    fn __eq__(self, other: Self) raises -> Bool:
+        return (
+            self.method == other.method
+            and self.uri == other.uri
+            and self.protocol == other.protocol
+            and self.headers == other.headers
+            and String(self.body_raw) == String(other.body_raw)
+        )
+
+    fn __ne__(self, other: Self) raises -> Bool:
+        return not (self == other)
 
     fn get_body(self) -> StringSlice[__origin_of(self.body_raw)]:
         return StringSlice(unsafe_from_utf8=Span(self.body_raw))
@@ -348,20 +336,32 @@ struct HTTPRequest(Writable, Stringable):
         writer.consuming_write(self^.body_raw)
         return writer.consume()
 
-    fn __str__(self) -> String:
-        return String.write(self)
+    @staticmethod
+    fn from_bytes(addr: String, max_body_size: Int, b: Span[Byte]) raises -> (HTTPRequest, Int):
+        var reader = ByteReader(b)
+        var headers = Headers()
+        var method: String
+        var protocol: String
+        var uri: String
+        try:
+            var rest = headers.parse_raw(reader)
+            method, uri, protocol = rest[0], rest[1], rest[2]
+        except e:
+            raise Error("HTTPRequest.from_bytes: Failed to parse request headers: " + String(e))
 
-    fn __eq__(self, other: Self) raises -> Bool:
-        return (
-            self.method == other.method
-            and self.uri == other.uri
-            and self.protocol == other.protocol
-            and self.headers == other.headers
-            and String(self.body_raw) == String(other.body_raw)
+        var content_length = headers.content_length()
+        if content_length > 0 and max_body_size > 0 and content_length > max_body_size:
+            raise Error("HTTPRequest.from_bytes: Request body too large.")
+
+        var request = HTTPRequest(
+            URI.parse(addr + uri), headers=headers, method=method, protocol=protocol,
         )
+        try:
+            request.read_body(reader, content_length, max_body_size)
+        except e:
+            raise Error("HTTPRequest.from_bytes: Failed to read request body: " + String(e))
 
-    fn __ne__(self, other: Self) raises -> Bool:
-        return not (self == other)
+        return request, reader.read_pos
 
 
 @value
@@ -373,85 +373,6 @@ struct HTTPResponse(Writable, Stringable):
     var status_text: String
     var protocol: String
 
-    @staticmethod
-    fn from_bytes(b: Span[Byte]) raises -> HTTPResponse:
-        var reader = ByteReader(b)
-        var headers = Headers()
-        var protocol: String
-        var status_code: String
-        var status_text: String
-
-        try:
-            var properties = headers.parse_raw(reader)
-            protocol, status_code, status_text = properties[0], properties[1], properties[2]
-        except e:
-            raise Error("Failed to parse response headers: " + String(e))
-
-        try:
-            return HTTPResponse(
-                reader=reader,
-                headers=headers,
-                protocol=protocol,
-                status_code=Int(status_code),
-                status_text=status_text,
-            )
-        except e:
-            logger.error(e)
-            raise Error("Failed to read request body")
-
-    @staticmethod
-    fn from_bytes(b: Span[Byte], conn: TCPConnection) raises -> HTTPResponse:
-        var reader = ByteReader(b)
-        var headers = Headers()
-        var protocol: String
-        var status_code: String
-        var status_text: String
-
-        try:
-            var properties = headers.parse_raw(reader)
-            protocol, status_code, status_text = properties[0], properties[1], properties[2]
-            reader.skip_carriage_return()
-        except e:
-            raise Error("Failed to parse response headers: " + String(e))
-
-        var response = HTTPResponse(
-            status_code=Int(status_code),
-            status_text=status_text,
-            headers=headers,
-            body_bytes=Bytes(),
-            protocol=protocol,
-        )
-
-        var transfer_encoding = response.headers.get(HeaderKey.TRANSFER_ENCODING)
-        if transfer_encoding and transfer_encoding.value() == "chunked":
-            var b = Bytes(reader.read_bytes())
-            var buff = Bytes(capacity=DEFAULT_BUFFER_SIZE)
-            try:
-                while conn.read(buff) > 0:
-                    b += buff
-
-                    if (
-                        buff[-5] == byte("0")
-                        and buff[-4] == byte("\r")
-                        and buff[-3] == byte("\n")
-                        and buff[-2] == byte("\r")
-                        and buff[-1] == byte("\n")
-                    ):
-                        break
-
-                    buff.resize(0)
-                response.read_chunks(b)
-                return response
-            except e:
-                logger.error(e)
-                raise Error("Failed to read chunked response.")
-
-        try:
-            response.read_body(reader)
-            return response
-        except e:
-            logger.error(e)
-            raise Error("Failed to read request body: ")
 
     fn __init__(
         out self,
@@ -480,6 +401,9 @@ struct HTTPResponse(Writable, Stringable):
         self.status_text = status_text
         self.protocol = protocol
         self.body_raw = Bytes(reader.read_bytes())
+
+    fn __str__(self) -> String:
+        return String.write(self)
 
     fn get_body(self) -> StringSlice[__origin_of(self.body_raw)]:
         return StringSlice(unsafe_from_utf8=Span(self.body_raw))
@@ -562,138 +486,83 @@ struct HTTPResponse(Writable, Stringable):
         writer.consuming_write(self^.body_raw)
         return writer.consume()
 
-    fn __str__(self) -> String:
-        return String.write(self)
+    @staticmethod
+    fn from_bytes(b: Span[Byte]) raises -> HTTPResponse:
+        var reader = ByteReader(b)
+        var headers = Headers()
+        var protocol: String
+        var status_code: String
+        var status_text: String
 
+        try:
+            var properties = headers.parse_raw(reader)
+            protocol, status_code, status_text = properties[0], properties[1], properties[2]
+        except e:
+            raise Error("Failed to parse response headers: " + String(e))
 
-# @value
-# struct HTTPResponse(Writable, Stringable):
-#     var headers: Headers
-#     var body_raw: Bytes
-#     var skip_reading_writing_body: Bool
-#     var raddr: TCPAddr
-#     var laddr: TCPAddr
-#     var __is_upgrade: Bool
-#
-#     var status_code: Int
-#     var status_text: String
-#     var protocol: String
-#
-#     @staticmethod
-#     fn from_bytes(owned b: Span[Byte]) raises -> HTTPResponse:
-#         var reader = ByteReader(b)
-#
-#         var headers = Headers()
-#         var protocol: String
-#         var status_code: String
-#         var status_text: String
-#
-#         try:
-#             protocol, status_code, status_text = headers.parse_raw(reader)
-#         except e:
-#             raise Error("Failed to parse response headers: " + e.__str__())
-#
-#         var response = HTTPResponse(
-#             status_code=Int(status_code),
-#             status_text=status_text,
-#             headers=headers,
-#             body_bytes=Bytes(),
-#             protocol=protocol,
-#         )
-#
-#         try:
-#             response.read_body(reader)
-#             return response
-#         except e:
-#             raise Error("Failed to read request body: " + e.__str__())
-#
-#     fn __init__(
-#         out self,
-#         status_code: Int,
-#         status_text: String,
-#         headers: Headers,
-#         body_bytes: Bytes,
-#         protocol: String = HTTP11,
-#     ):
-#         self.headers = headers
-#         self.status_code = status_code
-#         self.status_text = status_text
-#         self.protocol = protocol
-#         self.body_raw = body_bytes
-#         self.skip_reading_writing_body = False
-#         self.__is_upgrade = False
-#         self.raddr = TCPAddr()
-#         self.laddr = TCPAddr()
-#
-#     fn get_body_bytes(self) -> Bytes:
-#         return self.body_raw
-#
-#     fn get_body(self) -> StringSlice[__origin_of(self.body_raw)]:
-#         return StringSlice(unsafe_from_utf8=self.body_raw)
-#
-#     @always_inline
-#     fn set_connection_close(mut self):
-#         self.headers[HeaderKey.CONNECTION] = "close"
-#
-#     @always_inline
-#     fn set_connection_keep_alive(mut self):
-#         self.headers[HeaderKey.CONNECTION] = "keep-alive"
-#
-#     fn connection_close(self) -> Bool:
-#         return self.headers[HeaderKey.CONNECTION] == "close"
-#
-#     @always_inline
-#     fn set_content_length(mut self, l: Int):
-#         self.headers[HeaderKey.CONTENT_LENGTH] = String(l)
-#
-#     @always_inline
-#     fn read_body(mut self, mut r: ByteReader) raises -> None:
-#         r.consume(self.body_raw)
-#
-#     fn write_to[W: Writer](self, mut writer: W):
-#         writer.write(
-#             self.protocol,
-#             whitespace,
-#             self.status_code,
-#             whitespace,
-#             self.status_text,
-#             lineBreak,
-#         )
-#
-#         if HeaderKey.DATE not in self.headers:
-#             var current_time = get_date_timestamp()
-#             write_header(writer, HeaderKey.DATE, current_time)
-#
-#         self.headers.write_to(writer)
-#
-#         writer.write(lineBreak)
-#         writer.write(to_string(self.body_raw))
-#
-#     fn encode(owned self) -> Bytes:
-#         """Encodes response as bytes.
-#
-#         This method consumes the data in this request and it should
-#         no longer be considered valid.
-#         """
-#         var writer = ByteWriter()
-#         writer.write(
-#             self.protocol,
-#             whitespace,
-#             String(self.status_code),
-#             whitespace,
-#             self.status_text,
-#             lineBreak,
-#         )
-#         writer.write(self.headers, lineBreak)
-#
-#         # TODO: Changed line from taken code from lightbug_http
-#         # as it was causing a segfault. The original code was:
-#         # writer.consuming_write(self^.body_raw)
-#         writer.write_bytes(self.body_raw)
-#         return writer.consume()
-#
-#     fn __str__(self) -> String:
-#         output = String()
-#         self.write_to(output)
-#         return output
-#
+        try:
+            return HTTPResponse(
+                reader=reader,
+                headers=headers,
+                protocol=protocol,
+                status_code=Int(status_code),
+                status_text=status_text,
+            )
+        except e:
+            logger.error(e)
+            raise Error("Failed to read request body")
+
+    @staticmethod
+    fn from_bytes(b: Span[Byte], conn: TCPConnection) raises -> HTTPResponse:
+        var reader = ByteReader(b)
+        var headers = Headers()
+        var protocol: String
+        var status_code: String
+        var status_text: String
+
+        try:
+            var properties = headers.parse_raw(reader)
+            protocol, status_code, status_text = properties[0], properties[1], properties[2]
+            reader.skip_carriage_return()
+        except e:
+            raise Error("Failed to parse response headers: " + String(e))
+
+        var response = HTTPResponse(
+            status_code=Int(status_code),
+            status_text=status_text,
+            headers=headers,
+            body_bytes=Bytes(),
+            protocol=protocol,
+        )
+
+        var transfer_encoding = response.headers.get(HeaderKey.TRANSFER_ENCODING)
+        if transfer_encoding and transfer_encoding.value() == "chunked":
+            var b = Bytes(reader.read_bytes())
+            var buff = Bytes(capacity=DEFAULT_BUFFER_SIZE)
+            try:
+                while conn.read(buff) > 0:
+                    b += buff
+
+                    if (
+                        buff[-5] == byte("0")
+                        and buff[-4] == byte("\r")
+                        and buff[-3] == byte("\n")
+                        and buff[-2] == byte("\r")
+                        and buff[-1] == byte("\n")
+                    ):
+                        break
+
+                    buff.resize(0)
+                response.read_chunks(b)
+                return response
+            except e:
+                logger.error(e)
+                raise Error("Failed to read chunked response.")
+
+        try:
+            response.read_body(reader)
+            return response
+        except e:
+            logger.error(e)
+            raise Error("Failed to read request body: ")
+

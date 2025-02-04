@@ -127,6 +127,10 @@ struct Server:
         """
         self.shutdown()
 
+    # ===-------------------------------------------------------------------=== #
+    # Methods
+    # ===-------------------------------------------------------------------=== #
+
     fn serve_forever(mut self) raises:
         """
         Listen for incoming connections and serve HTTP requests.

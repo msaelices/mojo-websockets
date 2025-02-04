@@ -43,6 +43,46 @@ struct Client:
         self.uri = other.uri
         self.conn = other.conn
 
+    # Context manager methods
+
+    fn __enter__(mut self) raises -> Self:
+        """
+        Context manager entry point, called by the serve() function.
+
+        Usage:
+            with connect("ws://localhost:8000") as client:
+                client.send_text("Hello world!")
+                response = client.recv()
+        """
+        self.conn.connect(self.uri.get_hostname(), self.uri.get_port())
+        conn_req = self.protocol.connect()
+        logger.debug("Sending connection request:\n{}".format(String(conn_req)))
+        self.protocol.send_request(conn_req)
+        data_to_send = self.protocol.data_to_send()
+        _ = self.conn.write(data_to_send)
+        response_bytes = Bytes(capacity=DEFAULT_BUFFER_SIZE)
+        bytes_received = self.conn.read(response_bytes)
+        logger.debug("Bytes received: ", bytes_received)
+        receive_data(self.protocol, response_bytes)
+        if self.protocol.get_handshake_exc():
+            logger.error(String(self.protocol.get_handshake_exc().value()))
+            logger.error("Failed to establish connection. Closing connection.")
+            self.close()
+            raise self.protocol.get_handshake_exc().value()
+        return self
+
+    fn __exit__(
+        mut self,
+    ) raises -> None:
+        """
+        Context manager exit point, called by the serve() function, closing the connection.
+        """
+        self.close()
+
+    # ===-------------------------------------------------------------------=== #
+    # Methods
+    # ===-------------------------------------------------------------------=== #
+
     fn send_binary(mut self, message: Bytes) raises -> None:
         """
         Send a message to the server.
@@ -105,30 +145,6 @@ struct Client:
         """
         self.conn.teardown()
 
-    # Contex manager methods
-
-    fn __enter__(mut self) raises -> Self:
-        self.conn.connect(self.uri.get_hostname(), self.uri.get_port())
-        conn_req = self.protocol.connect()
-        logger.debug("Sending connection request:\n{}".format(String(conn_req)))
-        self.protocol.send_request(conn_req)
-        data_to_send = self.protocol.data_to_send()
-        _ = self.conn.write(data_to_send)
-        response_bytes = Bytes(capacity=DEFAULT_BUFFER_SIZE)
-        bytes_received = self.conn.read(response_bytes)
-        logger.debug("Bytes received: ", bytes_received)
-        receive_data(self.protocol, response_bytes)
-        if self.protocol.get_handshake_exc():
-            logger.error(String(self.protocol.get_handshake_exc().value()))
-            logger.error("Failed to establish connection. Closing connection.")
-            self.close()
-            raise self.protocol.get_handshake_exc().value()
-        return self
-
-    fn __exit__(
-        mut self,
-    ) raises -> None:
-        self.close()
 
 
 fn connect(uri: String) raises -> Client:
