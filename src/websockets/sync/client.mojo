@@ -4,6 +4,7 @@ from websockets.logger import logger
 from websockets.protocol.base import (
     receive_data,
     send_binary, 
+    send_continuation, 
     send_text, 
 )
 from websockets.protocol.client import ClientProtocol
@@ -60,6 +61,17 @@ struct Client:
             message: The message to send.
         """
         send_text(self.protocol, str_to_bytes(message))
+        _ = self.conn.write(self.protocol.data_to_send())
+
+    fn send_continuation(mut self, message: Bytes, fin: Bool = False) raises -> None:
+        """
+        Send a continuation message to the server.
+
+        Args:
+            message: The message to send.
+            fin: A boolean indicating if this is the final message in the sequence.
+        """
+        send_continuation(self.protocol, message, fin=fin)
         _ = self.conn.write(self.protocol.data_to_send())
 
     fn recv(mut self) raises -> Bytes:
