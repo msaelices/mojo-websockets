@@ -12,5 +12,3 @@ publish = { cmd = "bash scripts/publish.sh", env = { PREFIX_API_KEY = "$PREFIX_A
 
 [dependencies]
 max = "*"
-# libc = "==0.1.10"
-small_time = "==0.1.6"
