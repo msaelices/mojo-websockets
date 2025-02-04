@@ -1,7 +1,11 @@
 from websockets.aliases import Bytes, DEFAULT_BUFFER_SIZE
 from websockets.frames import Frame
 from websockets.logger import logger
-from websockets.protocol.base import send_text, send_binary, receive_data
+from websockets.protocol.base import (
+    receive_data,
+    send_binary, 
+    send_text, 
+)
 from websockets.protocol.client import ClientProtocol
 from websockets.net import TCPAddr, TCPConnection
 from websockets.socket import Socket
@@ -102,7 +106,11 @@ struct Client:
         bytes_received = self.conn.read(response_bytes)
         logger.debug("Bytes received: ", bytes_received)
         receive_data(self.protocol, response_bytes)
-        # TODO: Handle handshake exceptions
+        if self.protocol.get_handshake_exc():
+            logger.error(String(self.protocol.get_handshake_exc().value()))
+            logger.error("Failed to establish connection. Closing connection.")
+            self.close()
+            raise self.protocol.get_handshake_exc().value()
         return self
 
     fn __exit__(
