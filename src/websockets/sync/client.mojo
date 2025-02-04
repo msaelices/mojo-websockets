@@ -140,6 +140,15 @@ fn connect(uri: String) raises -> Client:
 
     Returns:
         Client - A client object that can be used to connect to a server.
+
+    Raises:
+        Error - If the connection fails.
+
+    Usage:
+        with connect("ws://localhost:8000") as client:
+            client.send_text("Hello world!")
+            response = client.recv()
+    .
     """
     return Client(uri)
 
