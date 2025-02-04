@@ -12,6 +12,7 @@ This software is in a early stage of development, using the Mojo nightly version
 
 - **WebSocket Server and Client**: Supports creating both WebSocket servers and clients.
 - **Compatibility**: API designed to be intuitive for developers familiar with the Python websockets library.
+- **Sans/IO Layer**: Implements a WebSocket Sans/IO layer pure Mojo and performs no I/O of its own.
 
 ## Installation
 
