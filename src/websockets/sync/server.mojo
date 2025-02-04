@@ -109,8 +109,27 @@ struct Server:
         self.max_request_body_size = other.max_request_body_size
         self.ln = other.ln
 
+    fn __enter__(self) -> Self:
+        """
+        Context manager entry point, called by the serve() function.
+
+        Usage:
+            with serve(handler, host, port) as server:
+                server.serve_forever()
+        """
+        return self
+
+    fn __exit__(
+        mut self,
+    ) raises -> None:
+        """
+        Context manager exit point, called by the serve() function which closes the server.
+        """
+        self.shutdown()
+
     fn serve_forever(mut self) raises:
-        """Listen for incoming connections and serve HTTP requests.
+        """
+        Listen for incoming connections and serve HTTP requests.
         """
         var net = ListenConfig()
         var listener = net.listen(self.host, self.port)
@@ -186,9 +205,20 @@ struct Server:
             )
 
     fn address(mut self) -> String:
+        """
+        Get the address of the server.
+        """
         return String(self.host, ":", self.port)
 
     fn handle_read(self, mut protocol: ServerProtocol, mut wsconn: WSConnection, data: Bytes) raises -> None:
+        """
+        Handle incoming data.
+
+        Args:
+            protocol: ServerProtocol - The protocol object that handles the connection.
+            wsconn: WSConnection - The connection object.
+            data: Bytes - The data received from the client.
+        """
         bytes_recv = len(data)
         if bytes_recv == 0:
             logger.debug("Received zero bytes. Closing connection.")
@@ -208,15 +238,11 @@ struct Server:
             logger.debug("Bytes written: ", bytes_written)
     
     fn shutdown(mut self) raises -> None:
+        """
+        Shutdown the server.
+        """
         self.ln.close()
 
-    fn __enter__(self) -> Self:
-        return self
-
-    fn __exit__(
-        mut self,
-    ) raises -> None:
-        self.shutdown()
 
 
 fn serve(handler: ConnHandler, host: String, port: Int) raises -> Server:
@@ -230,6 +256,14 @@ fn serve(handler: ConnHandler, host: String, port: Int) raises -> Server:
 
     Returns:
         Server - A server object that can be used to serve requests.
+
+    Raises:
+        If there is an error while serving requests.
+
+    Usage:
+        with serve(handler, host, port) as server:
+            server.serve_forever()
+    .
     """
     return Server(host, port, handler)
 
