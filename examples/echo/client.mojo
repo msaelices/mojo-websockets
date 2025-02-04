@@ -6,10 +6,10 @@ from websockets.utils.bytes import bytes_to_str
 
 
 fn send_and_receive(msg: String) raises:
-    with connect("ws://127.0.0.1:8000") as websocket:
-        websocket.send_text(msg)
+    with connect("ws://127.0.0.1:8000") as client:
+        client.send_text(msg)
         print(">>> ", msg)
-        response = websocket.recv()
+        response = client.recv()
         print("<<< ", bytes_to_str(response))
 
 
