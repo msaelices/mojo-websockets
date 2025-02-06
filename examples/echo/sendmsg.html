@@ -74,8 +74,17 @@
         }
         socket.onclose = (event) => console.log('disconnected')
 
-        socket.onmessage = (event) => {
-            messages.innerHTML += event.data + '<br>'
+        socket.onmessage = async (event) => {
+            let data = event.data
+            if (typeof data === "string") {
+                // If the data is already a string, just use it directly
+                messages.innerHTML += data + '<br>';
+            } else if (data instanceof Blob) {
+                // Convert Blob to ArrayBuffer
+                data = await data.arrayBuffer();
+                const decodedData = new TextDecoder("utf-8").decode(data)
+                messages.innerHTML += decodedData + '<br>'
+            }
         }
 
         function sendMessage() {
