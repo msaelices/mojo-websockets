@@ -327,6 +327,14 @@ struct Frame(Writable, Stringable, EqualityComparable):
             if not self.fin:
                 raise Error("ProtocolError: fragmented control frame")
 
+    @always_inline
+    fn is_data(self) -> Bool:
+        """
+        Return whether the frame is a data frame.
+
+        """
+        return self.opcode in DATA_OPCODES
+
     fn serialize[
        gen_mask_func: fn () -> Bytes = gen_mask,
     ](
