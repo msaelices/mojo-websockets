@@ -1,5 +1,7 @@
 # mojo-websockets
 
+![logo](./assets/logo.jpeg)
+
 `mojo-websockets` is a lightweight library for handling WebSocket connections in Mojo. 
 
 It aims to provide an similar interface as the [python-websockets](https://github.com/python-websockets/websockets) package for creating WebSocket servers and clients, with additional features for enhanced usability.
