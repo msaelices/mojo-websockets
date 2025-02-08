@@ -182,7 +182,7 @@ fn apply_mask(data: Bytes, mask: Bytes) raises -> Bytes:
 
 
 @value
-struct Frame(Writable, Stringable, EqualityComparable):
+struct Frame(Stringable, EqualityComparable):
     """
     WebSocket frame.
 
@@ -245,6 +245,12 @@ struct Frame(Writable, Stringable, EqualityComparable):
     fn write_repr_to[W: Writer](self, mut writer: W) raises:
         """
         Return a human-readable representation of a frame.
+
+        Parameters:
+            W: Writer type of the writer.
+
+        Args:
+            writer: Writer to write the representation to.
         """
         var coding: String = ""
         var data: String
@@ -285,13 +291,6 @@ struct Frame(Writable, Stringable, EqualityComparable):
 
         repr_data = "'{}'".format(data) if coding == "text" else data
         writer.write(get_op_code_name(self.opcode), " ", repr_data, " [", metadata, "]")
-
-    fn write_to[W: Writer](self, mut writer: W) -> None:
-        """
-        Serialize the frame to a writer.
-        """
-        # TODO: Implement based on serialize() method below
-        pass
 
     @always_inline
     fn _data_as_text(self) -> String:
