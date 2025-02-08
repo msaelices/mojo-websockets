@@ -1,7 +1,7 @@
 from bit import byte_swap
 from collections import Dict, Optional
+from collections.string import StringSlice
 from memory import bitcast, memcmp, UnsafePointer
-from utils import StringRef
 from sys.info import is_big_endian
 
 from websockets.streams import Streamable
@@ -298,7 +298,7 @@ struct Frame(Writable, Stringable, EqualityComparable):
         """
         Return the data as a string.
         """
-        return String(StringRef(self.data.unsafe_ptr(), len(self.data)))
+        return String(StringSlice[__origin_of(self)](ptr=self.data.unsafe_ptr(), length=len(self.data)))
 
     @always_inline
     fn _data_as_binary(self) raises -> String:
@@ -512,7 +512,7 @@ struct Close:
                 code = Int(byte_swap(data_u16))
             else:
                 code = Int(data_u16)
-            reason = String(StringRef(data.unsafe_ptr().offset(2), len(data) - 2))
+            reason = String(StringSlice[__origin_of(data)](ptr=data.unsafe_ptr().offset(2), length=len(data) - 2))
             close = Close(code, reason)
             close.check()
             return close

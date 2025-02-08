@@ -7,11 +7,11 @@ data exchange with external sources (files or network connections), or data tran
 between the Python application and the C layer.
 """
 from bit import byte_swap
+from collections.string import StringSlice
 from sys import bitwidthof
 from sys.info import is_big_endian
 from memory import bitcast, memcpy, Span, UnsafePointer
 from random import randint
-from utils import StringRef
 
 from websockets.aliases import Bytes
 
@@ -319,7 +319,7 @@ fn bytes_to_str(bytes: Bytes) -> String:
     Returns:
         The string.
     """
-    return String(StringRef(bytes.unsafe_ptr(), len(bytes)))
+    return String(StringSlice[__origin_of(bytes)](ptr=bytes.unsafe_ptr(), length=len(bytes)))
 
 
 @always_inline

@@ -3,7 +3,7 @@ from sys.info import alignof, sizeof
 from sys import external_call, os_is_macos
 from memory import UnsafePointer, Pointer, Span
 from time import sleep
-from utils import StaticTuple, StringRef, Variant
+from utils import StaticTuple, Variant
 
 from websockets.aliases import Bytes, Duration
 from websockets.libc import (
