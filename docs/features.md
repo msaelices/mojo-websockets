@@ -65,7 +65,7 @@
 | Configure ``User-Agent`` header        | ❌   | ❌       |
 | Modify opening handshake request       | ✅   | ✅       |
 | Modify opening handshake response      | ✅   | ✅       |
-| Connect to non-ASCII IRIs              | ??   | ✅       |
+| Connect to non-ASCII IRIs              | ✅   | ✅       |
 | Follow HTTP redirects                  | ❌   | —        |
 | Perform HTTP Basic Authentication      | ✅   | ✅       |
 | Perform HTTP Digest Authentication     | ❌   | ❌       |

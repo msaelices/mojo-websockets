@@ -13,13 +13,13 @@ from websockets.utils.string import (
     BytesConstant,
     is_newline,
     is_space,
-    lineBreak,
-    nChar,
-    rChar,
+    LINE_BREAK,
+    N_CHAR,
+    R_CHAR,
     HTTP11,
     SLASH,
     to_string,
-    whitespace,
+    WHITESPACE,
 )
 from websockets.utils.time import now
 from websockets.utils.uri import URI
@@ -59,12 +59,12 @@ struct Header(Writable, Stringable):
         return String.write(self)
 
     fn write_to[T: Writer, //](self, mut writer: T):
-        writer.write(self.key + ": ", self.value, lineBreak)
+        writer.write(self.key + ": ", self.value, LINE_BREAK)
 
 
 @always_inline
 fn write_header[W: Writer](mut writer: W, key: String, value: String):
-    writer.write(key + ": ", value, lineBreak)
+    writer.write(key + ": ", value, LINE_BREAK)
 
 
 @always_inline
@@ -72,7 +72,7 @@ fn write_header(mut writer: ByteWriter, key: String, mut value: String):
     var k = key + ": "
     writer.write(k)
     writer.write(value)
-    writer.write(lineBreak)
+    writer.write(LINE_BREAK)
 
 
 @always_inline
@@ -206,7 +206,7 @@ struct Headers(Writable, Stringable):
         var third = r.read_line()
 
         while r.available() and not is_newline(r.peek()):
-            var key = r.read_until(BytesConstant.colon)
+            var key = r.read_until(BytesConstant.COLON)
             r.increment()
             if is_space(r.peek()):
                 r.increment()
@@ -301,13 +301,13 @@ struct HTTPRequest(Writable, Stringable):
 
         writer.write(
             self.method,
-            whitespace,
+            WHITESPACE,
             path,
-            whitespace,
+            WHITESPACE,
             self.protocol,
-            lineBreak,
+            LINE_BREAK,
             self.headers,
-            lineBreak,
+            LINE_BREAK,
             to_string(self.body_raw),
         )
 
@@ -324,13 +324,13 @@ struct HTTPRequest(Writable, Stringable):
         var writer = ByteWriter()
         writer.write(
             self.method,
-            whitespace,
+            WHITESPACE,
             path,
-            whitespace,
+            WHITESPACE,
             self.protocol,
-            lineBreak,
+            LINE_BREAK,
             self.headers,
-            lineBreak,
+            LINE_BREAK,
         )
         writer.consuming_write(self^.body_raw)
         return writer.consume()
@@ -458,8 +458,8 @@ struct HTTPResponse(Writable, Stringable):
             self.body_raw += Bytes(data)
 
     fn write_to[T: Writer](self, mut writer: T):
-        writer.write(self.protocol, whitespace, self.status_code, whitespace, self.status_text, lineBreak)
-        writer.write(self.headers, lineBreak, to_string(self.body_raw))
+        writer.write(self.protocol, WHITESPACE, self.status_code, WHITESPACE, self.status_text, LINE_BREAK)
+        writer.write(self.headers, LINE_BREAK, to_string(self.body_raw))
 
     fn encode(owned self) -> Bytes:
         """Encodes response as bytes.
@@ -470,18 +470,18 @@ struct HTTPResponse(Writable, Stringable):
         var writer = ByteWriter()
         writer.write(
             self.protocol,
-            whitespace,
+            WHITESPACE,
             String(self.status_code),
-            whitespace,
+            WHITESPACE,
             self.status_text,
-            lineBreak,
+            LINE_BREAK,
         )
         if HeaderKey.DATE not in self.headers:
             try:
                 write_header(writer, HeaderKey.DATE, String(now(utc=True)))
             except:
                 pass
-        writer.write(self.headers, lineBreak)
+        writer.write(self.headers, LINE_BREAK)
         writer.consuming_write(self^.body_raw)
         return writer.consume()
 

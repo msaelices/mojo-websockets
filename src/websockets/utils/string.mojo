@@ -12,28 +12,25 @@ alias HTTP10 = "HTTP/1.0"
 alias WS = "ws"
 alias WSS = "wss"
 
-alias strMethodGet = "GET"
+alias R_CHAR = "\r"
+alias N_CHAR = "\n"
+alias LINE_BREAK = R_CHAR + N_CHAR
+alias COLON_CHAR = ":"
 
-alias rChar = "\r"
-alias nChar = "\n"
-alias lineBreak = rChar + nChar
-alias colonChar = ":"
-
-alias empty_string = ""
-alias whitespace = " "
-alias whitespace_byte = ord(whitespace)
-alias tab = "\t"
-alias tab_byte = ord(tab)
+alias EMPTY_STRING = ""
+alias WHITESPACE = " "
+alias WHITESPACE_byte = ord(WHITESPACE)
+alias TAB = "\t"
 
 alias EndOfReaderError = "No more bytes to read."
 alias OutOfBoundsError = "Tried to read past the end of the ByteReader."
 
 
 struct BytesConstant:
-    alias whitespace = byte(whitespace)
-    alias colon = byte(colonChar)
-    alias rChar = byte(rChar)
-    alias nChar = byte(nChar)
+    alias WHITESPACE = byte(WHITESPACE)
+    alias COLON = byte(COLON_CHAR)
+    alias R_CHAR = byte(R_CHAR)
+    alias N_CHAR = byte(N_CHAR)
 
 
 @value
@@ -194,7 +191,7 @@ struct ByteReader[origin: Origin]:
 
     @always_inline
     fn read_word(mut self) -> Span[Byte, origin]:
-        return self.read_until(BytesConstant.whitespace)
+        return self.read_until(BytesConstant.WHITESPACE)
 
     fn read_line(mut self) -> Span[Byte, origin]:
         var start = self.read_pos
@@ -208,14 +205,14 @@ struct ByteReader[origin: Origin]:
         if not self.available():
             return ret
 
-        if self._inner[self.read_pos] == BytesConstant.rChar:
+        if self._inner[self.read_pos] == BytesConstant.R_CHAR:
             self.increment(2)
         else:
             self.increment()
         return ret
 
     @always_inline
-    fn skip_whitespace(mut self):
+    fn skip_WHITESPACE(mut self):
         for i in range(self.read_pos, len(self._inner)):
             if is_space(self._inner[i]):
                 self.increment()
@@ -225,7 +222,7 @@ struct ByteReader[origin: Origin]:
     @always_inline
     fn skip_carriage_return(mut self):
         for i in range(self.read_pos, len(self._inner)):
-            if self._inner[i] == BytesConstant.rChar:
+            if self._inner[i] == BytesConstant.R_CHAR:
                 self.increment(2)
             else:
                 break
@@ -279,9 +276,9 @@ fn compare_case_insensitive(a: Bytes, b: Bytes) -> Bool:
 
 @always_inline
 fn is_newline(b: Byte) -> Bool:
-    return b == BytesConstant.nChar or b == BytesConstant.rChar
+    return b == BytesConstant.N_CHAR or b == BytesConstant.R_CHAR
 
 
 @always_inline
 fn is_space(b: Byte) -> Bool:
-    return b == BytesConstant.whitespace
+    return b == BytesConstant.WHITESPACE

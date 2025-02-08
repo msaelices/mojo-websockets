@@ -15,7 +15,7 @@ from websockets.utils.uri import URI
 from websockets.utils.string import (
     ByteReader,
     Bytes,
-    empty_string,
+    EMPTY_STRING,
     to_string,
 )
 
