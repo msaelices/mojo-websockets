@@ -6,7 +6,7 @@ It aims to provide an similar interface as the [python-websockets](https://githu
 
 ## Disclaimer ⚠️
 
-This software is in a early stage of development, using the Mojo nightly version. Please DO NOT use yet.
+This software is in a early stage of development, using the Mojo nightly version. Please DO NOT use yet for production ready services.
 
 ## Features
 
