@@ -58,9 +58,9 @@ from websockets.libc import (
     ShutdownInvalidArgumentError,
 )
 from websockets.aliases import Bytes
-from websockets.utils.string import NetworkType
 from websockets.net import (
     Addr,
+    NetworkType,
     default_buffer_size,
     binary_port_to_int,
     binary_ip_to_string,

@@ -5,9 +5,7 @@ from websockets.http import HTTPRequest, HTTPResponse
 from websockets.frames import (
        Close,
        Frame,
-       CLOSE_CODE_ABNORMAL_CLOSURE,
-       CLOSE_CODE_PROTOCOL_ERROR,
-       CLOSE_CODE_NO_STATUS_RCVD,
+       CloseCode,
        OK_CLOSE_CODES,
        OP_BINARY,
        OP_CLOSE,
@@ -183,7 +181,7 @@ fn parse_buffer[
     except error:
         err = error
         # TODO: Differentiate between protocol errors, connection and other kind of errors
-        code = CLOSE_CODE_PROTOCOL_ERROR
+        code = CloseCode.CLOSE_CODE_PROTOCOL_ERROR
         reason = String(error)
         event = Frame(OP_CLOSE, Close(code, reason).serialize(), fin=True)
 
@@ -485,7 +483,7 @@ fn send_close[
     if not code:
         if reason != "":
             raise Error("ProtocolError: cannot send a reason without a code")
-        close = Close(CLOSE_CODE_NO_STATUS_RCVD, "")
+        close = Close(CloseCode.CLOSE_CODE_NO_STATUS_RCVD, "")
         data = Bytes()
     else:
         close = Close(code.value(), reason)
@@ -560,7 +558,7 @@ fn fail[
     # sent if it's CLOSING), except when failing the connection because
     # of an error reading from or writing to the network.
     if protocol.get_state() == OPEN:
-        if code != CLOSE_CODE_ABNORMAL_CLOSURE:
+        if code != CloseCode.CLOSE_CODE_ABNORMAL_CLOSURE:
             close = Close(code, reason)
             data = close.serialize()
             send_frame[gen_mask_func=gen_mask_func](protocol, Frame(OP_CLOSE, data))

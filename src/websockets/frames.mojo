@@ -22,44 +22,48 @@ alias DATA_OPCODES = (OP_CONT, OP_TEXT, OP_BINARY)
 alias CTRL_OPCODES = (OP_CLOSE, OP_PING, OP_PONG)
 
 # Close codes
-alias CLOSE_CODE_NORMAL_CLOSURE = 1000
-alias CLOSE_CODE_GOING_AWAY = 1001
-alias CLOSE_CODE_PROTOCOL_ERROR = 1002
-alias CLOSE_CODE_UNSUPPORTED_DATA = 1003
+struct CloseCode:
+    """
+    Close codes for WebSocket close frames.
+    """
+    alias CLOSE_CODE_NORMAL_CLOSURE = 1000
+    alias CLOSE_CODE_GOING_AWAY = 1001
+    alias CLOSE_CODE_PROTOCOL_ERROR = 1002
+    alias CLOSE_CODE_UNSUPPORTED_DATA = 1003
 # 1004 is reserved
-alias CLOSE_CODE_NO_STATUS_RCVD = 1005
-alias CLOSE_CODE_ABNORMAL_CLOSURE = 1006
-alias CLOSE_CODE_INVALID_DATA = 1007
-alias CLOSE_CODE_POLICY_VIOLATION = 1008
-alias CLOSE_CODE_MESSAGE_TOO_BIG = 1009
-alias CLOSE_CODE_MANDATORY_EXTENSION = 1010
-alias CLOSE_CODE_INTERNAL_ERROR = 1011
-alias CLOSE_CODE_SERVICE_RESTART = 1012
-alias CLOSE_CODE_TRY_AGAIN_LATER = 1013
-alias CLOSE_CODE_BAD_GATEWAY = 1014
-alias CLOSE_CODE_TLS_HANDSHAKE = 1015
+    alias CLOSE_CODE_NO_STATUS_RCVD = 1005
+    alias CLOSE_CODE_ABNORMAL_CLOSURE = 1006
+    alias CLOSE_CODE_INVALID_DATA = 1007
+    alias CLOSE_CODE_POLICY_VIOLATION = 1008
+    alias CLOSE_CODE_MESSAGE_TOO_BIG = 1009
+    alias CLOSE_CODE_MANDATORY_EXTENSION = 1010
+    alias CLOSE_CODE_INTERNAL_ERROR = 1011
+    alias CLOSE_CODE_SERVICE_RESTART = 1012
+    alias CLOSE_CODE_TRY_AGAIN_LATER = 1013
+    alias CLOSE_CODE_BAD_GATEWAY = 1014
+    alias CLOSE_CODE_TLS_HANDSHAKE = 1015
 
 # Close code that are allowed in a close frame.
 alias EXTERNAL_CLOSE_CODES = (
-    CLOSE_CODE_NORMAL_CLOSURE,
-    CLOSE_CODE_GOING_AWAY,
-    CLOSE_CODE_PROTOCOL_ERROR,
-    CLOSE_CODE_UNSUPPORTED_DATA,
-    CLOSE_CODE_INVALID_DATA,
-    CLOSE_CODE_POLICY_VIOLATION,
-    CLOSE_CODE_MESSAGE_TOO_BIG,
-    CLOSE_CODE_MANDATORY_EXTENSION,
-    CLOSE_CODE_INTERNAL_ERROR,
-    CLOSE_CODE_SERVICE_RESTART,
-    CLOSE_CODE_TRY_AGAIN_LATER,
-    CLOSE_CODE_BAD_GATEWAY,
+    CloseCode.CLOSE_CODE_NORMAL_CLOSURE,
+    CloseCode.CLOSE_CODE_GOING_AWAY,
+    CloseCode.CLOSE_CODE_PROTOCOL_ERROR,
+    CloseCode.CLOSE_CODE_UNSUPPORTED_DATA,
+    CloseCode.CLOSE_CODE_INVALID_DATA,
+    CloseCode.CLOSE_CODE_POLICY_VIOLATION,
+    CloseCode.CLOSE_CODE_MESSAGE_TOO_BIG,
+    CloseCode.CLOSE_CODE_MANDATORY_EXTENSION,
+    CloseCode.CLOSE_CODE_INTERNAL_ERROR,
+    CloseCode.CLOSE_CODE_SERVICE_RESTART,
+    CloseCode.CLOSE_CODE_TRY_AGAIN_LATER,
+    CloseCode.CLOSE_CODE_BAD_GATEWAY,
 )
 
 # OK codes in a closed frame.
 alias OK_CLOSE_CODES = (
-    CLOSE_CODE_NORMAL_CLOSURE,
-    CLOSE_CODE_GOING_AWAY,
-    CLOSE_CODE_NO_STATUS_RCVD,
+    CloseCode.CLOSE_CODE_NORMAL_CLOSURE,
+    CloseCode.CLOSE_CODE_GOING_AWAY,
+    CloseCode.CLOSE_CODE_NO_STATUS_RCVD,
 )
 
 alias MAX_FRAME_OVERHEAD = 14  # FIN bit and opcode (1 byte) + length (1 or 3 or 9 bytes) + mask (4 bytes)
@@ -88,35 +92,35 @@ fn get_op_code_name(code: Int) raises -> String:
 @always_inline
 fn get_close_code_name(code: UInt16) raises -> String:
     var name: String
-    if code == CLOSE_CODE_NORMAL_CLOSURE:
+    if code == CloseCode.CLOSE_CODE_NORMAL_CLOSURE:
         name = "NORMAL_CLOSURE"
-    elif code == CLOSE_CODE_GOING_AWAY:
+    elif code == CloseCode.CLOSE_CODE_GOING_AWAY:
         name = "GOING_AWAY"
-    elif code == CLOSE_CODE_PROTOCOL_ERROR:
+    elif code == CloseCode.CLOSE_CODE_PROTOCOL_ERROR:
         name = "PROTOCOL_ERROR"
-       elif code == CLOSE_CODE_UNSUPPORTED_DATA:
+       elif code == CloseCode.CLOSE_CODE_UNSUPPORTED_DATA:
             name = "UNSUPPORTED_DATA"
-        elif code == CLOSE_CODE_NO_STATUS_RCVD:
+        elif code == CloseCode.CLOSE_CODE_NO_STATUS_RCVD:
             name = "NO_STATUS_RCVD"
-        elif code == CLOSE_CODE_ABNORMAL_CLOSURE:
+        elif code == CloseCode.CLOSE_CODE_ABNORMAL_CLOSURE:
             name = "ABNORMAL_CLOSURE"
-        elif code == CLOSE_CODE_INVALID_DATA:
+        elif code == CloseCode.CLOSE_CODE_INVALID_DATA:
             name = "INVALID_DATA"
-        elif code == CLOSE_CODE_POLICY_VIOLATION:
+        elif code == CloseCode.CLOSE_CODE_POLICY_VIOLATION:
             name = "POLICY_VIOLATION"
-        elif code == CLOSE_CODE_MESSAGE_TOO_BIG:
+        elif code == CloseCode.CLOSE_CODE_MESSAGE_TOO_BIG:
             name = "MESSAGE_TOO_BIG"
-        elif code == CLOSE_CODE_MANDATORY_EXTENSION:
+        elif code == CloseCode.CLOSE_CODE_MANDATORY_EXTENSION:
             name = "MANDATORY_EXTENSION"
-        elif code == CLOSE_CODE_INTERNAL_ERROR:
+        elif code == CloseCode.CLOSE_CODE_INTERNAL_ERROR:
             name = "INTERNAL_ERROR"
-        elif code == CLOSE_CODE_SERVICE_RESTART:
+        elif code == CloseCode.CLOSE_CODE_SERVICE_RESTART:
             name = "SERVICE_RESTART"
-        elif code == CLOSE_CODE_TRY_AGAIN_LATER:
+        elif code == CloseCode.CLOSE_CODE_TRY_AGAIN_LATER:
             name = "TRY_AGAIN_LATER"
-        elif code == CLOSE_CODE_BAD_GATEWAY:
+        elif code == CloseCode.CLOSE_CODE_BAD_GATEWAY:
             name = "BAD_GATEWAY"
-        elif code == CLOSE_CODE_TLS_HANDSHAKE:
+        elif code == CloseCode.CLOSE_CODE_TLS_HANDSHAKE:
             name = "TLS_HANDSHAKE"
         else:
             name = "UNKNOWN"
@@ -126,35 +130,35 @@ fn get_close_code_name(code: UInt16) raises -> String:
 @always_inline
 fn get_close_code_explanation(code: UInt16) raises -> String:
     var explanation: String
-    if code == CLOSE_CODE_NORMAL_CLOSURE:
+    if code == CloseCode.CLOSE_CODE_NORMAL_CLOSURE:
         explanation = "OK"
-    elif code == CLOSE_CODE_GOING_AWAY:
+    elif code == CloseCode.CLOSE_CODE_GOING_AWAY:
         explanation = "going away"
-    elif code == CLOSE_CODE_PROTOCOL_ERROR:
+    elif code == CloseCode.CLOSE_CODE_PROTOCOL_ERROR:
         explanation = "protocol error"
-    elif code == CLOSE_CODE_UNSUPPORTED_DATA:
+    elif code == CloseCode.CLOSE_CODE_UNSUPPORTED_DATA:
         explanation = "unsupported data"
-    elif code == CLOSE_CODE_NO_STATUS_RCVD:
+    elif code == CloseCode.CLOSE_CODE_NO_STATUS_RCVD:
         explanation = "no status received [internal]"
-    elif code == CLOSE_CODE_ABNORMAL_CLOSURE:
+    elif code == CloseCode.CLOSE_CODE_ABNORMAL_CLOSURE:
         explanation = "abnormal closure [internal]"
-    elif code == CLOSE_CODE_INVALID_DATA:
+    elif code == CloseCode.CLOSE_CODE_INVALID_DATA:
         explanation = "invalid frame payload data"
-    elif code == CLOSE_CODE_POLICY_VIOLATION:
+    elif code == CloseCode.CLOSE_CODE_POLICY_VIOLATION:
         explanation = "policy violation"
-    elif code == CLOSE_CODE_MESSAGE_TOO_BIG:
+    elif code == CloseCode.CLOSE_CODE_MESSAGE_TOO_BIG:
         explanation = "message too big"
-    elif code == CLOSE_CODE_MANDATORY_EXTENSION:
+    elif code == CloseCode.CLOSE_CODE_MANDATORY_EXTENSION:
         explanation = "mandatory extension"
-    elif code == CLOSE_CODE_INTERNAL_ERROR:
+    elif code == CloseCode.CLOSE_CODE_INTERNAL_ERROR:
         explanation = "internal error"
-    elif code == CLOSE_CODE_SERVICE_RESTART:
+    elif code == CloseCode.CLOSE_CODE_SERVICE_RESTART:
         explanation = "service restart"
-    elif code == CLOSE_CODE_TRY_AGAIN_LATER:
+    elif code == CloseCode.CLOSE_CODE_TRY_AGAIN_LATER:
         explanation = "try again later"
-    elif code == CLOSE_CODE_BAD_GATEWAY:
+    elif code == CloseCode.CLOSE_CODE_BAD_GATEWAY:
         explanation = "bad gateway"
-    elif code == CLOSE_CODE_TLS_HANDSHAKE:
+    elif code == CloseCode.CLOSE_CODE_TLS_HANDSHAKE:
         explanation = "TLS handshake failure [internal]"
     else:
         explanation = "unknown"
@@ -516,7 +520,7 @@ struct Close:
             close.check()
             return close
         elif len(data) == 0:
-            return Close(CLOSE_CODE_NO_STATUS_RCVD, "")
+            return Close(CloseCode.CLOSE_CODE_NO_STATUS_RCVD, "")
         else:
             raise Error("ProtocolError: close frame too short")
 
