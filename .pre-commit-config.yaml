@@ -12,4 +12,4 @@ repos:
         entry: magic run mojo format -l 88
         language: system
         files: '\.(mojo|🔥)$'
-        stages: [commit]
+        stages: [pre-commit]
