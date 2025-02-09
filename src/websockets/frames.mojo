@@ -10,11 +10,13 @@ from websockets.utils.bytes import pack, unpack, int_as_bytes, int_from_bytes, g
 
 alias Opcode = Int
 
+
 # Opcodes for WebSocket frames
 struct OpCode:
     """
     Opcodes for WebSocket frames.
     """
+
     alias OP_CONT = 0x00
     alias OP_TEXT = 0x01
     alias OP_BINARY = 0x02
@@ -22,28 +24,31 @@ struct OpCode:
     alias OP_PING = 0x09
     alias OP_PONG = 0x0A
 
+
 alias DATA_OPCODES = (
-    OpCode.OP_CONT, 
-    OpCode.OP_TEXT, 
+    OpCode.OP_CONT,
+    OpCode.OP_TEXT,
     OpCode.OP_BINARY,
 )
 
 alias CTRL_OPCODES = (
-    OpCode.OP_CLOSE, 
-    OpCode.OP_PING, 
+    OpCode.OP_CLOSE,
+    OpCode.OP_PING,
     OpCode.OP_PONG,
 )
+
 
 # Close codes
 struct CloseCode:
     """
     Close codes for WebSocket close frames.
     """
+
     alias CLOSE_CODE_NORMAL_CLOSURE = 1000
     alias CLOSE_CODE_GOING_AWAY = 1001
     alias CLOSE_CODE_PROTOCOL_ERROR = 1002
     alias CLOSE_CODE_UNSUPPORTED_DATA = 1003
-# 1004 is reserved
+    # 1004 is reserved
     alias CLOSE_CODE_NO_STATUS_RCVD = 1005
     alias CLOSE_CODE_ABNORMAL_CLOSURE = 1006
     alias CLOSE_CODE_INVALID_DATA = 1007
@@ -55,6 +60,7 @@ struct CloseCode:
     alias CLOSE_CODE_TRY_AGAIN_LATER = 1013
     alias CLOSE_CODE_BAD_GATEWAY = 1014
     alias CLOSE_CODE_TLS_HANDSHAKE = 1015
+
 
 # Close code that are allowed in a close frame.
 alias EXTERNAL_CLOSE_CODES = (
@@ -111,32 +117,32 @@ fn get_close_code_name(code: UInt16) raises -> String:
         name = "GOING_AWAY"
     elif code == CloseCode.CLOSE_CODE_PROTOCOL_ERROR:
         name = "PROTOCOL_ERROR"
-       elif code == CloseCode.CLOSE_CODE_UNSUPPORTED_DATA:
-            name = "UNSUPPORTED_DATA"
-        elif code == CloseCode.CLOSE_CODE_NO_STATUS_RCVD:
-            name = "NO_STATUS_RCVD"
-        elif code == CloseCode.CLOSE_CODE_ABNORMAL_CLOSURE:
-            name = "ABNORMAL_CLOSURE"
-        elif code == CloseCode.CLOSE_CODE_INVALID_DATA:
-            name = "INVALID_DATA"
-        elif code == CloseCode.CLOSE_CODE_POLICY_VIOLATION:
-            name = "POLICY_VIOLATION"
-        elif code == CloseCode.CLOSE_CODE_MESSAGE_TOO_BIG:
-            name = "MESSAGE_TOO_BIG"
-        elif code == CloseCode.CLOSE_CODE_MANDATORY_EXTENSION:
-            name = "MANDATORY_EXTENSION"
-        elif code == CloseCode.CLOSE_CODE_INTERNAL_ERROR:
-            name = "INTERNAL_ERROR"
-        elif code == CloseCode.CLOSE_CODE_SERVICE_RESTART:
-            name = "SERVICE_RESTART"
-        elif code == CloseCode.CLOSE_CODE_TRY_AGAIN_LATER:
-            name = "TRY_AGAIN_LATER"
-        elif code == CloseCode.CLOSE_CODE_BAD_GATEWAY:
-            name = "BAD_GATEWAY"
-        elif code == CloseCode.CLOSE_CODE_TLS_HANDSHAKE:
-            name = "TLS_HANDSHAKE"
-        else:
-            name = "UNKNOWN"
+    elif code == CloseCode.CLOSE_CODE_UNSUPPORTED_DATA:
+        name = "UNSUPPORTED_DATA"
+    elif code == CloseCode.CLOSE_CODE_NO_STATUS_RCVD:
+        name = "NO_STATUS_RCVD"
+    elif code == CloseCode.CLOSE_CODE_ABNORMAL_CLOSURE:
+        name = "ABNORMAL_CLOSURE"
+    elif code == CloseCode.CLOSE_CODE_INVALID_DATA:
+        name = "INVALID_DATA"
+    elif code == CloseCode.CLOSE_CODE_POLICY_VIOLATION:
+        name = "POLICY_VIOLATION"
+    elif code == CloseCode.CLOSE_CODE_MESSAGE_TOO_BIG:
+        name = "MESSAGE_TOO_BIG"
+    elif code == CloseCode.CLOSE_CODE_MANDATORY_EXTENSION:
+        name = "MANDATORY_EXTENSION"
+    elif code == CloseCode.CLOSE_CODE_INTERNAL_ERROR:
+        name = "INTERNAL_ERROR"
+    elif code == CloseCode.CLOSE_CODE_SERVICE_RESTART:
+        name = "SERVICE_RESTART"
+    elif code == CloseCode.CLOSE_CODE_TRY_AGAIN_LATER:
+        name = "TRY_AGAIN_LATER"
+    elif code == CloseCode.CLOSE_CODE_BAD_GATEWAY:
+        name = "BAD_GATEWAY"
+    elif code == CloseCode.CLOSE_CODE_TLS_HANDSHAKE:
+        name = "TLS_HANDSHAKE"
+    else:
+        name = "UNKNOWN"
     return name
 
 
@@ -188,7 +194,9 @@ fn apply_mask(data: Bytes, mask: Bytes) raises -> Bytes:
 
     """
     if len(mask) != 4:
-        raise Error("ValueError: mask must contain 4 bytes and not {}".format(len(mask)))
+        raise Error(
+            "ValueError: mask must contain 4 bytes and not {}".format(len(mask))
+        )
 
     # TODO: Use SIMD instructions to apply the mask.
     mask_repeated = mask * (len(data) // 4) + mask[: len(data) % 4]
@@ -242,7 +250,13 @@ struct Frame(Stringable, EqualityComparable):
         )
         # TODO: Figure out why the single self.data == other.data comparison doesn't work
         # so we need to do this hack with memcmp
-        return meta_is_eq and memcmp(self.data.data, other.data.data, min(len(self.data), len(other.data))) == 0
+        return (
+            meta_is_eq
+            and memcmp(
+                self.data.data, other.data.data, min(len(self.data), len(other.data))
+            )
+            == 0
+        )
 
     fn __ne__(self, other: Frame) -> Bool:
         return not (self == other)
@@ -273,8 +287,8 @@ struct Frame(Stringable, EqualityComparable):
         var data: String
 
         length = "{} byte{}".format(
-           Int(len(self.data)),
-           "" if len(self.data) == 1 else "s",
+            Int(len(self.data)),
+            "" if len(self.data) == 1 else "s",
         )
         non_final = "" if self.fin else "continued"
 
@@ -314,7 +328,11 @@ struct Frame(Stringable, EqualityComparable):
         """
         Return the data as a string.
         """
-        return String(StringSlice[__origin_of(self)](ptr=self.data.unsafe_ptr(), length=len(self.data)))
+        return String(
+            StringSlice[__origin_of(self)](
+                ptr=self.data.unsafe_ptr(), length=len(self.data)
+            )
+        )
 
     @always_inline
     fn _data_as_binary(self) raises -> String:
@@ -352,12 +370,8 @@ struct Frame(Stringable, EqualityComparable):
         return self.opcode in DATA_OPCODES
 
     fn serialize[
-       gen_mask_func: fn () -> Bytes = gen_mask,
-    ](
-        self,
-        *,
-        mask: Bool,
-    ) raises -> Bytes:
+        gen_mask_func: fn () -> Bytes = gen_mask,
+    ](self, *, mask: Bool,) raises -> Bytes:
         """
         Serialize a WebSocket frame.
 
@@ -404,11 +418,9 @@ struct Frame(Stringable, EqualityComparable):
         return output.consume()
 
     @staticmethod
-    fn parse[T: Streamable](
-        stream_ptr: UnsafePointer[T],
-        *,
-        mask: Bool,
-    ) raises -> Optional[Frame]:
+    fn parse[
+        T: Streamable
+    ](stream_ptr: UnsafePointer[T], *, mask: Bool,) raises -> Optional[Frame]:
         """
         Parse a WebSocket frame.
 
@@ -528,7 +540,11 @@ struct Close:
                 code = Int(byte_swap(data_u16))
             else:
                 code = Int(data_u16)
-            reason = String(StringSlice[__origin_of(data)](ptr=data.unsafe_ptr().offset(2), length=len(data) - 2))
+            reason = String(
+                StringSlice[__origin_of(data)](
+                    ptr=data.unsafe_ptr().offset(2), length=len(data) - 2
+                )
+            )
             close = Close(code, reason)
             close.check()
             return close
@@ -543,6 +559,7 @@ struct Close:
 
         """
         self.check()
+
         # TODO: Check if this is equivalent to struct.pack("!H", self.code) + self.reason.encode()
         @parameter
         if not is_big_endian():
@@ -566,4 +583,3 @@ struct Close:
         code = Int(self.code)
         if not (code in EXTERNAL_CLOSE_CODES or 3000 <= code < 5000):
             raise Error("ProtocolError: invalid status code: {}".format(self.code))
-

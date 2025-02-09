@@ -73,7 +73,9 @@ from websockets.logger import logger
 alias SocketClosedError = "Socket: Socket is already closed"
 
 
-struct Socket[AddrType: Addr, address_family: Int = AF_INET](Representable, Stringable, Writable):
+struct Socket[AddrType: Addr, address_family: Int = AF_INET](
+    Representable, Stringable, Writable
+):
     """Represents a network file descriptor. Wraps around a file descriptor and provides network functions.
 
     Args:
@@ -290,7 +292,10 @@ struct Socket[AddrType: Addr, address_family: Int = AF_INET](Representable, Stri
             new_socket_fd = accept(self.fd)
         except e:
             logger.error(e)
-            raise Error("Socket.accept: Failed to accept connection, system `accept()` returned an error.")
+            raise Error(
+                "Socket.accept: Failed to accept connection, system `accept()` returned"
+                " an error."
+            )
 
         var new_socket = Socket(
             fd=new_socket_fd,
@@ -340,7 +345,9 @@ struct Socket[AddrType: Addr, address_family: Int = AF_INET](Representable, Stri
             binary_ip = inet_pton[address_family](address.unsafe_ptr())
         except e:
             logger.error(e)
-            raise Error("ListenConfig.listen: Failed to convert IP address to binary form.")
+            raise Error(
+                "ListenConfig.listen: Failed to convert IP address to binary form."
+            )
 
         var local_address = sockaddr_in(
             address_family=address_family,
@@ -462,11 +469,15 @@ struct Socket[AddrType: Addr, address_family: Int = AF_INET](Representable, Stri
         else:
             ip = addrinfo_unix().get_ip_address(address)
 
-        var addr = sockaddr_in(address_family=address_family, port=port, binary_ip=ip.s_addr)
+        var addr = sockaddr_in(
+            address_family=address_family, port=port, binary_ip=ip.s_addr
+        )
         try:
             connect(self.fd, addr)
         except e:
-            logger.error("Socket.connect: Failed to establish a connection to the server.")
+            logger.error(
+                "Socket.connect: Failed to establish a connection to the server."
+            )
             raise e
 
         var remote = self.get_peer_name()
@@ -498,7 +509,11 @@ struct Socket[AddrType: Addr, address_family: Int = AF_INET](Representable, Stri
         # Try to send all the data in the buffer. If it did not send all the data, keep trying but start from the offset of the last successful send.
         while total_bytes_sent < len(src):
             if attempts > max_attempts:
-                raise Error("Failed to send message after " + String(max_attempts) + " attempts.")
+                raise Error(
+                    "Failed to send message after "
+                    + String(max_attempts)
+                    + " attempts."
+                )
 
             var sent: Int
             try:
@@ -506,7 +521,9 @@ struct Socket[AddrType: Addr, address_family: Int = AF_INET](Representable, Stri
             except e:
                 logger.error(e)
                 raise Error(
-                    "Socket.send_all: Failed to send message, wrote" + String(total_bytes_sent) + "bytes before failing."
+                    "Socket.send_all: Failed to send message, wrote"
+                    + String(total_bytes_sent)
+                    + "bytes before failing."
                 )
 
             total_bytes_sent += sent
@@ -534,8 +551,16 @@ struct Socket[AddrType: Addr, address_family: Int = AF_INET](Representable, Stri
         else:
             ip = addrinfo_unix().get_ip_address(address)
 
-        var addr = sockaddr_in(address_family=address_family, port=port, binary_ip=ip.s_addr)
-        bytes_sent = sendto(self.fd, src.unsafe_ptr(), len(src), 0, UnsafePointer.address_of(addr).bitcast[sockaddr]())
+        var addr = sockaddr_in(
+            address_family=address_family, port=port, binary_ip=ip.s_addr
+        )
+        bytes_sent = sendto(
+            self.fd,
+            src.unsafe_ptr(),
+            len(src),
+            0,
+            UnsafePointer.address_of(addr).bitcast[sockaddr](),
+        )
 
         return bytes_sent
 
@@ -600,7 +625,8 @@ struct Socket[AddrType: Addr, address_family: Int = AF_INET](Representable, Stri
         return self._receive(buffer)
 
     fn shutdown(mut self) raises -> None:
-        """Shut down the socket. The remote end will receive no more data (after queued data is flushed)."""
+        """Shut down the socket. The remote end will receive no more data (after queued data is flushed).
+        """
         try:
             shutdown(self.fd, SHUT_RDWR)
         except e:

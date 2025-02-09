@@ -75,7 +75,6 @@ trait Net:
     #    ...
 
 
-
 trait Connection(CollectionElement):
     fn __init__(out self, laddr: String, raddr: String) raises:
         ...
@@ -150,7 +149,9 @@ struct TCPAddr(Addr):
         return NetworkType.TCP.value
 
     fn __eq__(self, other: Self) -> Bool:
-        return self.ip == other.ip and self.port == other.port and self.zone == other.zone
+        return (
+            self.ip == other.ip and self.port == other.port and self.zone == other.zone
+        )
 
     fn __ne__(self, other: Self) -> Bool:
         return not self == other
@@ -164,7 +165,16 @@ struct TCPAddr(Addr):
         return String.write(self)
 
     fn write_to[W: Writer, //](self, mut writer: W):
-        writer.write("TCPAddr(", "ip=", repr(self.ip), ", port=", String(self.port), ", zone=", repr(self.zone), ")")
+        writer.write(
+            "TCPAddr(",
+            "ip=",
+            repr(self.ip),
+            ", port=",
+            String(self.port),
+            ", zone=",
+            repr(self.zone),
+            ")",
+        )
 
 
 struct TCPConnection:
@@ -364,6 +374,7 @@ fn parse_address(address: String) raises -> (String, UInt16):
         raise Error("missing host")
     return host, UInt16(Int(port))
 
+
 fn binary_port_to_int(port: UInt16) -> Int:
     """Convert a binary port to an integer.
 
@@ -376,7 +387,9 @@ fn binary_port_to_int(port: UInt16) -> Int:
     return Int(ntohs(port))
 
 
-fn binary_ip_to_string[address_family: Int32](owned ip_address: UInt32) raises -> String:
+fn binary_ip_to_string[
+    address_family: Int32
+](owned ip_address: UInt32) raises -> String:
     """Convert a binary IP address to a string by calling `inet_ntop`.
 
     Parameters:
@@ -388,7 +401,10 @@ fn binary_ip_to_string[address_family: Int32](owned ip_address: UInt32) raises -
     Returns:
         The IP address as a string.
     """
-    constrained[Int(address_family) in [AF_INET, AF_INET6], "Address family must be either AF_INET or AF_INET6."]()
+    constrained[
+        Int(address_family) in [AF_INET, AF_INET6],
+        "Address family must be either AF_INET or AF_INET6.",
+    ]()
     var ip: String
 
     @parameter
@@ -612,15 +628,23 @@ struct ListenConfig:
     fn __init__(out self, keep_alive: Duration = default_tcp_keep_alive):
         self._keep_alive = keep_alive
 
-    fn listen[address_family: Int = AF_INET](mut self, host: String, port: Int) raises -> TCPListener:
-        constrained[address_family in [AF_INET, AF_INET6], "Address family must be either AF_INET or AF_INET6."]()
+    fn listen[
+        address_family: Int = AF_INET
+    ](mut self, host: String, port: Int) raises -> TCPListener:
+        constrained[
+            address_family in [AF_INET, AF_INET6],
+            "Address family must be either AF_INET or AF_INET6.",
+        ]()
         var addr = TCPAddr(host, port)
         var socket: Socket[TCPAddr]
         try:
             socket = Socket[TCPAddr]()
         except e:
             logger.error(e)
-            raise Error("ListenConfig.listen: Failed to create listener due to socket creation failure.")
+            raise Error(
+                "ListenConfig.listen: Failed to create listener due to socket creation"
+                " failure."
+            )
 
         try:
 
@@ -655,10 +679,14 @@ struct ListenConfig:
             socket.listen(128)
         except e:
             logger.error(e)
-            raise Error("ListenConfig.listen: Listen failed on sockfd: " + String(socket.fd))
+            raise Error(
+                "ListenConfig.listen: Listen failed on sockfd: " + String(socket.fd)
+            )
 
         var listener = TCPListener(socket^)
-        var msg = String.write("\n🔥 Listening on ", "ws://", addr.ip, ":", String(addr.port))
+        var msg = String.write(
+            "\n🔥 Listening on ", "ws://", addr.ip, ":", String(addr.port)
+        )
         print(msg)
         print("Ready to accept connections...")
 

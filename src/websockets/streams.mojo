@@ -4,7 +4,6 @@ from websockets.utils.bytes import EOL
 
 
 trait Streamable:
-
     fn feed_data(mut self, data: Bytes) raises -> None:
         """
         Write data to the stream.
@@ -82,6 +81,7 @@ struct StreamReader(Streamable):
     """
     Stream reader.
     """
+
     var buffer: Bytes
     var eof: Bool
     var offset: Int
@@ -164,16 +164,26 @@ struct StreamReader(Streamable):
 
         p = n - self.offset
         if p > m:
-            raise Error("RuntimeError: read {} bytes, expected no more than {} bytes".format(p, m))
+            raise Error(
+                "RuntimeError: read {} bytes, expected no more than {} bytes".format(
+                    p, m
+                )
+            )
         if not found and self.eof:
-            raise Error("EOFError: stream ends after {} bytes, before end of line".format(p))
+            raise Error(
+                "EOFError: stream ends after {} bytes, before end of line".format(p)
+            )
         if n > m + self.offset:
-            raise Error("RuntimeError: read {} bytes, expected no more than {} bytes".format(n, m))
+            raise Error(
+                "RuntimeError: read {} bytes, expected no more than {} bytes".format(
+                    n, m
+                )
+            )
 
         if not found:
             return None
 
-        result = self.buffer[self.offset:n]
+        result = self.buffer[self.offset : n]
         self.offset = n
 
         return result
@@ -191,9 +201,13 @@ struct StreamReader(Streamable):
         remaining = len(self.buffer) - self.offset
         if remaining < n:
             if self.eof:
-                raise Error("EOFError: stream ends after {} bytes, expected {} bytes".format(remaining, n))
+                raise Error(
+                    "EOFError: stream ends after {} bytes, expected {} bytes".format(
+                        remaining, n
+                    )
+                )
             return None
-        result = self.buffer[self.offset: self.offset + n]
+        result = self.buffer[self.offset : self.offset + n]
         self.offset += n
         return result
 
@@ -210,9 +224,12 @@ struct StreamReader(Streamable):
         if not self.eof:
             p = len(self.buffer) - self.offset
             if p > m:
-                raise Error("RuntimeError: read {} bytes, expected no more than {} bytes".format(p, m))
+                raise Error(
+                    "RuntimeError: read {} bytes, expected no more than {} bytes"
+                    .format(p, m)
+                )
             return None
-        result = self.buffer[self.offset:]
+        result = self.buffer[self.offset :]
         self.offset = len(self.buffer)
         return result
 
@@ -237,4 +254,3 @@ struct StreamReader(Streamable):
         Discard all buffered data, but don't end the stream.
         """
         self.offset = len(self.buffer)
-
