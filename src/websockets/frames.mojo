@@ -8,8 +8,6 @@ from websockets.streams import Streamable
 from websockets.utils.string import Bytes, ByteWriter
 from websockets.utils.bytes import pack, unpack, int_as_bytes, int_from_bytes, gen_mask
 
-alias Opcode = Int
-
 
 # Opcodes for WebSocket frames
 struct OpCode:
@@ -212,7 +210,7 @@ struct Frame(Stringable, EqualityComparable):
     WebSocket frame.
 
     Attributes:
-        opcode: Opcode.
+        opcode: Int.
         data: Payload data.
         fin: FIN bit.
         rsv1: RSV1 bit.
@@ -223,14 +221,14 @@ struct Frame(Stringable, EqualityComparable):
     are handled on the fly when parsing and serializing frames.
     """
 
-    var opcode: Opcode
+    var opcode: Int
     var data: Bytes
     var fin: Bool
     var rsv1: Bool
     var rsv2: Bool
     var rsv3: Bool
 
-    fn __init__(out self, opcode: Opcode, data: Bytes, fin: Bool = True):
+    fn __init__(out self, opcode: Int, data: Bytes, fin: Bool = True):
         self.opcode = opcode
         self.data = data
         self.fin = fin
@@ -458,7 +456,7 @@ struct Frame(Stringable, EqualityComparable):
         rsv2 = True if head1 & 0b00100000 else False
         rsv3 = True if head1 & 0b00010000 else False
 
-        opcode = Opcode(head1 & 0b00001111)
+        opcode = Int(head1 & 0b00001111)
 
         if opcode not in DATA_OPCODES and opcode not in CTRL_OPCODES:
             raise Error("ProtocolError: invalid opcode: {}".format(opcode))
