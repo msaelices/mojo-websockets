@@ -2,7 +2,7 @@ from testing import assert_equal, assert_false, assert_true, assert_raises
 
 from websockets.aliases import Bytes
 from websockets.http import Header, Headers
-from websockets.frames import OP_TEXT, Frame
+from websockets.frames import OpCode, Frame
 from websockets.http import HTTPRequest, HTTPResponse
 from websockets.protocol import CONNECTING, OPEN, Event
 from websockets.protocol.base import (
@@ -535,7 +535,7 @@ fn test_invalid_accept() raises -> None:
 #     client = DummyProtocol[False, CLIENT](OPEN, StreamReader(), Bytes(), List[Event]())
 #     receive_data(client, Bytes(136, 0))  # \x88\x00
 #     events = client.events_received()
-#     assert_equal(events[0][Frame], Frame(OP_CLOSE, Bytes(), fin=True))
+#     assert_equal(events[0][Frame], Frame(OpCode.OP_CLOSE, Bytes(), fin=True))
 
 fn test_bypass_handshake() raises -> None:
     """ClientProtocol bypasses the opening handshake if state is OPEN."""
@@ -546,7 +546,7 @@ fn test_bypass_handshake() raises -> None:
     events = client.events_received()
 
     assert_true(events[0].isa[Frame]())
-    assert_bytes_equal(events[0][Frame].data, Frame(OP_TEXT, str_to_bytes("Hello!")).data)
+    assert_bytes_equal(events[0][Frame].data, Frame(OpCode.OP_TEXT, str_to_bytes("Hello!")).data)
 
 
 # TODO: Implement this tests when extensions are supported

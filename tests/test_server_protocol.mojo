@@ -2,7 +2,7 @@ from testing import assert_equal, assert_false, assert_true, assert_raises
 
 from websockets.aliases import Bytes
 from websockets.http import Header, Headers
-from websockets.frames import OP_TEXT, Frame
+from websockets.frames import Frame, OpCode
 from websockets.http import HTTPRequest, HTTPResponse
 from websockets.protocol import CONNECTING, OPEN, Event
 from websockets.protocol.base import (
@@ -621,7 +621,7 @@ fn test_bypass_handshake() raises:
     events = server.events_received()
     assert_equal(len(events), 1)
     var frame = events[0][Frame]
-    assert_equal(frame, Frame(OP_TEXT, str_to_bytes("Hello!")))
+    assert_equal(frame, Frame(OpCode.OP_TEXT, str_to_bytes("Hello!")))
 
 
 #     def test_no_extensions(self):

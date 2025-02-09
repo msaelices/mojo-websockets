@@ -11,15 +11,28 @@ from websockets.utils.bytes import pack, unpack, int_as_bytes, int_from_bytes, g
 alias Opcode = Int
 
 # Opcodes for WebSocket frames
-alias OP_CONT = 0x00
-alias OP_TEXT = 0x01
-alias OP_BINARY = 0x02
-alias OP_CLOSE = 0x08
-alias OP_PING = 0x09
-alias OP_PONG = 0x0A
+struct OpCode:
+    """
+    Opcodes for WebSocket frames.
+    """
+    alias OP_CONT = 0x00
+    alias OP_TEXT = 0x01
+    alias OP_BINARY = 0x02
+    alias OP_CLOSE = 0x08
+    alias OP_PING = 0x09
+    alias OP_PONG = 0x0A
 
-alias DATA_OPCODES = (OP_CONT, OP_TEXT, OP_BINARY)
-alias CTRL_OPCODES = (OP_CLOSE, OP_PING, OP_PONG)
+alias DATA_OPCODES = (
+    OpCode.OP_CONT, 
+    OpCode.OP_TEXT, 
+    OpCode.OP_BINARY,
+)
+
+alias CTRL_OPCODES = (
+    OpCode.OP_CLOSE, 
+    OpCode.OP_PING, 
+    OpCode.OP_PONG,
+)
 
 # Close codes
 struct CloseCode:
@@ -72,17 +85,17 @@ alias MAX_FRAME_OVERHEAD = 14  # FIN bit and opcode (1 byte) + length (1 or 3 or
 @always_inline
 fn get_op_code_name(code: Int) raises -> String:
     var name: String
-    if code == OP_CONT:
+    if code == OpCode.OP_CONT:
         name = "CONT"
-    elif code == OP_TEXT:
+    elif code == OpCode.OP_TEXT:
         name = "TEXT"
-    elif code == OP_BINARY:
+    elif code == OpCode.OP_BINARY:
         name = "BINARY"
-    elif code == OP_CLOSE:
+    elif code == OpCode.OP_CLOSE:
         name = "CLOSE"
-    elif code == OP_PING:
+    elif code == OpCode.OP_PING:
         name = "PING"
-    elif code == OP_PONG:
+    elif code == OpCode.OP_PONG:
         name = "PONG"
     else:
         name = "UNKNOWN"
@@ -265,17 +278,17 @@ struct Frame(Stringable, EqualityComparable):
         )
         non_final = "" if self.fin else "continued"
 
-        if self.opcode == OP_TEXT:
+        if self.opcode == OpCode.OP_TEXT:
             # Decoding only the beginning and the end is needlessly hard.
             # Decode the entire payload then elide later if necessary.
             data = self._data_as_text()
             coding = "text"
-        elif self.opcode == OP_BINARY:
+        elif self.opcode == OpCode.OP_BINARY:
             # We'll show at most the first 16 bytes and the last 8 bytes.
             # Encode just what we need, plus two dummy bytes to elide later.
             data = self._data_as_binary()
             coding = "binary"
-        elif self.opcode == OP_CLOSE:
+        elif self.opcode == OpCode.OP_CLOSE:
             data = String(Close.parse(self.data))
         elif self.data:
             # We don't know if a Continuation frame contains text or binary.

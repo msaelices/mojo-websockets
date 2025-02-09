@@ -6,13 +6,8 @@ from websockets.frames import (
        Close,
        Frame,
        CloseCode,
+       OpCode,
        OK_CLOSE_CODES,
-       OP_BINARY,
-       OP_CLOSE,
-       OP_CONT,
-       OP_PING,
-       OP_PONG,
-       OP_TEXT,
 )
 from websockets.streams import StreamReader
 from websockets.utils.bytes import gen_mask
@@ -183,7 +178,7 @@ fn parse_buffer[
         # TODO: Differentiate between protocol errors, connection and other kind of errors
         code = CloseCode.CLOSE_CODE_PROTOCOL_ERROR
         reason = String(error)
-        event = Frame(OP_CLOSE, Close(code, reason).serialize(), fin=True)
+        event = Frame(OpCode.OP_CLOSE, Close(code, reason).serialize(), fin=True)
 
         # Fail the WebSocket Connection
         fail[gen_mask_func=gen_mask_func](protocol, code, reason)
@@ -212,7 +207,7 @@ fn receive_frame[
     Raises:
         Error: If the frame is invalid.
     """
-    if frame.opcode == OP_TEXT or frame.opcode == OP_BINARY:
+    if frame.opcode == OpCode.OP_TEXT or frame.opcode == OpCode.OP_BINARY:
         if protocol.get_curr_size():
             raise Error("ProtocolError: expected a continuation frame")
         if frame.fin:
@@ -220,7 +215,7 @@ fn receive_frame[
         else:
             protocol.set_curr_size(len(frame.data))
 
-    elif frame.opcode == OP_CONT:
+    elif frame.opcode == OpCode.OP_CONT:
         if not protocol.get_curr_size():
             raise Error("ProtocolError: unexpected continuation frame")
         if frame.fin:
@@ -228,18 +223,18 @@ fn receive_frame[
         else:
             protocol.set_curr_size(protocol.get_curr_size().value() + len(frame.data))
 
-    elif frame.opcode == OP_PING:
+    elif frame.opcode == OpCode.OP_PING:
         # 5.5.2. Ping: "Upon receipt of a Ping frame, an endpoint MUST
         # send a Pong frame in response"
-        pong_frame = Frame(OP_PONG, frame.data)
+        pong_frame = Frame(OpCode.OP_PONG, frame.data)
         send_frame[gen_mask_func=gen_mask_func](protocol, pong_frame)
 
-    elif frame.opcode == OP_PONG:
+    elif frame.opcode == OpCode.OP_PONG:
         # 5.5.3 Pong: "A response to an unsolicited Pong frame is not
         # expected."
         pass
 
-    elif frame.opcode == OP_CLOSE:
+    elif frame.opcode == OpCode.OP_CLOSE:
         # 7.1.5.  The WebSocket Connection Close Code
         # 7.1.6.  The WebSocket Connection Close Reason
         protocol.set_close_rcvd(Close.parse(frame.data))
@@ -261,7 +256,7 @@ fn receive_frame[
             # Close.serialize() because that fails when the close frame
             # is empty and Close.parse() synthesizes a 1005 close code.
             # The rest is identical to send_close().
-            send_frame[gen_mask_func=gen_mask_func](protocol, Frame(OP_CLOSE, frame.data))
+            send_frame[gen_mask_func=gen_mask_func](protocol, Frame(OpCode.OP_CLOSE, frame.data))
             protocol.set_close_sent(protocol.get_close_rcvd())
             protocol.set_close_rcvd_then_sent(True)
             protocol.set_state(CLOSING)
@@ -321,7 +316,7 @@ fn send_text[
         raise Error("InvalidState: connection is {}".format(state))
 
     protocol.set_expect_continuation_frame(not fin)
-    send_frame[gen_mask_func=gen_mask_func](protocol, Frame(OP_TEXT, data, fin))
+    send_frame[gen_mask_func=gen_mask_func](protocol, Frame(OpCode.OP_TEXT, data, fin))
 
 
 fn send_frame[
@@ -384,7 +379,7 @@ fn send_continuation[
     if protocol.get_state() != OPEN:
         raise Error("InvalidState: connection is not open")
     protocol.set_expect_continuation_frame(not fin)
-    send_frame[gen_mask_func=gen_mask_func](protocol, Frame(OP_CONT, data, fin))
+    send_frame[gen_mask_func=gen_mask_func](protocol, Frame(OpCode.OP_CONT, data, fin))
 
 
 fn send_eof[T: Protocol](mut protocol: T) raises -> None:
@@ -489,7 +484,7 @@ fn send_close[
         close = Close(code.value(), reason)
         data = close.serialize()
     # 7.1.3. The WebSocket Closing Handshake is Started
-    send_frame[gen_mask_func=gen_mask_func](protocol, Frame(OP_CLOSE, data))
+    send_frame[gen_mask_func=gen_mask_func](protocol, Frame(OpCode.OP_CLOSE, data))
     # Since the state is OPEN, no close frame was received yet.
     # As a consequence, protocol.close_rcvd_then_sent remains None.
     if protocol.get_close_rcvd():
@@ -527,7 +522,7 @@ fn send_binary[
     if protocol.get_state() != OPEN:
         raise Error("InvalidState: connection is {}".format(protocol.get_state()))
     protocol.set_expect_continuation_frame(not fin)
-    send_frame[gen_mask_func=gen_mask_func](protocol, Frame(OP_BINARY, data, fin))
+    send_frame[gen_mask_func=gen_mask_func](protocol, Frame(OpCode.OP_BINARY, data, fin))
 
 
 fn fail[
@@ -561,7 +556,7 @@ fn fail[
         if code != CloseCode.CLOSE_CODE_ABNORMAL_CLOSURE:
             close = Close(code, reason)
             data = close.serialize()
-            send_frame[gen_mask_func=gen_mask_func](protocol, Frame(OP_CLOSE, data))
+            send_frame[gen_mask_func=gen_mask_func](protocol, Frame(OpCode.OP_CLOSE, data))
             protocol.set_close_sent(close)
             # If recv_messages() raised an exception upon receiving a close
             # frame but before echoing it, then close_rcvd is not None even
@@ -641,7 +636,7 @@ fn send_ping[
     state = protocol.get_state()
     if state != OPEN and state != CLOSING:
         raise Error("InvalidState: connection is {}".format(state))
-    send_frame[gen_mask_func=gen_mask_func](protocol, Frame(OP_PING, data))
+    send_frame[gen_mask_func=gen_mask_func](protocol, Frame(OpCode.OP_PING, data))
 
 
 fn close_expected[T: Protocol](protocol: T) -> Bool:
