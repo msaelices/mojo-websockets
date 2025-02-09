@@ -116,17 +116,17 @@ trait Addr(Stringable, Representable, Writable, EqualityComparableCollectionElem
 struct NetworkType:
     var value: String
 
-    alias empty = NetworkType("")
-    alias tcp = NetworkType("tcp")
-    alias tcp4 = NetworkType("tcp4")
-    alias tcp6 = NetworkType("tcp6")
-    alias udp = NetworkType("udp")
-    alias udp4 = NetworkType("udp4")
-    alias udp6 = NetworkType("udp6")
-    alias ip = NetworkType("ip")
-    alias ip4 = NetworkType("ip4")
-    alias ip6 = NetworkType("ip6")
-    alias unix = NetworkType("unix")
+    alias EMPTY = NetworkType("")
+    alias TCP = NetworkType("tcp")
+    alias TCP4 = NetworkType("tcp4")
+    alias TCP6 = NetworkType("tcp6")
+    alias UDP = NetworkType("udp")
+    alias UDP4 = NetworkType("udp4")
+    alias UDP6 = NetworkType("udp6")
+    alias IP = NetworkType("ip")
+    alias IP4 = NetworkType("ip4")
+    alias IP6 = NetworkType("ip6")
+    alias UNIX = NetworkType("unix")
 
 
 @value
@@ -147,7 +147,7 @@ struct TCPAddr(Addr):
         self.zone = ""
 
     fn network(self) -> String:
-        return NetworkType.tcp.value
+        return NetworkType.TCP.value
 
     fn __eq__(self, other: Self) -> Bool:
         return self.ip == other.ip and self.port == other.port and self.zone == other.zone
@@ -227,12 +227,12 @@ fn resolve_internet_addr(network: String, address: String) raises -> TCPAddr:
     var port: String = ""
     var portnum: Int = 0
     if (
-        network == NetworkType.tcp.value
-        or network == NetworkType.tcp4.value
-        or network == NetworkType.tcp6.value
-        or network == NetworkType.udp.value
-        or network == NetworkType.udp4.value
-        or network == NetworkType.udp6.value
+        network == NetworkType.TCP.value
+        or network == NetworkType.TCP4.value
+        or network == NetworkType.TCP6.value
+        or network == NetworkType.UDP.value
+        or network == NetworkType.UDP4.value
+        or network == NetworkType.UDP6.value
     ):
         if address != "":
             var host_port = split_host_port(address)
@@ -240,13 +240,13 @@ fn resolve_internet_addr(network: String, address: String) raises -> TCPAddr:
             port = host_port.port
             portnum = atol(port.__str__())
     elif (
-        network == NetworkType.ip.value
-        or network == NetworkType.ip4.value
-        or network == NetworkType.ip6.value
+        network == NetworkType.IP.value
+        or network == NetworkType.IP4.value
+        or network == NetworkType.IP6.value
     ):
         if address != "":
             host = address
-    elif network == NetworkType.unix.value:
+    elif network == NetworkType.UNIX.value:
         raise Error("Unix addresses not supported yet")
     else:
         raise Error("unsupported network type: " + network)
