@@ -2,7 +2,7 @@
 
 ![logo](./assets/logo.jpeg)
 
-`mojo-websockets` is a lightweight library for handling WebSocket connections in Mojo. 
+`mojo-websockets` is a lightweight library for handling WebSocket connections in Mojo.
 
 It aims to provide an similar interface as the [python-websockets](https://github.com/python-websockets/websockets) package for creating WebSocket servers and clients, with additional features for enhanced usability.
 
@@ -70,7 +70,7 @@ fn main() raises:
 
 ## TODO
 
-- [ ] Asynchronous non-blocking communication (waiting for the Mojo async/await support)
+- [ ] Asynchronous non-blocking communication (waiting for the Mojo async support)
 - [ ] Implement automatic reconnection for clients
 - [ ] Get rid of Python dependencies and logic (e.g. no more `from python import ...`)
 - [ ] Make sure it passes all the tests in [Autobahn|Testsuite](https://github.com/crossbario/autobahn-testsuite/)
