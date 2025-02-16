@@ -1,18 +1,24 @@
 # Contributing Guide
 
-## Install and upgrade Magic
+## Activate the magic shell
+
+For development, you can activate the magic shell by running:
 
 ```bash
-magic update && magic install
+magic shell
 ```
 
 ## How to build this package
 
+Once you have the magic shell activated, you can build the package by running:
+
 ```bash
-mojo package src/websockets -o websockets.mojopkg
-``
+./scripts/build.sh
+```
 
 ## How to run tests
+
+To run the tests, you can run:
 
 ```bash
 ./scripts/run-tests.sh
