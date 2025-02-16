@@ -1,4 +1,4 @@
-# mojo-websockets
+# Mojo Websockets
 
 ![logo](./assets/logo.jpeg)
 
