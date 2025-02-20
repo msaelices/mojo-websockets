@@ -266,6 +266,7 @@ struct Server:
         """
         while True:
             var conn = ln.accept()
+            var socket = conn.socket
             remote_addr = conn.socket.remote_address()
             logger.debug(
                 "Connection accepted! IP:", remote_addr.ip, "Port:", remote_addr.port
@@ -275,6 +276,11 @@ struct Server:
                 ThreadContext, mut=False, origin=StaticConstantOrigin
             ].address_of(thread_context)
             _ = start_thread(handle_thread, context_ptr)
+
+            # Black magic to avoid the thread_context being destroyed before the thread starts
+            __mlir_op.`lit.ownership.mark_destroyed`(
+                __get_mvalue_as_litref(thread_context)
+            )
 
     fn address(mut self) -> String:
         """
