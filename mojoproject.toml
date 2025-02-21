@@ -7,4 +7,4 @@ platforms = ["linux-64", "osx-arm64"]
 version = "0.1.2"
 
 [dependencies]
-max = "25.1"
+max = "==25.1"
