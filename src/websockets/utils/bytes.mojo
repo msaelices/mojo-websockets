@@ -15,7 +15,7 @@ from random import randint
 
 from websockets.aliases import Bytes
 
-alias MODIFIERS = List[String]('>', '<', '!', '=')
+alias MODIFIERS = List[String](">", "<", "!", "=")
 alias EOL = Byte(10)
 
 
@@ -58,7 +58,7 @@ fn unpack(format: String, buffer: Bytes) raises -> List[Int]:
     var reader = ByteReader(buffer)
     var values = List[Int]()
     var offset = 0
-    var order: String = '>' if is_big_endian() else '<'
+    var order: String = ">" if is_big_endian() else "<"
     if len(format) > 1:
         if format[0] in MODIFIERS:
             # big-endian, little-endian, network, native
@@ -67,25 +67,25 @@ fn unpack(format: String, buffer: Bytes) raises -> List[Int]:
     var fmt_span = format.as_bytes()[offset:]
     for c_ref in fmt_span:
         c = c_ref[]
-        if c == ord('b'):
+        if c == ord("b"):
             values.append(Int(reader.read[DType.int8](order)))
-        elif c == ord('B'):
+        elif c == ord("B"):
             values.append(Int(reader.read[DType.uint8](order)))
-        elif c == ord('h'):
+        elif c == ord("h"):
             values.append(Int(reader.read[DType.int16](order)))
-        elif c == ord('H'):
+        elif c == ord("H"):
             values.append(Int(reader.read[DType.uint16](order)))
-        elif c == ord('i'):
+        elif c == ord("i"):
             values.append(Int(reader.read[DType.int32](order)))
-        elif c == ord('I'):
+        elif c == ord("I"):
             values.append(Int(reader.read[DType.uint32](order)))
-        elif c == ord('l'):
+        elif c == ord("l"):
             values.append(Int(reader.read[DType.int32](order)))
-        elif c == ord('L'):
+        elif c == ord("L"):
             values.append(Int(reader.read[DType.uint32](order)))
-        elif c == ord('q'):
+        elif c == ord("q"):
             values.append(Int(reader.read[DType.int64](order)))
-        elif c == ord('Q'):
+        elif c == ord("Q"):
             values.append(Int(reader.read[DType.uint64](order)))
         else:
             raise Error("ValueError: Unknown format character: {}".format(String(c)))
@@ -120,7 +120,7 @@ fn pack[format: String](*values: Int) raises -> Bytes:
     Returns:
         The packed buffer.
     """
-    alias order: String = '>' if is_big_endian() else '<'
+    alias order: String = ">" if is_big_endian() else "<"
     var offset = 0
 
     @parameter
@@ -130,29 +130,29 @@ fn pack[format: String](*values: Int) raises -> Bytes:
 
     var fmt_span = format[offset:]
     var i = 0
-    alias big_endian = format[0] == '>' or format[0] == '!' or is_big_endian()
+    alias big_endian = format[0] == ">" or format[0] == "!" or is_big_endian()
 
     var buffer = Bytes(capacity=len(fmt_span) * 8)  # 8 is the maximum size of a type
-    for c in fmt_span.char_slices():
-        if c == 'b':
+    for c in fmt_span.codepoint_slices():
+        if c == "b":
             buffer += int_as_bytes[DType.int8, big_endian](values[i])
-        elif c == 'B':
+        elif c == "B":
             buffer += int_as_bytes[DType.uint8, big_endian](values[i])
-        elif c == 'h':
+        elif c == "h":
             buffer += int_as_bytes[DType.int16, big_endian](values[i])
-        elif c == 'H':
+        elif c == "H":
             buffer += int_as_bytes[DType.uint16, big_endian](values[i])
-        elif c == 'i':
+        elif c == "i":
             buffer += int_as_bytes[DType.int32, big_endian](values[i])
-        elif c == 'I':
+        elif c == "I":
             buffer += int_as_bytes[DType.uint32, big_endian](values[i])
-        elif c == 'l':
+        elif c == "l":
             buffer += int_as_bytes[DType.int32, big_endian](values[i])
-        elif c == 'L':
+        elif c == "L":
             buffer += int_as_bytes[DType.uint32, big_endian](values[i])
-        elif c == 'q':
+        elif c == "q":
             buffer += int_as_bytes[DType.int64, big_endian](values[i])
-        elif c == 'Q':
+        elif c == "Q":
             buffer += int_as_bytes[DType.uint64, big_endian](values[i])
         else:
             raise Error("ValueError: Unknown format character: {}".format(String(c)))
@@ -199,14 +199,18 @@ struct ByteReader:
         Returns:
             The next value from the buffer.
         """
-        var ptr: UnsafePointer[Byte] = UnsafePointer.address_of(self.buffer[][self.index])
+        var ptr: UnsafePointer[Byte] = UnsafePointer.address_of(
+            self.buffer[][self.index]
+        )
         alias width = bitwidthof[type]()
         var value: SIMD[type, 1] = ptr.bitcast[Scalar[type]]()[]
         var ordered_value = self._set_order(value, order)
         self.index += width // 8
         return ordered_value
 
-    fn _set_order[type: DType, //](self, value: SIMD[type, 1], order: String) raises -> Scalar[type]:
+    fn _set_order[
+        type: DType, //
+    ](self, value: SIMD[type, 1], order: String) raises -> Scalar[type]:
         """
         Set the order of the bytes in the value.
 
@@ -219,16 +223,17 @@ struct ByteReader:
         """
         var ordered: Scalar[type] = value
         alias width = bitwidthof[type]()
+
         @parameter
         if width == 8:
             return ordered
 
         @parameter
         if not is_big_endian():
-            if order == '>' or order == '!':
+            if order == ">" or order == "!":
                 ordered = byte_swap(value)
         else:
-            if order == '<':
+            if order == "<":
                 ordered = byte_swap(value)
         return ordered
 
@@ -263,9 +268,7 @@ fn int_from_bytes[
     return Int(value)
 
 
-fn int_as_bytes[
-    type: DType, big_endian: Bool = False
-](value: Scalar[type]) -> Bytes:
+fn int_as_bytes[type: DType, big_endian: Bool = False](value: Scalar[type]) -> Bytes:
     """Convert the integer to a byte array.
     Parameters:
         type: The type of the integer.
@@ -289,7 +292,7 @@ fn int_as_bytes[
     var list = Bytes(capacity=type_len)
 
     memcpy(list.unsafe_ptr(), byte_ptr, type_len)
-    list.size = type_len
+    list._len = type_len
 
     return list^
 
@@ -305,7 +308,7 @@ fn str_to_bytes(s: String) -> Bytes:
     """
     capacity = len(s)
     bytes = Bytes(capacity=capacity)
-    for c in s.char_slices():
+    for c in s.codepoint_slices():
         bytes.append(ord(c))
     return bytes
 
@@ -319,7 +322,9 @@ fn bytes_to_str(bytes: Bytes) -> String:
     Returns:
         The string.
     """
-    return String(StringSlice[__origin_of(bytes)](ptr=bytes.unsafe_ptr(), length=len(bytes)))
+    return String(
+        StringSlice[__origin_of(bytes)](ptr=bytes.unsafe_ptr(), length=len(bytes))
+    )
 
 
 @always_inline
@@ -328,7 +333,7 @@ fn gen_token(length: Int) -> Bytes:
     Generate a random token.
     """
     token = Bytes(capacity=length)
-    token.size = length
+    token._len = length
     randint[Byte.type](token.unsafe_ptr(), length, 0, 255)
     return token^
 
@@ -429,4 +434,3 @@ fn bytes_equal(a: Bytes, b: Bytes) -> Bool:
         if a[i] != b[i]:
             return False
     return True
-
