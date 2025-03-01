@@ -579,14 +579,14 @@ struct Socket[AddrType: Addr, address_family: Int = AF_INET](
         """
         var bytes_received: Int
         try:
-            var buff_size = buffer.size
+            var buff_size = len(buffer)
             bytes_received = recv(
                 self.fd,
                 buffer.unsafe_ptr().offset(buff_size),
-                buffer.capacity - buffer.size,
+                buffer.capacity - len(buffer),
                 0,
             )
-            buffer.size += bytes_received
+            buffer._len += bytes_received
         except e:
             logger.error(e)
             raise Error("Socket.receive: Failed to read data from connection.")
