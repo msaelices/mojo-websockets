@@ -1,4 +1,4 @@
-"""Server example using the threading API."""
+"""WebSocket server example using io_uring for concurrency."""
 
 from websockets.aliases import Bytes
 from websockets.sync.server import serve, WSConnection
@@ -13,7 +13,7 @@ fn on_message(conn: WSConnection, data: Bytes) raises -> None:
 
 
 fn main() raises:
+    print("Starting WebSocket echo server with io_uring concurrency support")
+    print("Multiple clients can connect simultaneously")
     with serve(on_message, "127.0.0.1", 8001) as server:
         server.serve_forever()
-
-

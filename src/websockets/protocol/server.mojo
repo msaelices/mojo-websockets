@@ -3,7 +3,12 @@ from collections import Optional
 from memory import UnsafePointer
 from python import Python, PythonObject
 
-from websockets.aliases import Bytes, DEFAULT_MAX_REQUEST_BODY_SIZE, DEFAULT_BUFFER_SIZE, MAGIC_CONSTANT
+from websockets.aliases import (
+    Bytes,
+    DEFAULT_MAX_REQUEST_BODY_SIZE,
+    DEFAULT_BUFFER_SIZE,
+    MAGIC_CONSTANT,
+)
 from websockets.http import (
     get_date_timestamp,
     encode,
@@ -31,6 +36,7 @@ struct ServerProtocol(Protocol):
     """
     Sans-I/O implementation of a WebSocket server connection.
     """
+
     alias side = SERVER
 
     var origins: Optional[List[String]]
@@ -48,6 +54,24 @@ struct ServerProtocol(Protocol):
     var close_rcvd_then_sent: Optional[Bool]
     var eof_sent: Bool
     var discard_sent: Bool
+    var _active: Bool  # Track if the protocol is active/used
+
+    fn __moveinit__(mut self, owned existing: Self):
+        self.origins = existing.origins
+        self.reader = existing.reader^
+        self.events = existing.events^
+        self.writes = existing.writes^
+        self.state = existing.state
+        self.expect_cont_frame = existing.expect_cont_frame
+        self.parser_exc = existing.parser_exc
+        self.handshake_exc = existing.handshake_exc
+        self.curr_size = existing.curr_size
+        self.close_rcvd = existing.close_rcvd
+        self.close_sent = existing.close_sent
+        self.close_rcvd_then_sent = existing.close_rcvd_then_sent
+        self.eof_sent = existing.eof_sent
+        self.discard_sent = existing.discard_sent
+        self._active = existing._active
 
     fn __init__(out self, origins: Optional[List[String]] = None):
         self.origins = origins
@@ -65,6 +89,7 @@ struct ServerProtocol(Protocol):
         self.close_rcvd_then_sent = None
         self.eof_sent = False
         self.discard_sent = False
+        self._active = False
 
     fn __copyinit__(out self, other: ServerProtocol):
         self.origins = other.origins
@@ -85,6 +110,7 @@ struct ServerProtocol(Protocol):
         self.close_rcvd_then_sent = other.close_rcvd_then_sent
         self.eof_sent = other.eof_sent
         self.discard_sent = other.discard_sent
+        self._active = other._active
 
     # ===-------------------------------------------------------------------=== #
     # Trait implementations
@@ -145,7 +171,10 @@ struct ServerProtocol(Protocol):
 
     fn process_response(mut self, response: HTTPResponse) raises -> None:
         """Process the handshare response from the server."""
-        constrained[Self.side == CLIENT, "Protocol.process_response() is only available for client connections."]()
+        constrained[
+            Self.side == CLIENT,
+            "Protocol.process_response() is only available for client connections.",
+        ]()
 
     # Public method for getting outgoing data after receiving data or sending events.
 
@@ -235,7 +264,6 @@ struct ServerProtocol(Protocol):
         """Set the parser exception."""
         self.parser_exc = exc
 
-
     fn get_handshake_exc(self) -> Optional[Error]:
         """Get the handshake exception."""
         return self.handshake_exc
@@ -244,11 +272,25 @@ struct ServerProtocol(Protocol):
         """Set the handshake exception."""
         self.handshake_exc = exc
 
+    fn is_active(self) -> Bool:
+        """Return True if this protocol is active/in use."""
+        return self._active
+
+    fn set_active(mut self):
+        """Mark this protocol as active/in use."""
+        self._active = True
+
+    fn set_inactive(mut self):
+        """Mark this protocol as inactive/available."""
+        self._active = False
+
     # ===-------------------------------------------------------------------=== #
     # Methods
     # ===-------------------------------------------------------------------=== #
 
-    fn accept[date_func: fn () -> String = get_date_timestamp](mut self, request: HTTPRequest) raises -> HTTPResponse:
+    fn accept[
+        date_func: fn () -> String = get_date_timestamp
+    ](mut self, request: HTTPRequest) raises -> HTTPResponse:
         """
         Accept a WebSocket connection.
 
@@ -283,7 +325,9 @@ struct ServerProtocol(Protocol):
 
             if self.origins is not None and "Origin" in request.headers:
                 if request.headers["Origin"] not in self.origins.value():
-                    raise Error('Invalid "Origin" header: {}'.format(request.headers["Origin"]))
+                    raise Error(
+                        'Invalid "Origin" header: {}'.format(request.headers["Origin"])
+                    )
 
             # Validate the base64 encoded Sec-WebSocket-Key
             _ = b64decode[validate=True](request.headers["Sec-WebSocket-Key"])
@@ -334,7 +378,7 @@ struct ServerProtocol(Protocol):
             _ = parse_buffer(self)
 
     fn reject[
-        date_func : fn () -> String = get_date_timestamp,
+        date_func: fn () -> String = get_date_timestamp,
     ](mut self, status_code: Int, status_text: String, body: String) -> HTTPResponse:
         """
         Fail the WebSocket connection.
@@ -351,6 +395,6 @@ struct ServerProtocol(Protocol):
             Header("Date", date_func()),
             Header("Connection", "close"),
             Header("Content-Length", String(len(body))),
-            Header("Content-type", "text/plain; charset=utf-8")
+            Header("Content-type", "text/plain; charset=utf-8"),
         )
         return HTTPResponse(status_code, status_text, headers, str_to_bytes(body))
