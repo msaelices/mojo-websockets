@@ -38,17 +38,13 @@ alias WRITE = 2
 alias CLOSE = 3  # For handling connection closing
 
 # Configuration for io_uring
-# alias MAX_CONNECTIONS = 16
-alias MAX_CONNECTIONS = 8
+alias MAX_CONNECTIONS = 16
 alias BACKLOG = 512
-# alias MAX_MESSAGE_LEN = 16384  # Increased for WebSocket frames
-alias MAX_MESSAGE_LEN = 1024
-# alias BUFFERS_COUNT = 16  # Must be power of 2
-alias BUFFERS_COUNT = 4  # Must be power of 2
+alias MAX_MESSAGE_LEN = 16384  # Increased for WebSocket frames
+alias BUFFERS_COUNT = 16  # Must be power of 2
 alias BUF_RING_SIZE = BUFFERS_COUNT
 # Number of entries in the submission queue
-# alias SQ_ENTRIES = 128
-alias SQ_ENTRIES = 24
+alias SQ_ENTRIES = 128
 
 alias ConnHandler = fn (conn: WSConnection, data: Bytes) raises -> None
 
@@ -572,19 +568,19 @@ struct Server:
         var protocol = self.protocols[conn.protocol_id]
         var events_received = protocol.events_received()
 
+        # Create a WSConnection for the handler - moved outside the loop
+        var wsconn = WSConnection(
+            Int(conn.fd),
+            conn.protocol_id,
+            UnsafePointer.address_of(self.buffer_memory),
+            UnsafePointer.address_of(self.ring),
+            UnsafePointer.address_of(self),
+        )
+
         for event_ref in events_received:
             var event = event_ref[]
             if event.isa[Frame]() and event[Frame].is_data():
                 var data_received = event[Frame].data
-
-                # Create an WSConnection for the handler
-                var wsconn = WSConnection(
-                    Int(conn.fd),
-                    conn.protocol_id,
-                    UnsafePointer.address_of(self.buffer_memory),
-                    UnsafePointer.address_of(self.ring),
-                    UnsafePointer.address_of(self),
-                )
 
                 # Call the handler
                 self.handler(wsconn, data_received)
