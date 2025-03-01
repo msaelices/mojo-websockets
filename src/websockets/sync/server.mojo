@@ -32,28 +32,23 @@ from mojix.net.types import AddrFamily, SocketType, SocketAddrV4
 from io_uring import IoUring
 from io_uring.op import Accept, Read, Write
 
-alias BYTE_0_TEXT: UInt8 = 1
-alias BYTE_0_NO_FRAGMENT: UInt8 = 128
-
-alias BYTE_1_FRAME_IS_MASKED: UInt8 = 128
-
-alias BYTE_1_SIZE_ONE_BYTE: UInt8 = 125
-alias BYTE_1_SIZE_TWO_BYTES: UInt8 = 126
-alias BYTE_1_SIZE_EIGHT_BYTES: UInt8 = 127
-
 alias ACCEPT = 0
 alias READ = 1
 alias WRITE = 2
 alias CLOSE = 3  # For handling connection closing
 
 # Configuration for io_uring
-alias MAX_CONNECTIONS = 16
+# alias MAX_CONNECTIONS = 16
+alias MAX_CONNECTIONS = 8
 alias BACKLOG = 512
-alias MAX_MESSAGE_LEN = 16384  # Increased for WebSocket frames
-alias BUFFERS_COUNT = 16  # Must be power of 2
+# alias MAX_MESSAGE_LEN = 16384  # Increased for WebSocket frames
+alias MAX_MESSAGE_LEN = 1024
+# alias BUFFERS_COUNT = 16  # Must be power of 2
+alias BUFFERS_COUNT = 4  # Must be power of 2
 alias BUF_RING_SIZE = BUFFERS_COUNT
 # Number of entries in the submission queue
-alias SQ_ENTRIES = 128
+# alias SQ_ENTRIES = 128
+alias SQ_ENTRIES = 24
 
 alias ConnHandler = fn (conn: WSConnection, data: Bytes) raises -> None
 
@@ -272,7 +267,7 @@ struct Server:
 
         # Initialize protocol list
         self.protocols = List[ServerProtocol]()
-        for i in range(MAX_CONNECTIONS):
+        for _ in range(MAX_CONNECTIONS):
             self.protocols.append(ServerProtocol())
 
         self.active_connections = 0
