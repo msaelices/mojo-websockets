@@ -166,11 +166,13 @@ struct WSConnection:
 
     fn send_text(self, message: String) raises:
         # Find the protocol
-        var protocol_ref = self.server[].protocols[self.protocol_id]
+        var protocol_ptr = UnsafePointer[ServerProtocol].address_of(
+            self.server[].protocols[self.protocol_id]
+        )
 
         # Prepare the message
-        send_text(protocol_ref, str_to_bytes(message))
-        var data_to_send = protocol_ref.data_to_send()
+        send_text(protocol_ptr[], str_to_bytes(message))
+        var data_to_send = protocol_ptr[].data_to_send()
 
         # Use io_uring to write the data
         var sq = self.ring[].sq()
@@ -198,11 +200,13 @@ struct WSConnection:
 
     fn send_binary(self, message: Bytes) raises:
         # Find the protocol
-        var protocol_ref = self.server[].protocols[self.protocol_id]
+        var protocol_ptr = UnsafePointer[ServerProtocol].address_of(
+            self.server[].protocols[self.protocol_id]
+        )
 
         # Prepare the message
-        send_binary(protocol_ref, message)
-        var data_to_send = protocol_ref.data_to_send()
+        send_binary(protocol_ptr[], message)
+        var data_to_send = protocol_ptr[].data_to_send()
 
         # Use io_uring to write the data
         var sq = self.ring[].sq()
