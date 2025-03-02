@@ -13,6 +13,7 @@ This software is in a early stage of development. Please DO NOT use yet for prod
 ## Features
 
 - **WebSocket Server and Client**: Supports creating both WebSocket servers and clients.
+- **Asynchronous non-blocking communication**: Support concurrent connections via [io_uring](https://unixism.net/loti/).
 - **Compatibility**: API designed to be intuitive for developers familiar with the Python websockets library.
 - **Sans/IO Layer**: Implements a WebSocket Sans/IO layer pure Mojo and performs no I/O of its own.
 
@@ -70,7 +71,6 @@ fn main() raises:
 
 ## TODO
 
-- [ ] Asynchronous non-blocking communication (waiting for the Mojo async support)
 - [ ] Implement automatic reconnection for clients
 - [ ] Get rid of Python dependencies and logic (e.g. no more `from python import ...`)
 - [ ] Make sure it passes all the tests in [Autobahn|Testsuite](https://github.com/crossbario/autobahn-testsuite/)
@@ -86,9 +86,9 @@ Contributions are welcome! If you'd like to contribute, please follow the contri
 
 ## Acknowledgments
 
-We have taken a lot of code from the amazing [lightbug_http](https://github.com/saviorand/lightbug_http) project.
-
-Also, we took inspiration and some code from the [python-websockets](https://github.com/websockets) project, specially for implementing the [WebSocket Sans/IO layer](https://websockets.readthedocs.io/en/stable/howto/sansio.html) and their tests.
+* We have taken a lot of code from the amazing [lightbug_http](https://github.com/saviorand/lightbug_http) project.
+* We took inspiration and some code from the [python-websockets](https://github.com/websockets) project, specially for implementing the [WebSocket Sans/IO layer](https://websockets.readthedocs.io/en/stable/howto/sansio.html) and their tests.
+* We are using the [io_uring](https://github.com/dmitry-salin/io_uring/) library for the I/O operations concurrency.
 
 ## License
 
