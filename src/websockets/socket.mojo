@@ -465,6 +465,7 @@ struct Socket[AddrType: Addr, address_family: Int = AF_INET](
         logger.debug("Socket.connect: Connecting to ", address, ":", String(port))
 
         var ip: in_addr
+        var binary_ip: c_uint
         var addr: sockaddr_in
 
         try:
@@ -475,19 +476,17 @@ struct Socket[AddrType: Addr, address_family: Int = AF_INET](
             else:
                 ip = addrinfo_unix().get_ip_address(address)
 
-            addr = sockaddr_in(
-                address_family=address_family,
-                port=port,
-                binary_ip=ip.s_addr,
-            )
+            binary_ip = ip.s_addr
+
         except e:
             logger.debug("get_ip_address failed: Falling back to direct IP")
-            addr = sockaddr_in(
-                address_family=address_family,
-                port=port,
-                binary_ip=inet_pton[address_family](address.unsafe_ptr()),
-            )
+            binary_ip = inet_pton[address_family](address.unsafe_ptr())
 
+        addr = sockaddr_in(
+            address_family=address_family,
+            port=port,
+            binary_ip=binary_ip,
+        )
         try:
             connect(self.fd, addr)
         except e:
