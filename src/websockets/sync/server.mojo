@@ -341,6 +341,8 @@ struct Server:
             # Submit and wait for at least 1 completion
             var submitted = self.ring.submit_and_wait(wait_nr=1)
 
+            logger.debug("Submitting io_uring operations:", submitted)
+
             if submitted < 0:
                 logger.error("Error submitting io_uring operations")
                 break
@@ -349,6 +351,8 @@ struct Server:
             for cqe in self.ring.cq(wait_nr=0):
                 var res = cqe.res
                 var user_data = cqe.user_data
+
+                logger.debug("Completion result:", res, "user_data:", user_data)
 
                 if res < 0:
                     logger.error("Error in completion:", res)
@@ -443,14 +447,18 @@ struct Server:
 
                         # Process the data with the protocol
                         if conn.protocol_id < len(self.protocols):
-                            var protocol = self.protocols[conn.protocol_id]
+                            var protocol_ptr = UnsafePointer[ServerProtocol].address_of(
+                                self.protocols[conn.protocol_id]
+                            )
 
                             # Send data to protocol
-                            receive_data(protocol, data)
+                            receive_data(protocol_ptr[], data)
 
                             # Check for parser exceptions
-                            if protocol.get_parser_exc():
-                                logger.error(String(protocol.get_parser_exc().value()))
+                            if protocol_ptr[].get_parser_exc():
+                                logger.error(
+                                    String(protocol_ptr[].get_parser_exc().value())
+                                )
 
                                 # Close the connection
                                 libc_close(conn.fd)
@@ -463,26 +471,30 @@ struct Server:
                                 )
 
                                 # Mark protocol as inactive
-                                protocol.set_inactive()
+                                protocol_ptr[].set_inactive()
 
                                 # Free the buffer
                                 self.buffer_memory.mark_buffer_available(buffer_idx)
                                 continue
 
                             # Handle connection state
-                            if protocol.get_state() == CONNECTING:
+                            if protocol_ptr[].get_state() == CONNECTING:
                                 # WebSocket handshake
                                 logger.debug("Handling WebSocket handshake")
-                                var events_list = protocol.events_received()
+                                var events_list = protocol_ptr[].events_received()
                                 if len(events_list) > 0:
                                     var request: HTTPRequest = events_list[0][
                                         HTTPRequest
                                     ]
-                                    var response = protocol.accept(request)
+                                    var response = protocol_ptr[].accept(request)
 
-                                    if protocol.get_handshake_exc():
+                                    if protocol_ptr[].get_handshake_exc():
                                         logger.error(
-                                            String(protocol.get_handshake_exc().value())
+                                            String(
+                                                protocol_ptr[]
+                                                .get_handshake_exc()
+                                                .value()
+                                            )
                                         )
 
                                         # Close the connection
@@ -490,7 +502,7 @@ struct Server:
                                         self.active_connections -= 1
 
                                         # Mark protocol as inactive
-                                        protocol.set_inactive()
+                                        protocol_ptr[].set_inactive()
 
                                         # Free the buffer
                                         self.buffer_memory.mark_buffer_available(
@@ -499,8 +511,8 @@ struct Server:
                                         continue
 
                                     logger.debug("Sending handshake response")
-                                    protocol.send_response(response)
-                                    var data_to_send = protocol.data_to_send()
+                                    protocol_ptr[].send_response(response)
+                                    var data_to_send = protocol_ptr[].data_to_send()
 
                                     # Use io_uring to write the handshake response
                                     sq = self.ring.sq()
@@ -536,7 +548,13 @@ struct Server:
 
                 # Handle write completion
                 elif conn.type == WRITE:
-                    logger.debug("Write completion (buffer_idx:", conn.bid, ")")
+                    logger.debug(
+                        "Write completion (buffer_idx:",
+                        conn.bid,
+                        ", protocol_id",
+                        conn.protocol_id,
+                        ")",
+                    )
 
                     # Free the buffer
                     self.buffer_memory.mark_buffer_available(Int(conn.bid))
@@ -548,6 +566,9 @@ struct Server:
                         var result = self.buffer_memory.get_available_buffer()
                         var buf_idx = result[0]
                         var buf_ptr = result[1]
+                        logger.debug(
+                            "Posting new read for connection (buffer_idx:", buf_idx, ")"
+                        )
                         read_conn = ConnInfo(
                             fd=conn.fd,
                             type=READ,
