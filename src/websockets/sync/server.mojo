@@ -562,6 +562,7 @@ struct Server:
                                         ).user_data(write_conn.to_int())
                             else:
                                 # Handle WebSocket frames
+                                logger.debug("Handling WebSocket frame")
                                 self.handle_websocket_frame(conn, buffer_idx)
 
                 # Handle write completion
@@ -611,8 +612,10 @@ struct Server:
         if conn.protocol_id >= len(self.protocols):
             return
 
-        var protocol = self.protocols[conn.protocol_id]
-        var events_received = protocol.events_received()
+        var protocol_ptr = UnsafePointer[ServerProtocol].address_of(
+            self.protocols[conn.protocol_id]
+        )
+        var events_received = protocol_ptr[].events_received()
 
         # Create a WSConnection for the handler - moved outside the loop
         var wsconn = WSConnection(
@@ -631,7 +634,7 @@ struct Server:
                 # Call the handler
                 self.handler(wsconn, data_received)
 
-        var data_to_send = protocol.data_to_send()
+        var data_to_send = protocol_ptr[].data_to_send()
         if len(data_to_send) > 0:
             # Use io_uring to write response
             var sq = self.ring.sq()
