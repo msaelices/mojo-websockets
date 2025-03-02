@@ -462,23 +462,40 @@ struct Socket[AddrType: Addr, address_family: Int = AF_INET](
         Raises:
             Error: If connecting to the remote socket fails.
         """
+        logger.debug("Socket.connect: Connecting to ", address, ":", String(port))
 
-        @parameter
-        if os_is_macos():
-            ip = addrinfo_macos().get_ip_address(address)
-        else:
-            ip = addrinfo_unix().get_ip_address(address)
+        var ip: in_addr
+        var addr: sockaddr_in
 
-        var addr = sockaddr_in(
-            address_family=address_family, port=port, binary_ip=ip.s_addr
-        )
+        try:
+
+            @parameter
+            if os_is_macos():
+                ip = addrinfo_macos().get_ip_address(address)
+            else:
+                ip = addrinfo_unix().get_ip_address(address)
+
+            addr = sockaddr_in(
+                address_family=address_family,
+                port=port,
+                binary_ip=ip.s_addr,
+            )
+        except e:
+            logger.debug("get_ip_address failed: Falling back to direct IP")
+            addr = sockaddr_in(
+                address_family=address_family,
+                port=port,
+                binary_ip=inet_pton[address_family](address.unsafe_ptr()),
+            )
+
         try:
             connect(self.fd, addr)
         except e:
             logger.error(
-                "Socket.connect: Failed to establish a connection to the server."
+                "Socket.connect: Failed to establish a connection to the server: {}"
+                .format(e)
             )
-            raise e
+            raise Error("Failed to connect to server: {}".format(e))
 
         var remote = self.get_peer_name()
         self._remote_address = AddrType(remote[0], remote[1])
