@@ -41,7 +41,7 @@ alias CLOSE = 3  # For handling connection closing
 alias MAX_CONNECTIONS = 16
 alias BACKLOG = 512
 # alias MAX_MESSAGE_LEN = 16384  # Increased for WebSocket frames
-alias MAX_MESSAGE_LEN = 1024  # Increased for WebSocket frames
+alias MAX_MESSAGE_LEN = 2048  # Reduced because of compiler slow compilation (InlineArray meta-programming)
 alias BUFFERS_COUNT = 16  # Must be power of 2
 alias BUF_RING_SIZE = BUFFERS_COUNT
 # Number of entries in the submission queue
