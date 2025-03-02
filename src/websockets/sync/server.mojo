@@ -51,7 +51,7 @@ alias ConnHandler = fn (conn: WSConnection, data: Bytes) raises -> None
 
 
 @value
-struct ConnInfo:
+struct ConnInfo(Writable):
     var fd: Int32
     var type: UInt16
     var bid: UInt32  # Buffer ID
@@ -82,6 +82,25 @@ struct ConnInfo:
             type=UInt16((value >> 24) & 0xFF),
             protocol_id=UInt16((value >> 16) & 0xFF),
             bid=UInt32(value & 0xFFFF),
+        )
+
+    fn write_to[W: Writer](self, mut writer: W) -> None:
+        type_str = (
+            "ACCEPT" if self.type
+            == ACCEPT else "READ" if self.type
+            == READ else "WRITE" if self.type
+            == WRITE else "CLOSE"
+        )
+        writer.write(
+            "ConnInfo(fd: ",
+            self.fd,
+            ", type:",
+            type_str,
+            ", bid:",
+            self.bid,
+            ", protocol_id:",
+            self.protocol_id,
+            ")",
         )
 
 
@@ -352,13 +371,12 @@ struct Server:
                 var res = cqe.res
                 var user_data = cqe.user_data
 
-                logger.debug("Completion result:", res, "user_data:", user_data)
-
                 if res < 0:
                     logger.error("Error in completion:", res)
                     continue
 
                 var conn = ConnInfo.from_int(user_data)
+                logger.debug("Completion result:", res, "conn:", conn)
 
                 # Handle accept completion
                 if conn.type == ACCEPT:
