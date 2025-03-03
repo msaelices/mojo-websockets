@@ -16,7 +16,6 @@ def ws_accept_key(key: String) -> String:
     """
     var accept_key = key + MAGIC_CONSTANT
 
-    # Use pure Mojo SHA1 implementation
     var digest = sha1_digest_string(accept_key)
 
     # Convert digest to Bytes for b64encode
