@@ -67,7 +67,6 @@ fn main() raises:
 
 - [ ] Asynchronous non-blocking communication (implemented in the `io_uring` branch)
 - [ ] Implement automatic reconnection for clients
-- [ ] Get rid of Python dependencies and logic (e.g. no more `from python import ...`)
 - [ ] Make sure it passes all the tests in [Autobahn|Testsuite](https://github.com/crossbario/autobahn-testsuite/)
 - [ ] Implement subprotocols and extensions
 - [ ] Optimize performance for high-concurrency scenarios
