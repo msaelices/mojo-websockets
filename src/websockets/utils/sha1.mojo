@@ -2,6 +2,8 @@
 SHA1 Implementation in pure Mojo.
 
 This module implements the SHA-1 hashing algorithm as described in FIPS PUB 180-1.
+
+Code converted to Mojo from this Python implementation: https://github.com/ajalt/python-sha1
 """
 
 from websockets.aliases import Bytes
@@ -12,7 +14,9 @@ fn _left_rotate(n: UInt32, b: Int) -> UInt32:
     return (n << b) | (n >> (32 - b))
 
 
-fn _process_chunk(mut chunk: List[UInt8], h0: UInt32, h1: UInt32, h2: UInt32, h3: UInt32, h4: UInt32) -> Tuple[UInt32, UInt32, UInt32, UInt32, UInt32]:
+fn _process_chunk(
+    mut chunk: List[UInt8], h0: UInt32, h1: UInt32, h2: UInt32, h3: UInt32, h4: UInt32
+) -> (UInt32, UInt32, UInt32, UInt32, UInt32):
     """Process a chunk of data and return the new digest variables."""
 
     var w = List[UInt32]()
@@ -141,7 +145,9 @@ struct Sha1Hash:
             for i in range(64):
                 chunk.append(self._unprocessed[i])
 
-            var result = _process_chunk(chunk, self._h0, self._h1, self._h2, self._h3, self._h4)
+            var result = _process_chunk(
+                chunk, self._h0, self._h1, self._h2, self._h3, self._h4
+            )
             self._h0 = result[0]
             self._h1 = result[1]
             self._h2 = result[2]
@@ -221,7 +227,7 @@ struct Sha1Hash:
 
         return result
 
-    fn _produce_digest(self) -> Tuple[UInt32, UInt32, UInt32, UInt32, UInt32]:
+    fn _produce_digest(self) -> (UInt32, UInt32, UInt32, UInt32, UInt32):
         """Return finalized digest variables for the data processed so far."""
         # Pre-processing:
         var message = List[UInt8]()
@@ -260,7 +266,9 @@ struct Sha1Hash:
         for i in range(min(64, len(message))):
             first_chunk.append(message[i])
 
-        var h = _process_chunk(first_chunk, self._h0, self._h1, self._h2, self._h3, self._h4)
+        var h = _process_chunk(
+            first_chunk, self._h0, self._h1, self._h2, self._h3, self._h4
+        )
 
         if len(message) > 64:  # handle second chunk if needed
             var second_chunk = List[UInt8]()
