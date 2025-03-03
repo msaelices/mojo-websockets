@@ -4,11 +4,10 @@ import sys
 
 from websockets.aliases import Bytes
 from websockets.sync.server import serve, WSConnection
-from websockets.utils.bytes import bytes_to_str
 
 
 fn on_message(conn: WSConnection, data: Bytes) raises -> None:
-    str_received = bytes_to_str(data)
+    str_received = String(data)
     print("<<< ", str_received)
     conn.send_text(str_received)
     print(">>> ", str_received)
