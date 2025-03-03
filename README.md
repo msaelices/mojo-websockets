@@ -36,7 +36,6 @@ from websockets.aliases import Bytes
 from websockets.sync.server import serve, WSConnection
 from websockets.utils.bytes import bytes_to_str
 
-
 fn on_message(conn: WSConnection, data: Bytes) raises -> None:
     str_received = bytes_to_str(data)
     print("<<< ", str_received)
@@ -53,15 +52,13 @@ fn main() raises:
 
 ```mojo
 from websockets.sync.client import connect
-from websockets.utils.bytes import bytes_to_str
-
 
 fn send_and_receive(msg: String) raises:
     with connect("ws://127.0.0.1:8000") as client:
         client.send_text(msg)
         print(">>> ", msg)
-        response = client.recv()
-        print("<<< ", bytes_to_str(response))
+        response = client.recv_text()
+        print("<<< ", response)
 
 fn main() raises:
     send_and_receive("Hello world!")

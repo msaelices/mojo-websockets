@@ -1,6 +1,5 @@
 """Client example using the threading API."""
 from websockets.sync.client import connect
-from websockets.utils.bytes import bytes_to_str, str_to_bytes
 
 
 fn send_and_receive_loop() raises:
@@ -9,8 +8,8 @@ fn send_and_receive_loop() raises:
             msg = input("Enter a message: ")
             client.send_text(msg)
             print(">>> ", msg)
-            response = client.recv()
-            print("<<< ", bytes_to_str(response))
+            response = client.recv_text()
+            print("<<< ", response)
 
 
 fn main() raises:
