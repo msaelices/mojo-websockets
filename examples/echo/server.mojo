@@ -1,13 +1,14 @@
 """WebSocket server example using io_uring for concurrency."""
 
 import sys
+from utils import StringSlice
 
 from websockets.aliases import Bytes
 from websockets.sync.server import serve, WSConnection
 
 
 fn on_message(conn: WSConnection, data: Bytes) raises -> None:
-    str_received = String(data)
+    str_received = String(StringSlice.from_utf8(data))
     print("<<< ", str_received)
     conn.send_text(str_received)
     print(">>> ", str_received)
