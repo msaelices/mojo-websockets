@@ -6,6 +6,7 @@ This module implements the SHA-1 hashing algorithm as described in FIPS PUB 180-
 Code converted to Mojo from this Python implementation: https://github.com/ajalt/python-sha1
 """
 
+from collections import InlineArray
 from websockets.aliases import Bytes
 
 
@@ -19,9 +20,7 @@ fn _process_chunk(
 ) -> (UInt32, UInt32, UInt32, UInt32, UInt32):
     """Process a chunk of data and return the new digest variables."""
 
-    var w = List[UInt32]()
-    for _ in range(80):
-        w.append(0)
+    var w = InlineArray[UInt32, 80](fill=0)
 
     # Break chunk into sixteen 4-byte big-endian words w[i]
     for i in range(16):
