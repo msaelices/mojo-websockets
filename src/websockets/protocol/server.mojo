@@ -1,7 +1,6 @@
 from base64 import b64encode
 from collections import Optional
 from memory import UnsafePointer
-from python import Python, PythonObject
 
 from websockets.aliases import Bytes, DEFAULT_MAX_REQUEST_BODY_SIZE, DEFAULT_BUFFER_SIZE, MAGIC_CONSTANT
 from websockets.http import (
