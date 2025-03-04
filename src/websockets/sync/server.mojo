@@ -4,7 +4,6 @@
 from base64 import b64encode
 from collections import Dict, InlineArray, List, Optional
 from memory import UnsafePointer
-from python import Python, PythonObject
 from time import sleep
 
 from websockets.libc import c_int, close as libc_close
