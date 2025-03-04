@@ -8,6 +8,7 @@ Code converted to Mojo from this Python implementation: https://github.com/ajalt
 
 from collections import InlineArray
 from websockets.aliases import Bytes
+from websockets.utils.bytes import bytes_to_str
 
 
 fn _left_rotate(n: UInt32, b: Int) -> UInt32:
@@ -16,7 +17,12 @@ fn _left_rotate(n: UInt32, b: Int) -> UInt32:
 
 
 fn _process_chunk(
-    mut chunk: List[UInt8], h0: UInt32, h1: UInt32, h2: UInt32, h3: UInt32, h4: UInt32
+    mut chunk: Bytes,
+    h0: UInt32,
+    h1: UInt32,
+    h2: UInt32,
+    h3: UInt32,
+    h4: UInt32,
 ) -> (UInt32, UInt32, UInt32, UInt32, UInt32):
     """Process a chunk of data and return the new digest variables."""
 
@@ -87,7 +93,7 @@ struct Sha1Hash:
     var _h2: UInt32
     var _h3: UInt32
     var _h4: UInt32
-    var _unprocessed: List[UInt8]
+    var _unprocessed: Bytes
     var _message_byte_length: UInt64
 
     fn __init__(mut self):
@@ -101,7 +107,7 @@ struct Sha1Hash:
 
         # List with 0 <= len < 64 used to store the end of the message
         # if the message length is not congruent to 64
-        self._unprocessed = List[UInt8]()
+        self._unprocessed = Bytes()
 
         # Length in bytes of all data that has been processed so far
         self._message_byte_length = 0
@@ -140,7 +146,7 @@ struct Sha1Hash:
 
         # Process the full chunks
         while len(self._unprocessed) >= 64:
-            var chunk = List[UInt8]()
+            var chunk = Bytes(capacity=64)
             for i in range(64):
                 chunk.append(self._unprocessed[i])
 
@@ -156,7 +162,7 @@ struct Sha1Hash:
             self._message_byte_length += 64
 
             # Remove the processed chunk
-            var new_unprocessed = List[UInt8]()
+            var new_unprocessed = Bytes(capacity=len(self._unprocessed) - 64)
             for i in range(64, len(self._unprocessed)):
                 new_unprocessed.append(self._unprocessed[i])
             self._unprocessed = new_unprocessed
@@ -201,7 +207,7 @@ struct Sha1Hash:
     fn hexdigest(self) -> String:
         """Produce the final hash value (big-endian) as a hex string."""
         var h = self._produce_digest()
-        var result = String()
+        var result = Bytes(capacity=20)
 
         for i in range(5):
             var value: UInt32
@@ -220,16 +226,16 @@ struct Sha1Hash:
             for shift in range(7, -1, -1):
                 var nibble = Int((value >> (shift * 4)) & 0xF)
                 if nibble < 10:
-                    result += String(chr(48 + nibble))  # 0-9
+                    result.append(Byte(48 + nibble))  # 0-9
                 else:
-                    result += String(chr(97 + (nibble - 10)))  # a-f
+                    result.append(Byte(97 + (nibble - 10)))  # a-f
 
-        return result
+        return bytes_to_str(result)
 
     fn _produce_digest(self) -> (UInt32, UInt32, UInt32, UInt32, UInt32):
         """Return finalized digest variables for the data processed so far."""
         # Pre-processing:
-        var message = List[UInt8]()
+        var message = Bytes(capacity=len(self._unprocessed))
 
         # Copy unprocessed data
         for i in range(len(self._unprocessed)):
@@ -261,7 +267,7 @@ struct Sha1Hash:
 
         # Process the final chunk(s)
         # At this point, the length of the message is either 64 or 128 bytes.
-        var first_chunk = List[UInt8]()
+        var first_chunk = Bytes(capacity=64)
         for i in range(min(64, len(message))):
             first_chunk.append(message[i])
 
@@ -270,7 +276,7 @@ struct Sha1Hash:
         )
 
         if len(message) > 64:  # handle second chunk if needed
-            var second_chunk = List[UInt8]()
+            var second_chunk = Bytes()
             for i in range(64, len(message)):
                 second_chunk.append(message[i])
 
