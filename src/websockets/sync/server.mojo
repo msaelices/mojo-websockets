@@ -8,7 +8,12 @@ from time import sleep
 
 from websockets.libc import c_int
 
-from websockets.aliases import Bytes, DEFAULT_BUFFER_SIZE, DEFAULT_MAX_REQUEST_BODY_SIZE, MAGIC_CONSTANT
+from websockets.aliases import (
+    Bytes,
+    DEFAULT_BUFFER_SIZE,
+    DEFAULT_MAX_REQUEST_BODY_SIZE,
+    MAGIC_CONSTANT,
+)
 from websockets.frames import Frame
 from websockets.http import Header, Headers, HTTPRequest, HTTPResponse, encode
 from websockets.logger import logger
@@ -17,6 +22,7 @@ from websockets.protocol import CONNECTING, SERVER
 from websockets.protocol.base import receive_data, receive_eof, send_text, send_binary
 from websockets.protocol.server import ServerProtocol
 from websockets.protocol.client import ClientProtocol
+from websockets.threads import start_thread
 from websockets.utils.bytes import str_to_bytes
 
 alias BYTE_0_TEXT: UInt8 = 1
@@ -32,10 +38,79 @@ alias BYTE_1_SIZE_EIGHT_BYTES: UInt8 = 127
 alias ConnHandler = fn (conn: WSConnection, data: Bytes) raises -> None
 
 
+@value
+@explicit_destroy
+struct ThreadContext:
+    """
+    A context object for the thread that holds the connection and the handler function.
+    """
+
+    var conn: TCPConnection
+    var handler: ConnHandler
+
+
+fn handle_thread(context_ptr: UnsafePointer[ThreadContext]) raises -> None:
+    """
+    Handle incoming data.
+
+    Args:
+        context_ptr: Pointer to the Thread context.
+    """
+    conn = context_ptr[].conn
+    handler = context_ptr[].handler
+
+    protocol = ServerProtocol()
+    remote_addr = conn.socket.remote_address()
+    logger.debug("Connection accepted! IP:", remote_addr.ip, "Port:", remote_addr.port)
+    wsconn = WSConnection(conn, protocol)
+    while True:
+        var b = Bytes(capacity=DEFAULT_BUFFER_SIZE)
+        try:
+            _ = wsconn.read(b)
+        except e:
+            conn.teardown()
+            logger.error(e)
+            return
+        logger.debug("Bytes received:", len(b))
+
+        if protocol.get_parser_exc():
+            logger.error(String(protocol.get_parser_exc().value()))
+            conn.teardown()
+            return
+
+        # If the server is set to not support keep-alive connections, or the client requests a connection close, we mark the connection to be closed.
+        if protocol.get_state() == CONNECTING:
+            var request: HTTPRequest = protocol.events_received()[0][HTTPRequest]
+
+            logger.debug("Starting handshake")
+
+            response = protocol.accept(request)
+            if protocol.get_handshake_exc():
+                logger.error(String(protocol.get_handshake_exc().value()))
+                conn.teardown()
+                return
+
+            logger.debug("Sending handshake response")
+            protocol.send_response(response)
+            data_to_send = protocol.data_to_send()
+
+            bytes_written = conn.write(data_to_send)
+            logger.debug("Bytes written:", bytes_written)
+        else:
+            handle_read(protocol, wsconn, b, handler)
+
+        logger.debug(
+            remote_addr.ip,
+            String(remote_addr.port),
+        )
+
+
+@value
 struct WSConnection:
     """
     A connection object that represents a WebSocket connection.
     """
+
     var conn_ptr: UnsafePointer[TCPConnection]
     var protocol_ptr: UnsafePointer[ServerProtocol]
 
@@ -62,10 +137,45 @@ struct WSConnection:
         self.conn_ptr[].close()
 
 
+fn handle_read(
+    mut protocol: ServerProtocol,
+    mut wsconn: WSConnection,
+    data: Bytes,
+    handler: ConnHandler,
+) raises -> None:
+    """
+    Handle incoming data.
+
+    Args:
+        protocol: ServerProtocol - The protocol object that handles the connection.
+        wsconn: WSConnection - The connection object.
+        data: Bytes - The data received from the client.
+        handler: ConnHandler - The handler function that processes the incoming data.
+    """
+    bytes_recv = len(data)
+    if bytes_recv == 0:
+        logger.debug("Received zero bytes. Closing connection.")
+        receive_eof(protocol)
+        return
+
+    events_received = protocol.events_received()
+    for event_ref in events_received:
+        event = event_ref[]
+        if event.isa[Frame]() and event[Frame].is_data():
+            data_received = event[Frame].data
+            handler(wsconn, data_received)
+
+    data_to_send = protocol.data_to_send()
+    if len(data_to_send) > 0:
+        bytes_written = wsconn.write(data_to_send)
+        logger.debug("Bytes written: ", bytes_written)
+
+
 struct Server:
     """
     A Mojo-based web server that accept incoming requests and delivers HTTP services.
     """
+
     # TODO: add an error_handler to the constructor
 
     var host: String
@@ -75,7 +185,13 @@ struct Server:
 
     var ln: TCPListener
 
-    fn __init__(out self, host: String, port: Int, handler: ConnHandler, max_request_body_size: Int = DEFAULT_MAX_REQUEST_BODY_SIZE) raises:
+    fn __init__(
+        out self,
+        host: String,
+        port: Int,
+        handler: ConnHandler,
+        max_request_body_size: Int = DEFAULT_MAX_REQUEST_BODY_SIZE,
+    ) raises:
         """
         Initialize a new server.
 
@@ -149,62 +265,20 @@ struct Server:
         """
         while True:
             var conn = ln.accept()
-            self.serve_connection(conn)
-
-    fn serve_connection(mut self, mut conn: TCPConnection) raises -> None:
-        """Serve a single connection.
-
-        Args:
-            conn: A connection object that represents a client connection.
-
-        Raises:
-            If there is an error while serving the connection.
-        """
-        protocol = ServerProtocol()
-        remote_addr = conn.socket.remote_address()
-        logger.debug(
-            "Connection accepted! IP:", remote_addr.ip, "Port:", remote_addr.port
-        )
-        wsconn = WSConnection(conn, protocol)
-        while True:
-            var b = Bytes(capacity=DEFAULT_BUFFER_SIZE)
-            try:
-                _ = wsconn.read(b)
-            except e:
-                conn.teardown()
-                logger.error(e)
-                return
-            logger.debug("Bytes received:", len(b))
-
-            if protocol.get_parser_exc():
-                logger.error(String(protocol.get_parser_exc().value()))
-                conn.teardown()
-                return
-
-            # If the server is set to not support keep-alive connections, or the client requests a connection close, we mark the connection to be closed.
-            if protocol.get_state() == CONNECTING:
-                var request: HTTPRequest = protocol.events_received()[0][HTTPRequest]
-
-                logger.debug("Starting handshake")
-
-                response = protocol.accept(request)
-                if protocol.get_handshake_exc():
-                    logger.error(String(protocol.get_handshake_exc().value()))
-                    conn.teardown()
-                    return
-
-                logger.debug("Sending handshake response")
-                protocol.send_response(response)
-                data_to_send = protocol.data_to_send()
-        
-                bytes_written = conn.write(data_to_send)
-                logger.debug("Bytes written:", bytes_written)
-            else:
-                self.handle_read(protocol, wsconn, b)
-
+            var socket = conn.socket
+            remote_addr = conn.socket.remote_address()
             logger.debug(
-                remote_addr.ip,
-                String(remote_addr.port),
+                "Connection accepted! IP:", remote_addr.ip, "Port:", remote_addr.port
+            )
+            var thread_context = ThreadContext(conn, self.handler)
+            var context_ptr = UnsafePointer[
+                ThreadContext, mut=False, origin=StaticConstantOrigin
+            ].address_of(thread_context)
+            _ = start_thread(handle_thread, context_ptr)
+
+            # Black magic to avoid the thread_context being destroyed before the thread starts
+            __mlir_op.`lit.ownership.mark_destroyed`(
+                __get_mvalue_as_litref(thread_context)
             )
 
     fn address(mut self) -> String:
@@ -213,39 +287,11 @@ struct Server:
         """
         return String(self.host, ":", self.port)
 
-    fn handle_read(self, mut protocol: ServerProtocol, mut wsconn: WSConnection, data: Bytes) raises -> None:
-        """
-        Handle incoming data.
-
-        Args:
-            protocol: ServerProtocol - The protocol object that handles the connection.
-            wsconn: WSConnection - The connection object.
-            data: Bytes - The data received from the client.
-        """
-        bytes_recv = len(data)
-        if bytes_recv == 0:
-            logger.debug("Received zero bytes. Closing connection.")
-            receive_eof(protocol)
-            return
-
-        events_received = protocol.events_received()
-        for event_ref in events_received:
-            event = event_ref[]
-            if event.isa[Frame]() and event[Frame].is_data():
-                data_received = event[Frame].data
-                self.handler(wsconn, data_received)
-
-        data_to_send = protocol.data_to_send()
-        if len(data_to_send) > 0:
-            bytes_written = wsconn.write(data_to_send)
-            logger.debug("Bytes written: ", bytes_written)
-    
     fn shutdown(mut self) raises -> None:
         """
         Shutdown the server.
         """
         self.ln.close()
-
 
 
 fn serve(handler: ConnHandler, host: String, port: Int) raises -> Server:
@@ -269,4 +315,3 @@ fn serve(handler: ConnHandler, host: String, port: Int) raises -> Server:
     .
     """
     return Server(host, port, handler)
-
