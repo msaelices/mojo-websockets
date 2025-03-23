@@ -117,20 +117,29 @@ fn submit_read_with_buffer_select(
     sq = ring.sq()
     if sq:
         read_conn = ConnInfo(fd=fd, type=READ, protocol_id=protocol_id)
-
         logger.debug("Setting up read with buffer select for fd:", fd)
 
         # Setup a Read operation with proper buffer select flags
         var client_fd = Fd(unsafe_fd=fd)
         var buf_ring_ptr = buf_ring[]
+
+        # Get a buffer pointer from the buffer ring
         var buffer_ptr = buf_ring_ptr.unsafe_buf(
             index=0, len=UInt32(MAX_MESSAGE_LEN)
         ).buf_ptr
+
+        # Get a fresh SQE and set the buffer select flag
         var sqe = sq.__next__()
         sqe.flags |= IoUringSqeFlags.BUFFER_SELECT
-        _ = Read(sqe, client_fd, buffer_ptr, UInt(MAX_MESSAGE_LEN)).user_data(
-            read_conn.to_int()
-        )
+
+        # Create a read operation with a new SQE
+        # The buffer group ID is implicitly set via the buffer pointer we're providing
+        _ = Read(
+            sq.__next__(),  # Use a new SQE, not the one we modified
+            client_fd,
+            buffer_ptr,
+            UInt(MAX_MESSAGE_LEN),
+        ).user_data(read_conn.to_int())
 
 
 fn submit_write_with_buffer(
@@ -188,28 +197,42 @@ struct WSConnection:
         send_text(protocol_ptr[], str_to_bytes(message))
         var data_to_send = protocol_ptr[].data_to_send()
 
-        # Allocate a temporary buffer for the data
-        var temp_buffer = InlineArray[Int8, MAX_MESSAGE_LEN](fill=0)
+        if len(data_to_send) == 0:
+            logger.debug("No data to send")
+            return
 
-        # Copy data to the buffer
+        # Allocate a heap buffer that will stay alive until the operation completes
+        var heap_buffer = UnsafePointer[Int8].alloc(MAX_MESSAGE_LEN)
+
+        # Copy data to the heap buffer
         for i in range(len(data_to_send)):
             if i < MAX_MESSAGE_LEN:
-                temp_buffer[i] = Int8(data_to_send[i])
+                heap_buffer[i] = Int8(data_to_send[i])
 
-        # Get a void pointer to send
-        var buffer_ptr = UnsafePointer[c_void](temp_buffer.unsafe_ptr())
+        var sq = self.ring[].sq()
+        if sq:
+            var write_conn = ConnInfo(
+                fd=self.fd.unsafe_fd(), type=WRITE, protocol_id=self.protocol_id
+            )
 
-        # Submit write operation
-        submit_write_with_buffer(
-            self.fd.unsafe_fd(),
-            buffer_ptr,
-            len(data_to_send),
-            self.ring[],
-            self.protocol_id,
-        )
+            # Submit the write with the heap buffer
+            _ = Write(
+                sq.__next__(),
+                self.fd,
+                UnsafePointer[c_void](heap_buffer),
+                UInt(len(data_to_send)),
+            ).user_data(write_conn.to_int())
 
-        # Submit operations
-        _ = self.ring[].submit_and_wait(wait_nr=1)
+            # Submit and wait for the operation to complete
+            var submitted = self.ring[].submit_and_wait(wait_nr=1)
+            logger.debug("send_text submitted operations:", submitted)
+
+            # Process any completions to ensure our write is done
+            for cqe in self.ring[].cq(wait_nr=0):
+                logger.debug("Processed completion in send_text")
+
+        # Now it's safe to free the buffer
+        heap_buffer.free()
 
     fn send_binary(self, message: Bytes) raises:
         # Find the protocol
@@ -221,28 +244,42 @@ struct WSConnection:
         send_binary(protocol_ptr[], message)
         var data_to_send = protocol_ptr[].data_to_send()
 
-        # Allocate a temporary buffer for the data
-        var temp_buffer = InlineArray[Int8, MAX_MESSAGE_LEN]()
+        if len(data_to_send) == 0:
+            logger.debug("No binary data to send")
+            return
 
-        # Copy data to the buffer
+        # Allocate a heap buffer that will stay alive until the operation completes
+        var heap_buffer = UnsafePointer[Int8].alloc(MAX_MESSAGE_LEN)
+
+        # Copy data to the heap buffer
         for i in range(len(data_to_send)):
             if i < MAX_MESSAGE_LEN:
-                temp_buffer[i] = Int8(data_to_send[i])
+                heap_buffer[i] = Int8(data_to_send[i])
 
-        # Get a void pointer to send
-        var buffer_ptr = UnsafePointer[c_void](temp_buffer.unsafe_ptr())
+        var sq = self.ring[].sq()
+        if sq:
+            var write_conn = ConnInfo(
+                fd=self.fd.unsafe_fd(), type=WRITE, protocol_id=self.protocol_id
+            )
 
-        # Submit write operation
-        submit_write_with_buffer(
-            self.fd.unsafe_fd(),
-            buffer_ptr,
-            len(data_to_send),
-            self.ring[],
-            self.protocol_id,
-        )
+            # Submit the write with the heap buffer
+            _ = Write(
+                sq.__next__(),
+                self.fd,
+                UnsafePointer[c_void](heap_buffer),
+                UInt(len(data_to_send)),
+            ).user_data(write_conn.to_int())
 
-        # Submit operations
-        _ = self.ring[].submit_and_wait(wait_nr=1)
+            # Submit and wait for the operation to complete
+            var submitted = self.ring[].submit_and_wait(wait_nr=1)
+            logger.debug("send_binary submitted operations:", submitted)
+
+            # Process any completions to ensure our write is done
+            for cqe in self.ring[].cq(wait_nr=0):
+                logger.debug("Processed completion in send_binary")
+
+        # Now it's safe to free the buffer
+        heap_buffer.free()
 
     fn close(self) raises -> None:
         # Just close the file descriptor
@@ -558,29 +595,53 @@ struct Server:
                                     protocol_ptr[].send_response(response)
                                     var data_to_send = protocol_ptr[].data_to_send()
 
-                                    # Allocate a temporary buffer for the handshake data
-                                    var temp_buffer = InlineArray[
-                                        Int8, MAX_MESSAGE_LEN
-                                    ](fill=0)
+                                    logger.debug(
+                                        "Have handshake data to send:",
+                                        len(data_to_send),
+                                    )
 
-                                    # Copy data to the buffer
+                                    # Allocate a heap buffer that will stay alive until the operation completes
+                                    var heap_buffer = UnsafePointer[Int8].alloc(
+                                        MAX_MESSAGE_LEN
+                                    )
+
+                                    # Copy data to the heap buffer
                                     for i in range(len(data_to_send)):
                                         if i < MAX_MESSAGE_LEN:
-                                            temp_buffer[i] = Int8(data_to_send[i])
+                                            heap_buffer[i] = Int8(data_to_send[i])
 
-                                    # Get a void pointer to send
-                                    var buffer_ptr = UnsafePointer[c_void](
-                                        temp_buffer.unsafe_ptr()
-                                    )
+                                    var sq = self.ring.sq()
+                                    if sq:
+                                        var write_conn = ConnInfo(
+                                            fd=conn.fd,
+                                            type=WRITE,
+                                            protocol_id=conn.protocol_id,
+                                        )
 
-                                    # Use submit_write_with_buffer for the handshake response
-                                    submit_write_with_buffer(
-                                        conn.fd,
-                                        buffer_ptr,
-                                        len(data_to_send),
-                                        self.ring,
-                                        conn.protocol_id,
-                                    )
+                                        # Submit the write with the heap buffer
+                                        _ = Write(
+                                            sq.__next__(),
+                                            Fd(unsafe_fd=conn.fd),
+                                            UnsafePointer[c_void](heap_buffer),
+                                            UInt(len(data_to_send)),
+                                        ).user_data(write_conn.to_int())
+
+                                        # Submit and wait for the operation to complete
+                                        var submitted = self.ring.submit_and_wait(
+                                            wait_nr=1
+                                        )
+                                        logger.debug(
+                                            "Handshake submitted operations:", submitted
+                                        )
+
+                                        # Process any completions to ensure our write is done
+                                        for cqe in self.ring.cq(wait_nr=0):
+                                            logger.debug(
+                                                "Processed completion in handshake"
+                                            )
+
+                                    # Now it's safe to free the buffer
+                                    heap_buffer.free()
                             else:
                                 # Handle WebSocket frames
                                 logger.debug("Handling WebSocket frame")
@@ -635,21 +696,40 @@ struct Server:
 
         var data_to_send = protocol_ptr[].data_to_send()
         if len(data_to_send) > 0:
-            # Allocate a temporary buffer for the data
-            var temp_buffer = InlineArray[Int8, MAX_MESSAGE_LEN](fill=0)
+            logger.debug("WebSocket frame handler has data to send:", len(data_to_send))
 
-            # Copy data to the buffer
+            # Allocate a heap buffer that will stay alive until the operation completes
+            var heap_buffer = UnsafePointer[Int8].alloc(MAX_MESSAGE_LEN)
+
+            # Copy data to the heap buffer
             for i in range(len(data_to_send)):
                 if i < MAX_MESSAGE_LEN:
-                    temp_buffer[i] = Int8(data_to_send[i])
+                    heap_buffer[i] = Int8(data_to_send[i])
 
-            # Get a void pointer to send
-            var buffer_ptr = UnsafePointer[c_void](temp_buffer.unsafe_ptr())
+            var sq = self.ring.sq()
+            if sq:
+                var write_conn = ConnInfo(
+                    fd=conn.fd, type=WRITE, protocol_id=conn.protocol_id
+                )
 
-            # Submit write operation
-            submit_write_with_buffer(
-                conn.fd, buffer_ptr, len(data_to_send), self.ring, conn.protocol_id
-            )
+                # Submit the write with the heap buffer
+                _ = Write(
+                    sq.__next__(),
+                    Fd(unsafe_fd=conn.fd),
+                    UnsafePointer[c_void](heap_buffer),
+                    UInt(len(data_to_send)),
+                ).user_data(write_conn.to_int())
+
+                # Submit and wait for the operation to complete
+                var submitted = self.ring.submit_and_wait(wait_nr=1)
+                logger.debug("handle_websocket_frame submitted operations:", submitted)
+
+                # Process any completions to ensure our write is done
+                for cqe in self.ring.cq(wait_nr=0):
+                    logger.debug("Processed completion in handle_websocket_frame")
+
+            # Now it's safe to free the buffer
+            heap_buffer.free()
 
     fn address(self) -> String:
         """
