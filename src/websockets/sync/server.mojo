@@ -123,23 +123,27 @@ fn submit_read_with_buffer_select(
         var client_fd = Fd(unsafe_fd=fd)
         var buf_ring_ptr = buf_ring[]
 
-        # Get a buffer pointer from the buffer ring
+        # We only need the buffer pointer for the size, kernel will select which buffer to use
         var buffer_ptr = buf_ring_ptr.unsafe_buf(
             index=0, len=UInt32(MAX_MESSAGE_LEN)
         ).buf_ptr
 
-        # Get a fresh SQE and set the buffer select flag
+        # Get an SQE and set the BUFFER_SELECT flag (we'll use a different SQE for Read)
         var sqe = sq.__next__()
         sqe.flags |= IoUringSqeFlags.BUFFER_SELECT
 
-        # Create a read operation with a new SQE
-        # The buffer group ID is implicitly set via the buffer pointer we're providing
+        # Create read operation with a new SQE, just like in the working echoserver example
+        # This is a key difference - we set the flag on one SQE but use a fresh one for the operation
         _ = Read(
-            sq.__next__(),  # Use a new SQE, not the one we modified
+            sq.__next__(),  # Use a FRESH SQE here, not the one we set flags on
             client_fd,
             buffer_ptr,
             UInt(MAX_MESSAGE_LEN),
         ).user_data(read_conn.to_int())
+
+        # Submit operation immediately to ensure it's queued
+        _ = ring.submit_and_wait(wait_nr=0)
+        logger.debug("Submitted read with buffer select for fd:", fd)
 
 
 fn submit_write_with_buffer(
@@ -157,9 +161,14 @@ fn submit_write_with_buffer(
         write_conn = ConnInfo(fd=fd, type=WRITE, protocol_id=protocol_id)
         logger.debug("Setting up write with fd:", write_conn.fd)
 
+        # Submit write with user-provided buffer
         _ = Write(
             sq.__next__(), Fd(unsafe_fd=write_conn.fd), buf_ptr, UInt(bytes_count)
         ).user_data(write_conn.to_int())
+
+        # Submit operation immediately
+        _ = ring.submit_and_wait(wait_nr=0)
+        logger.debug("Submitted write for fd:", fd, "bytes:", bytes_count)
 
 
 struct WSConnection:
@@ -209,27 +218,22 @@ struct WSConnection:
             if i < MAX_MESSAGE_LEN:
                 heap_buffer[i] = Int8(data_to_send[i])
 
-        var sq = self.ring[].sq()
-        if sq:
-            var write_conn = ConnInfo(
-                fd=self.fd.unsafe_fd(), type=WRITE, protocol_id=self.protocol_id
-            )
+        # Use direct write_with_buffer helper that handles submission
+        submit_write_with_buffer(
+            self.fd.unsafe_fd(),
+            UnsafePointer[c_void](heap_buffer),
+            len(data_to_send),
+            self.ring[],
+            self.protocol_id,
+        )
 
-            # Submit the write with the heap buffer
-            _ = Write(
-                sq.__next__(),
-                self.fd,
-                UnsafePointer[c_void](heap_buffer),
-                UInt(len(data_to_send)),
-            ).user_data(write_conn.to_int())
+        # Submit and wait for the operation to complete
+        var submitted = self.ring[].submit_and_wait(wait_nr=1)
+        logger.debug("send_text submitted operations:", submitted)
 
-            # Submit and wait for the operation to complete
-            var submitted = self.ring[].submit_and_wait(wait_nr=1)
-            logger.debug("send_text submitted operations:", submitted)
-
-            # Process any completions to ensure our write is done
-            for cqe in self.ring[].cq(wait_nr=0):
-                logger.debug("Processed completion in send_text")
+        # Process any completions to ensure our write is done
+        for cqe in self.ring[].cq(wait_nr=0):
+            logger.debug("Processed completion in send_text")
 
         # Now it's safe to free the buffer
         heap_buffer.free()
@@ -256,27 +260,22 @@ struct WSConnection:
             if i < MAX_MESSAGE_LEN:
                 heap_buffer[i] = Int8(data_to_send[i])
 
-        var sq = self.ring[].sq()
-        if sq:
-            var write_conn = ConnInfo(
-                fd=self.fd.unsafe_fd(), type=WRITE, protocol_id=self.protocol_id
-            )
+        # Use direct write_with_buffer helper that handles submission
+        submit_write_with_buffer(
+            self.fd.unsafe_fd(),
+            UnsafePointer[c_void](heap_buffer),
+            len(data_to_send),
+            self.ring[],
+            self.protocol_id,
+        )
 
-            # Submit the write with the heap buffer
-            _ = Write(
-                sq.__next__(),
-                self.fd,
-                UnsafePointer[c_void](heap_buffer),
-                UInt(len(data_to_send)),
-            ).user_data(write_conn.to_int())
+        # Submit and wait for the operation to complete
+        var submitted = self.ring[].submit_and_wait(wait_nr=1)
+        logger.debug("send_binary submitted operations:", submitted)
 
-            # Submit and wait for the operation to complete
-            var submitted = self.ring[].submit_and_wait(wait_nr=1)
-            logger.debug("send_binary submitted operations:", submitted)
-
-            # Process any completions to ensure our write is done
-            for cqe in self.ring[].cq(wait_nr=0):
-                logger.debug("Processed completion in send_binary")
+        # Process any completions to ensure our write is done
+        for cqe in self.ring[].cq(wait_nr=0):
+            logger.debug("Processed completion in send_binary")
 
         # Now it's safe to free the buffer
         heap_buffer.free()
@@ -426,25 +425,31 @@ struct Server:
         # Main event loop
         while self.running:
             # Submit and wait for at least 1 completion
+            # This call is critical for the event loop to work correctly
             var submitted = self.ring.submit_and_wait(wait_nr=1)
 
-            logger.debug("Submitting io_uring operations:", submitted)
+            logger.debug("Submitted io_uring operations:", submitted)
 
             if submitted < 0:
-                logger.error("Error submitting io_uring operations")
+                logger.error("Error submitting io_uring operations:", submitted)
                 break
 
-            # Process completions
+            # Process all available completions - important to process ALL events
             for cqe in self.ring.cq(wait_nr=0):
                 var res = cqe.res
                 var user_data = cqe.user_data
-
-                if res < 0:
-                    logger.error("Error in completion:", res)
-                    continue
+                var flags = cqe.flags  # Important for buffer handling
 
                 var conn = ConnInfo.from_int(user_data)
-                logger.debug("Completion result:", res, "conn:", conn)
+
+                # Use more detailed error reporting like in the working echoserver
+                if res < 0:
+                    logger.error(
+                        "Error:", res, "on operation type:", conn.type, "fd:", conn.fd
+                    )
+                    continue
+
+                logger.debug("Completion result:", res, "for conn:", conn)
 
                 # Handle accept completion
                 if conn.type == ACCEPT:
@@ -509,6 +514,7 @@ struct Server:
                         var flags = cqe.flags
 
                         # Extract buffer index from completion flags
+                        # The kernel provides buffer index and other info in the flags field
                         var buffer_idx = BufRing.flags_to_index(flags)
                         logger.debug(
                             "Read completion (bytes:",
@@ -520,6 +526,15 @@ struct Server:
 
                         # Get a buffer handle to safely use it
                         var buf_ring_ptr = self.buf_ring[]
+
+                        # Need to make sure buffer_idx is valid - it should be < BUFFERS_COUNT
+                        if buffer_idx >= BUFFERS_COUNT:
+                            logger.error("Invalid buffer index:", buffer_idx)
+                            buffer_idx = 0
+
+                        # Get a buffer handle with the correct index and size
+                        # Note: by using unsafe_buf, we ensure the buffer is properly tracked by the kernel
+                        # so it can be properly released/recycled after use
                         var buffer = buf_ring_ptr.unsafe_buf(
                             index=buffer_idx, len=UInt32(bytes_read)
                         )
@@ -610,38 +625,44 @@ struct Server:
                                         if i < MAX_MESSAGE_LEN:
                                             heap_buffer[i] = Int8(data_to_send[i])
 
-                                    var sq = self.ring.sq()
-                                    if sq:
-                                        var write_conn = ConnInfo(
-                                            fd=conn.fd,
-                                            type=WRITE,
-                                            protocol_id=conn.protocol_id,
-                                        )
+                                    # Use direct write_with_buffer helper that handles submission
+                                    submit_write_with_buffer(
+                                        conn.fd,
+                                        UnsafePointer[c_void](heap_buffer),
+                                        len(data_to_send),
+                                        self.ring,
+                                        conn.protocol_id,
+                                    )
 
-                                        # Submit the write with the heap buffer
-                                        _ = Write(
-                                            sq.__next__(),
-                                            Fd(unsafe_fd=conn.fd),
-                                            UnsafePointer[c_void](heap_buffer),
-                                            UInt(len(data_to_send)),
-                                        ).user_data(write_conn.to_int())
+                                    # Submit and wait for the operation to complete
+                                    var submitted = self.ring.submit_and_wait(wait_nr=1)
+                                    logger.debug(
+                                        "Handshake submitted operations:", submitted
+                                    )
 
-                                        # Submit and wait for the operation to complete
-                                        var submitted = self.ring.submit_and_wait(
-                                            wait_nr=1
-                                        )
+                                    # Process any completions to ensure our write is done
+                                    for cqe in self.ring.cq(wait_nr=0):
                                         logger.debug(
-                                            "Handshake submitted operations:", submitted
+                                            "Processed completion in handshake"
                                         )
-
-                                        # Process any completions to ensure our write is done
-                                        for cqe in self.ring.cq(wait_nr=0):
-                                            logger.debug(
-                                                "Processed completion in handshake"
-                                            )
 
                                     # Now it's safe to free the buffer
                                     heap_buffer.free()
+
+                                    # IMPORTANT: Post a new read for the connection after handshake
+                                    logger.info(
+                                        "Setting up read after handshake for fd:",
+                                        conn.fd,
+                                    )
+                                    submit_read_with_buffer_select(
+                                        conn.fd,
+                                        self.ring,
+                                        self.buf_ring,
+                                        conn.protocol_id,
+                                    )
+
+                                    # Make sure the submission gets through
+                                    _ = self.ring.submit_and_wait(wait_nr=0)
                             else:
                                 # Handle WebSocket frames
                                 logger.debug("Handling WebSocket frame")
@@ -658,9 +679,16 @@ struct Server:
                     )
 
                     # Post a new read for the connection using BUFFER_SELECT
+                    # This is critical for the echo server's request-response pattern
+                    logger.info(
+                        "Setting up next read after write completion for fd:", conn.fd
+                    )
                     submit_read_with_buffer_select(
                         conn.fd, self.ring, self.buf_ring, conn.protocol_id
                     )
+
+                    # Make sure our submissions are getting through
+                    _ = self.ring.submit_and_wait(wait_nr=0)
 
     fn handle_websocket_frame(mut self, conn: ConnInfo) raises -> None:
         """
@@ -706,30 +734,36 @@ struct Server:
                 if i < MAX_MESSAGE_LEN:
                     heap_buffer[i] = Int8(data_to_send[i])
 
-            var sq = self.ring.sq()
-            if sq:
-                var write_conn = ConnInfo(
-                    fd=conn.fd, type=WRITE, protocol_id=conn.protocol_id
-                )
+            # Use direct write_with_buffer helper that handles submission
+            submit_write_with_buffer(
+                conn.fd,
+                UnsafePointer[c_void](heap_buffer),
+                len(data_to_send),
+                self.ring,
+                conn.protocol_id,
+            )
 
-                # Submit the write with the heap buffer
-                _ = Write(
-                    sq.__next__(),
-                    Fd(unsafe_fd=conn.fd),
-                    UnsafePointer[c_void](heap_buffer),
-                    UInt(len(data_to_send)),
-                ).user_data(write_conn.to_int())
+            # Submit and wait for the operation to complete
+            var submitted = self.ring.submit_and_wait(wait_nr=1)
+            logger.debug("handle_websocket_frame submitted operations:", submitted)
 
-                # Submit and wait for the operation to complete
-                var submitted = self.ring.submit_and_wait(wait_nr=1)
-                logger.debug("handle_websocket_frame submitted operations:", submitted)
-
-                # Process any completions to ensure our write is done
-                for cqe in self.ring.cq(wait_nr=0):
-                    logger.debug("Processed completion in handle_websocket_frame")
+            # Process any completions to ensure our write is done
+            for cqe in self.ring.cq(wait_nr=0):
+                logger.debug("Processed completion in handle_websocket_frame")
 
             # Now it's safe to free the buffer
             heap_buffer.free()
+
+            # IMPORTANT: Post a new read for this connection - this is critical for the next message
+            logger.info(
+                "Setting up follow-up read in WebSocket frame handler for fd:", conn.fd
+            )
+            submit_read_with_buffer_select(
+                conn.fd, self.ring, self.buf_ring, conn.protocol_id
+            )
+
+            # Make sure the read submission gets through
+            _ = self.ring.submit_and_wait(wait_nr=0)
 
     fn address(self) -> String:
         """
