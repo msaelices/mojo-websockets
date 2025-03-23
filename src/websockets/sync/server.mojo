@@ -25,10 +25,12 @@ from websockets.protocol.client import ClientProtocol
 from websockets.utils.bytes import str_to_bytes
 
 from mojix.fd import Fd
-from mojix.io_uring import SQE64
+from mojix.ctypes import c_void
+from mojix.io_uring import SQE64, IoUringOp, IoUringSqeFlags
 from mojix.net.socket import socket, bind, listen
 from mojix.net.types import AddrFamily, SocketType, SocketAddrV4
 from io_uring import IoUring
+from io_uring.buf import BufRing
 from io_uring.op import Accept, Read, Write
 
 alias ACCEPT = 0
@@ -50,14 +52,15 @@ alias ConnHandler = fn (conn: WSConnection, data: Bytes) raises -> None
 
 
 @value
+@register_passable("trivial")
 struct ConnInfo(Writable):
     var fd: Int32
     var type: UInt16
-    var bid: UInt32  # Buffer ID
+    var bid: UInt16  # Buffer ID (now UInt16 to match the echoserver example)
     var protocol_id: UInt16  # ID to track which protocol instance this is associated with
 
     fn __init__(
-        out self, fd: Int32, type: UInt16, bid: UInt32 = 0, protocol_id: UInt16 = 0
+        out self, fd: Int32, type: UInt16, bid: UInt16 = 0, protocol_id: UInt16 = 0
     ):
         self.fd = fd
         self.type = type
@@ -80,7 +83,7 @@ struct ConnInfo(Writable):
             fd=Int32((value >> 32) & 0xFFFFFFFF),
             type=UInt16((value >> 24) & 0xFF),
             protocol_id=UInt16((value >> 16) & 0xFF),
-            bid=UInt32(value & 0xFFFF),
+            bid=UInt16(value & 0xFFFF),
         )
 
     fn write_to[W: Writer](self, mut writer: W) -> None:
@@ -103,39 +106,51 @@ struct ConnInfo(Writable):
         )
 
 
-struct BufferMemory:
-    """Manages the buffer memory for the server."""
+# Buffer ring helper functions
+fn submit_read_with_buffer_select(
+    fd: Int32, mut ring: IoUring, mut buf_ring: BufRing, protocol_id: UInt16 = 0
+) raises:
+    """Submit a read operation with BUFFER_SELECT flag to have the kernel select a buffer.
+    This is the proper way to use buffer rings - let the kernel pick a buffer from the
+    ring rather than selecting ourselves."""
 
-    var _data: InlineArray[Int8, MAX_MESSAGE_LEN * BUFFERS_COUNT]
-    var _buffer_avail: InlineArray[Bool, BUFFERS_COUNT]  # Track buffer availability
+    sq = ring.sq()
+    if sq:
+        read_conn = ConnInfo(fd=fd, type=READ, protocol_id=protocol_id)
 
-    fn __init__(out self):
-        """Initialize the buffer memory."""
-        logger.debug("Initializing BufferMemory with direct buffers")
-        self._data = InlineArray[Int8, MAX_MESSAGE_LEN * BUFFERS_COUNT](fill=0)
-        self._buffer_avail = InlineArray[Bool, BUFFERS_COUNT](
-            fill=True
-        )  # All buffers start as available
+        logger.debug("Setting up read with buffer select for fd:", fd)
 
-    fn get_buffer_pointer(self, idx: Int) -> UnsafePointer[Int8]:
-        """Get a pointer to a specific buffer."""
-        return self._data.unsafe_ptr() + (idx * MAX_MESSAGE_LEN)
+        # Setup a Read operation with proper buffer select flags
+        var client_fd = Fd(unsafe_fd=fd)
+        var buf_ring_ptr = buf_ring[]
+        var buffer_ptr = buf_ring_ptr.unsafe_buf(
+            index=0, len=UInt32(MAX_MESSAGE_LEN)
+        ).buf_ptr
+        var sqe = sq.__next__()
+        sqe.flags |= IoUringSqeFlags.BUFFER_SELECT
+        _ = Read(sqe, client_fd, buffer_ptr, UInt(MAX_MESSAGE_LEN)).user_data(
+            read_conn.to_int()
+        )
 
-    fn get_available_buffer(mut self) -> (Int, UnsafePointer[Int8]):
-        """Get an available buffer."""
-        # Find an available buffer
-        for i in range(BUFFERS_COUNT):
-            if self._buffer_avail[i]:
-                self._buffer_avail[i] = False  # Mark as in use
-                return (i, self.get_buffer_pointer(i))
 
-        # If all buffers are in use, just return the first one
-        logger.error("All buffers in use, recycling buffer 0")
-        return (0, self.get_buffer_pointer(0))
+fn submit_write_with_buffer(
+    fd: Int32,
+    buf_ptr: UnsafePointer[c_void],
+    bytes_count: Int,
+    mut ring: IoUring,
+    protocol_id: UInt16 = 0,
+) raises:
+    """Handle read completion by submitting a write with the provided buffer pointer.
+    The buffer will be recycled when the Buf object goes out of scope in the caller."""
 
-    fn mark_buffer_available(mut self, idx: Int):
-        """Mark a buffer as available."""
-        self._buffer_avail[idx] = True
+    sq = ring.sq()
+    if sq:
+        write_conn = ConnInfo(fd=fd, type=WRITE, protocol_id=protocol_id)
+        logger.debug("Setting up write with fd:", write_conn.fd)
+
+        _ = Write(
+            sq.__next__(), Fd(unsafe_fd=write_conn.fd), buf_ptr, UInt(bytes_count)
+        ).user_data(write_conn.to_int())
 
 
 struct WSConnection:
@@ -145,22 +160,22 @@ struct WSConnection:
 
     var fd: Fd
     var protocol_id: UInt16
-    var buffer_memory: UnsafePointer[BufferMemory]
     var ring: UnsafePointer[IoUring]
+    var buf_ring: UnsafePointer[BufRing]
     var server: UnsafePointer[Server]
 
     fn __init__(
         out self,
         fd: Int,
         protocol_id: UInt16,
-        owned buffer_memory: UnsafePointer[BufferMemory],
         owned ring: UnsafePointer[IoUring],
+        owned buf_ring: UnsafePointer[BufRing],
         owned server: UnsafePointer[Server],
     ):
         self.fd = Fd(unsafe_fd=fd)
         self.protocol_id = protocol_id
-        self.buffer_memory = buffer_memory
         self.ring = ring
+        self.buf_ring = buf_ring
         self.server = server
 
     fn send_text(self, message: String) raises:
@@ -173,29 +188,28 @@ struct WSConnection:
         send_text(protocol_ptr[], str_to_bytes(message))
         var data_to_send = protocol_ptr[].data_to_send()
 
-        # Use io_uring to write the data
-        var sq = self.ring[].sq()
-        if sq:
-            # We need to copy the data because we can't guarantee when io_uring will use it
-            var buffer_idx = Int(self.buffer_memory[].get_available_buffer()[0])
-            var buffer_ptr = self.buffer_memory[].get_buffer_pointer(buffer_idx)
+        # Allocate a temporary buffer for the data
+        var temp_buffer = InlineArray[Int8, MAX_MESSAGE_LEN](fill=0)
 
-            # Copy data to the buffer
-            for i in range(len(data_to_send)):
-                buffer_ptr[i] = Int8(data_to_send[i])
+        # Copy data to the buffer
+        for i in range(len(data_to_send)):
+            if i < MAX_MESSAGE_LEN:
+                temp_buffer[i] = Int8(data_to_send[i])
 
-            var write_conn = ConnInfo(
-                fd=self.fd.unsafe_fd(),
-                type=WRITE,
-                bid=UInt32(buffer_idx),
-                protocol_id=self.protocol_id,
-            )
-            _ = Write[type=SQE64, origin = __origin_of(sq)](
-                sq.__next__(), self.fd, buffer_ptr, UInt(len(data_to_send))
-            ).user_data(write_conn.to_int())
+        # Get a void pointer to send
+        var buffer_ptr = UnsafePointer[c_void](temp_buffer.unsafe_ptr())
 
-            # Submit operations
-            _ = self.ring[].submit_and_wait(wait_nr=1)
+        # Submit write operation
+        submit_write_with_buffer(
+            self.fd.unsafe_fd(),
+            buffer_ptr,
+            len(data_to_send),
+            self.ring[],
+            self.protocol_id,
+        )
+
+        # Submit operations
+        _ = self.ring[].submit_and_wait(wait_nr=1)
 
     fn send_binary(self, message: Bytes) raises:
         # Find the protocol
@@ -207,29 +221,28 @@ struct WSConnection:
         send_binary(protocol_ptr[], message)
         var data_to_send = protocol_ptr[].data_to_send()
 
-        # Use io_uring to write the data
-        var sq = self.ring[].sq()
-        if sq:
-            # We need to copy the data because we can't guarantee when io_uring will use it
-            var buffer_idx = Int(self.buffer_memory[].get_available_buffer()[0])
-            var buffer_ptr = self.buffer_memory[].get_buffer_pointer(buffer_idx)
+        # Allocate a temporary buffer for the data
+        var temp_buffer = InlineArray[Int8, MAX_MESSAGE_LEN]()
 
-            # Copy data to the buffer
-            for i in range(len(data_to_send)):
-                buffer_ptr[i] = Int8(data_to_send[i])
+        # Copy data to the buffer
+        for i in range(len(data_to_send)):
+            if i < MAX_MESSAGE_LEN:
+                temp_buffer[i] = Int8(data_to_send[i])
 
-            var write_conn = ConnInfo(
-                fd=self.fd.unsafe_fd(),
-                type=WRITE,
-                bid=UInt32(buffer_idx),
-                protocol_id=self.protocol_id,
-            )
-            _ = Write[type=SQE64, origin = __origin_of(sq)](
-                sq.__next__(), self.fd, buffer_ptr, UInt(len(data_to_send))
-            ).user_data(write_conn.to_int())
+        # Get a void pointer to send
+        var buffer_ptr = UnsafePointer[c_void](temp_buffer.unsafe_ptr())
 
-            # Submit operations
-            _ = self.ring[].submit_and_wait(wait_nr=1)
+        # Submit write operation
+        submit_write_with_buffer(
+            self.fd.unsafe_fd(),
+            buffer_ptr,
+            len(data_to_send),
+            self.ring[],
+            self.protocol_id,
+        )
+
+        # Submit operations
+        _ = self.ring[].submit_and_wait(wait_nr=1)
 
     fn close(self) raises -> None:
         # Just close the file descriptor
@@ -249,7 +262,7 @@ struct Server:
 
     # io_uring related fields
     var ring: IoUring
-    var buffer_memory: BufferMemory
+    var buf_ring: BufRing
     var protocols: List[ServerProtocol]
     var active_connections: Int
     var running: Bool
@@ -279,10 +292,21 @@ struct Server:
         self.max_request_body_size = max_request_body_size
 
         # Initialize io_uring instance
-        self.ring = IoUring[](sq_entries=SQ_ENTRIES)
+        self.ring = IoUring(sq_entries=SQ_ENTRIES)
 
-        # Initialize buffer memory
-        self.buffer_memory = BufferMemory()
+        # Create buffer ring for efficient memory management
+        logger.info(
+            "Initializing buffer ring with",
+            BUFFERS_COUNT,
+            "entries of size",
+            MAX_MESSAGE_LEN,
+        )
+        # Use buffer group ID 0 as that's what kernel expects by default
+        self.buf_ring = self.ring.create_buf_ring(
+            bgid=0,  # Buffer group ID (must be consistent with Recv operation)
+            entries=BUFFERS_COUNT,
+            entry_size=MAX_MESSAGE_LEN,
+        )
 
         # Initialize protocol list
         self.protocols = List[ServerProtocol]()
@@ -309,6 +333,10 @@ struct Server:
         Context manager exit point, called by the serve() function which closes the server.
         """
         self.shutdown()
+
+        # Clean up buf_ring if it was created
+        # TODO: Fix this sentence which is not compiling
+        # self.ring.unsafe_delete_buf_ring(self.buf_ring^)
 
     # ===-------------------------------------------------------------------=== #
     # Methods
@@ -413,22 +441,10 @@ struct Server:
                         self.protocols.append(ServerProtocol())
                         self.protocols[protocol_id].set_active()
 
-                    # Add read for the new connection
-                    sq = self.ring.sq()
-                    if sq:
-                        # Get available buffer
-                        var result = self.buffer_memory.get_available_buffer()
-                        var buf_idx = result[0]
-                        var buf_ptr = result[1]
-                        read_conn = ConnInfo(
-                            fd=client_fd.unsafe_fd(),
-                            type=READ,
-                            bid=UInt32(buf_idx),
-                            protocol_id=protocol_id,
-                        )
-                        _ = Read[type=SQE64, origin = __origin_of(sq)](
-                            sq.__next__(), client_fd, buf_ptr, UInt(MAX_MESSAGE_LEN)
-                        ).user_data(read_conn.to_int())
+                    # Add read for the new connection using buffer select
+                    submit_read_with_buffer_select(
+                        client_fd.unsafe_fd(), self.ring, self.buf_ring, protocol_id
+                    )
 
                     # Re-add accept
                     sq = self.ring.sq()
@@ -450,16 +466,27 @@ struct Server:
                         # Mark the protocol as inactive
                         if conn.protocol_id < len(self.protocols):
                             self.protocols[conn.protocol_id].set_inactive()
-
-                        # Free the buffer
-                        self.buffer_memory.mark_buffer_available(Int(conn.bid))
                     else:
-                        # Get buffer info
-                        var buffer_idx = Int(conn.bid)
-                        var buffer_ptr = self.buffer_memory.get_buffer_pointer(
-                            buffer_idx
-                        )
+                        # Get buffer from completion flags
                         var bytes_read = Int(res)
+                        var flags = cqe.flags
+
+                        # Extract buffer index from completion flags
+                        var buffer_idx = BufRing.flags_to_index(flags)
+                        logger.debug(
+                            "Read completion (bytes:",
+                            bytes_read,
+                            ", buffer_idx:",
+                            buffer_idx,
+                            ")",
+                        )
+
+                        # Get a buffer handle to safely use it
+                        var buf_ring_ptr = self.buf_ring[]
+                        var buffer = buf_ring_ptr.unsafe_buf(
+                            index=buffer_idx, len=UInt32(bytes_read)
+                        )
+                        var buffer_ptr = UnsafePointer[Int8](buffer.buf_ptr)
 
                         # Create a Bytes object from the buffer
                         var data = Bytes(capacity=bytes_read)
@@ -494,8 +521,7 @@ struct Server:
                                 # Mark protocol as inactive
                                 protocol_ptr[].set_inactive()
 
-                                # Free the buffer
-                                self.buffer_memory.mark_buffer_available(buffer_idx)
+                                # Buffer is automatically recycled with buf_ring
                                 continue
 
                             # Handle connection state
@@ -525,92 +551,62 @@ struct Server:
                                         # Mark protocol as inactive
                                         protocol_ptr[].set_inactive()
 
-                                        # Free the buffer
-                                        self.buffer_memory.mark_buffer_available(
-                                            buffer_idx
-                                        )
+                                        # Buffer is automatically recycled with buf_ring
                                         continue
 
                                     logger.debug("Sending handshake response")
                                     protocol_ptr[].send_response(response)
                                     var data_to_send = protocol_ptr[].data_to_send()
 
-                                    # Use io_uring to write the handshake response
-                                    sq = self.ring.sq()
-                                    if sq:
-                                        # Copy data to a fresh buffer
-                                        var new_buffer_idx = Int(
-                                            self.buffer_memory.get_available_buffer()[0]
-                                        )
-                                        var new_buffer_ptr = self.buffer_memory.get_buffer_pointer(
-                                            new_buffer_idx
-                                        )
+                                    # Allocate a temporary buffer for the handshake data
+                                    var temp_buffer = InlineArray[
+                                        Int8, MAX_MESSAGE_LEN
+                                    ](fill=0)
 
-                                        # Copy the data
-                                        for i in range(len(data_to_send)):
-                                            new_buffer_ptr[i] = Int8(data_to_send[i])
+                                    # Copy data to the buffer
+                                    for i in range(len(data_to_send)):
+                                        if i < MAX_MESSAGE_LEN:
+                                            temp_buffer[i] = Int8(data_to_send[i])
 
-                                        # Send handshake response
-                                        write_conn = ConnInfo(
-                                            fd=conn.fd,
-                                            type=WRITE,
-                                            bid=UInt32(new_buffer_idx),
-                                            protocol_id=conn.protocol_id,
-                                        )
-                                        _ = Write[type=SQE64, origin = __origin_of(sq)](
-                                            sq.__next__(),
-                                            Fd(unsafe_fd=conn.fd),
-                                            new_buffer_ptr,
-                                            UInt(len(data_to_send)),
-                                        ).user_data(write_conn.to_int())
+                                    # Get a void pointer to send
+                                    var buffer_ptr = UnsafePointer[c_void](
+                                        temp_buffer.unsafe_ptr()
+                                    )
+
+                                    # Use submit_write_with_buffer for the handshake response
+                                    submit_write_with_buffer(
+                                        conn.fd,
+                                        buffer_ptr,
+                                        len(data_to_send),
+                                        self.ring,
+                                        conn.protocol_id,
+                                    )
                             else:
                                 # Handle WebSocket frames
                                 logger.debug("Handling WebSocket frame")
-                                self.handle_websocket_frame(conn, buffer_idx)
+                                self.handle_websocket_frame(conn)
 
                 # Handle write completion
                 elif conn.type == WRITE:
                     logger.debug(
-                        "Write completion (buffer_idx:",
-                        conn.bid,
-                        ", protocol_id",
+                        "Write completion (fd:",
+                        conn.fd,
+                        ", protocol_id:",
                         conn.protocol_id,
                         ")",
                     )
 
-                    # Free the buffer
-                    self.buffer_memory.mark_buffer_available(Int(conn.bid))
+                    # Post a new read for the connection using BUFFER_SELECT
+                    submit_read_with_buffer_select(
+                        conn.fd, self.ring, self.buf_ring, conn.protocol_id
+                    )
 
-                    # Post a new read for the connection
-                    sq = self.ring.sq()
-                    if sq:
-                        # Get available buffer
-                        var result = self.buffer_memory.get_available_buffer()
-                        var buf_idx = result[0]
-                        var buf_ptr = result[1]
-                        logger.debug(
-                            "Posting new read for connection (buffer_idx:", buf_idx, ")"
-                        )
-                        read_conn = ConnInfo(
-                            fd=conn.fd,
-                            type=READ,
-                            bid=UInt32(buf_idx),
-                            protocol_id=conn.protocol_id,
-                        )
-                        _ = Read[type=SQE64, origin = __origin_of(sq)](
-                            sq.__next__(),
-                            Fd(unsafe_fd=conn.fd),
-                            buf_ptr,
-                            UInt(MAX_MESSAGE_LEN),
-                        ).user_data(read_conn.to_int())
-
-    fn handle_websocket_frame(mut self, conn: ConnInfo, buffer_idx: Int) raises -> None:
+    fn handle_websocket_frame(mut self, conn: ConnInfo) raises -> None:
         """
         Handle incoming WebSocket frames.
 
         Args:
             conn: ConnInfo - Connection information.
-            buffer_idx: Int - Buffer index.
         """
         if conn.protocol_id >= len(self.protocols):
             return
@@ -620,12 +616,12 @@ struct Server:
         )
         var events_received = protocol_ptr[].events_received()
 
-        # Create a WSConnection for the handler - moved outside the loop
+        # Create a WSConnection for the handler
         var wsconn = WSConnection(
             Int(conn.fd),
             conn.protocol_id,
-            UnsafePointer.address_of(self.buffer_memory),
             UnsafePointer.address_of(self.ring),
+            UnsafePointer.address_of(self.buf_ring),
             UnsafePointer.address_of(self),
         )
 
@@ -639,31 +635,21 @@ struct Server:
 
         var data_to_send = protocol_ptr[].data_to_send()
         if len(data_to_send) > 0:
-            # Use io_uring to write response
-            var sq = self.ring.sq()
-            if sq:
-                # We need to copy the data
-                var new_buffer_idx = Int(self.buffer_memory.get_available_buffer()[0])
-                var new_buffer_ptr = self.buffer_memory.get_buffer_pointer(
-                    new_buffer_idx
-                )
+            # Allocate a temporary buffer for the data
+            var temp_buffer = InlineArray[Int8, MAX_MESSAGE_LEN](fill=0)
 
-                # Copy the data
-                for i in range(len(data_to_send)):
-                    new_buffer_ptr[i] = Int8(data_to_send[i])
+            # Copy data to the buffer
+            for i in range(len(data_to_send)):
+                if i < MAX_MESSAGE_LEN:
+                    temp_buffer[i] = Int8(data_to_send[i])
 
-                var write_conn = ConnInfo(
-                    fd=conn.fd,
-                    type=WRITE,
-                    bid=UInt32(new_buffer_idx),
-                    protocol_id=conn.protocol_id,
-                )
-                _ = Write[type=SQE64, origin = __origin_of(sq)](
-                    sq.__next__(),
-                    Fd(unsafe_fd=conn.fd),
-                    new_buffer_ptr,
-                    UInt(len(data_to_send)),
-                ).user_data(write_conn.to_int())
+            # Get a void pointer to send
+            var buffer_ptr = UnsafePointer[c_void](temp_buffer.unsafe_ptr())
+
+            # Submit write operation
+            submit_write_with_buffer(
+                conn.fd, buffer_ptr, len(data_to_send), self.ring, conn.protocol_id
+            )
 
     fn address(self) -> String:
         """
