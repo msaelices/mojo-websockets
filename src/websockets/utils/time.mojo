@@ -1,7 +1,6 @@
 # Code adapted from https://github.com/thatstoasty/small-time/
 # We just needed a small subset considering always UTC
 
-from collections import InlineList, Optional
 from memory import UnsafePointer, Pointer
 from sys import external_call
 
@@ -48,6 +47,7 @@ struct Tm:
 @register_passable("trivial")
 struct TimeVal:
     """Time value."""
+
     var tv_sec: Int
     """Seconds."""
     var tv_usec: Int
@@ -55,7 +55,7 @@ struct TimeVal:
 
     fn __init__(out self, tv_sec: Int = 0, tv_usec: Int = 0):
         """Initializes a new time value.
-        
+
         Args:
             tv_sec: Seconds.
             tv_usec: Microseconds.
@@ -63,9 +63,11 @@ struct TimeVal:
         self.tv_sec = tv_sec
         self.tv_usec = tv_usec
 
+
 @value
 struct TimeZone(Stringable):
     """Timezone."""
+
     var offset: Int
     """Offset in seconds."""
     var name: Optional[String]
@@ -104,7 +106,7 @@ struct TimeZone(Stringable):
 
         Args:
             sep: Separator between hours and minutes.
-        
+
         Returns:
             Formatted timezone.
         """
@@ -121,10 +123,10 @@ struct TimeZone(Stringable):
         return sign + String(hh).rjust(2, "0") + sep + String(mm).rjust(2, "0")
 
 
-
 @value
 struct SmallTime(Stringable, Writable, Representable):
     """Datetime representation."""
+
     var year: Int
     """Year."""
     var month: Int
@@ -174,10 +176,9 @@ struct SmallTime(Stringable, Writable, Representable):
         self.microsecond = microsecond
         self.tz = tz
 
-
     fn __str__(self) -> String:
         """Return the string representation of the `SmallTime` instance.
-        
+
         Returns:
             The string representation.
         """
@@ -185,7 +186,7 @@ struct SmallTime(Stringable, Writable, Representable):
 
     fn __repr__(self) -> String:
         """Return the string representation of the `SmallTime` instance.
-        
+
         Returns:
             The string representation.
         """
@@ -199,10 +200,10 @@ struct SmallTime(Stringable, Writable, Representable):
 
         Args:
             sep: The separator between date and time.
-        
+
         Returns:
             The formatted string.
-        
+
         Notes:
             The full format looks like 'YYYY-MM-DD HH:MM:SS.mmmmmm'.
 
@@ -216,49 +217,57 @@ struct SmallTime(Stringable, Writable, Representable):
             terms of the time to include. Valid options are 'auto', 'hours',
             'minutes', 'seconds', 'milliseconds' and 'microseconds'.
         """
-        alias valid = InlineList[String, 6]("auto", "hours", "minutes", "seconds", "milliseconds", "microseconds")
+        alias valid = InlineArray[String, 6](
+            "auto", "hours", "minutes", "seconds", "milliseconds", "microseconds"
+        )
         """Valid timespec values."""
         constrained[
             timespec in valid,
             msg="timespec must be one of the following: 'auto', 'hours', 'minutes', 'seconds', 'milliseconds', 'microseconds'",
         ]()
         var date_str = String(
-            String(self.year).rjust(4, "0"), "-", String(self.month).rjust(2, "0"), "-", String(self.day).rjust(2, "0")
+            String(self.year).rjust(4, "0"),
+            "-",
+            String(self.month).rjust(2, "0"),
+            "-",
+            String(self.day).rjust(2, "0"),
         )
-        
+
         var time_str = String("")
 
         @parameter
         if timespec == "auto" or timespec == "microseconds":
             time_str = String(
-                String(self.hour).rjust(2, "0")
-                , ":"
-                , String(self.minute).rjust(2, "0")
-                , ":"
-                , String(self.second).rjust(2, "0")
-                , "."
-                , String(self.microsecond).rjust(6, "0")
+                String(self.hour).rjust(2, "0"),
+                ":",
+                String(self.minute).rjust(2, "0"),
+                ":",
+                String(self.second).rjust(2, "0"),
+                ".",
+                String(self.microsecond).rjust(6, "0"),
             )
         elif timespec == "milliseconds":
             time_str = String(
-                String(self.hour).rjust(2, "0")
-                , ":"
-                , String(self.minute).rjust(2, "0")
-                , ":"
-                , String(self.second).rjust(2, "0")
-                , "."
-                , String(self.microsecond // 1000).rjust(3, "0")
+                String(self.hour).rjust(2, "0"),
+                ":",
+                String(self.minute).rjust(2, "0"),
+                ":",
+                String(self.second).rjust(2, "0"),
+                ".",
+                String(self.microsecond // 1000).rjust(3, "0"),
             )
         elif timespec == "seconds":
             time_str = String(
-                String(self.hour).rjust(2, "0")
-                , ":"
-                , String(self.minute).rjust(2, "0")
-                , ":"
-                , String(self.second).rjust(2, "0")
+                String(self.hour).rjust(2, "0"),
+                ":",
+                String(self.minute).rjust(2, "0"),
+                ":",
+                String(self.second).rjust(2, "0"),
             )
         elif timespec == "minutes":
-            time_str = String(String(self.hour).rjust(2, "0"), ":", String(self.minute).rjust(2, "0"))
+            time_str = String(
+                String(self.hour).rjust(2, "0"), ":", String(self.minute).rjust(2, "0")
+            )
         elif timespec == "hours":
             time_str = String(self.hour).rjust(2, "0")
 
@@ -276,6 +285,7 @@ struct SmallTime(Stringable, Writable, Representable):
         Args:
             writer: The writer to write the contents to.
         """
+
         @parameter
         fn write_optional(opt: Optional[String]):
             if opt:
@@ -283,18 +293,24 @@ struct SmallTime(Stringable, Writable, Representable):
             else:
                 writer.write(repr(None))
 
-        writer.write("SmallTime(",
-        "year=", self.year,
-        ", month=", self.month,
-        ", day=", self.day,
-        ", hour=", self.hour,
-        ", minute=", self.minute,
-        ", second=", self.second,
-        ", microsecond=", self.microsecond,
+        writer.write(
+            "SmallTime(",
+            "year=",
+            self.year,
+            ", month=",
+            self.month,
+            ", day=",
+            self.day,
+            ", hour=",
+            self.hour,
+            ", minute=",
+            self.minute,
+            ", second=",
+            self.second,
+            ", microsecond=",
+            self.microsecond,
         )
-        writer.write(", tz=", "TimeZone(",
-        "offset=", self.tz.offset,
-        ", name=")
+        writer.write(", tz=", "TimeZone(", "offset=", self.tz.offset, ", name=")
         write_optional(self.tz.name)
         writer.write(")")
         writer.write(")")
@@ -305,10 +321,10 @@ fn from_timestamp(t: TimeVal) raises -> SmallTime:
 
     Args:
         t: The timestamp.
-    
+
     Returns:
         The SmallTime instance.
-    
+
     Raises:
         Error: If the timestamp is invalid.
     """
@@ -321,7 +337,7 @@ fn now(*, utc: Bool = False) raises -> SmallTime:
 
     Args:
         utc: If True, return the current time in UTC. Otherwise, return the current time in local time.
-    
+
     Returns:
         The current time.
     """
@@ -330,20 +346,22 @@ fn now(*, utc: Bool = False) raises -> SmallTime:
 
 fn gmtime(owned tv_sec: Int) -> Tm:
     """Converts a time value to a broken-down UTC time.
-    
+
     Args:
         tv_sec: Time value in seconds since the Epoch.
-    
+
     Returns:
         Broken down UTC time.
     """
-    var tm = external_call["gmtime", UnsafePointer[Tm]](Pointer.address_of(tv_sec)).take_pointee()
+    var tm = external_call["gmtime", UnsafePointer[Tm]](
+        Pointer.address_of(tv_sec)
+    ).take_pointee()
     return tm
 
 
 fn gettimeofday() -> TimeVal:
     """Gets the current time. It's a wrapper around libc `gettimeofday`.
-    
+
     Returns:
         Current time.
     """
@@ -352,46 +370,68 @@ fn gettimeofday() -> TimeVal:
     return tv
 
 
-fn _validate_timestamp(tm: Tm, time_val: TimeVal, time_zone: TimeZone) raises -> SmallTime:
+fn _validate_timestamp(
+    tm: Tm, time_val: TimeVal, time_zone: TimeZone
+) raises -> SmallTime:
     """Validate the timestamp.
 
     Args:
         tm: The time struct.
         time_val: The time value.
         time_zone: The time zone.
-    
+
     Returns:
         The validated timestamp.
-    
+
     Raises:
         Error: If the timestamp is invalid.
     """
     var year = Int(tm.tm_year) + 1900
     if not -1 < year < 10000:
-        raise Error("The year parsed out from the timestamp is too large or negative. Received: " + String(year))
+        raise Error(
+            "The year parsed out from the timestamp is too large or negative."
+            " Received: "
+            + String(year)
+        )
 
     var month = Int(tm.tm_mon) + 1
     if not -1 < month < 13:
-        raise Error("The month parsed out from the timestamp is too large or negative. Received: " + String(month))
+        raise Error(
+            "The month parsed out from the timestamp is too large or negative."
+            " Received: "
+            + String(month)
+        )
 
     var day = Int(tm.tm_mday)
     if not -1 < day < 32:
         raise Error(
-            "The day of the month parsed out from the timestamp is too large or negative. Received: " + String(day)
+            "The day of the month parsed out from the timestamp is too large or"
+            " negative. Received: "
+            + String(day)
         )
 
     var hours = Int(tm.tm_hour)
     if not -1 < hours < 25:
-        raise Error("The hour parsed out from the timestamp is too large or negative. Received: " + String(hours))
+        raise Error(
+            "The hour parsed out from the timestamp is too large or negative."
+            " Received: "
+            + String(hours)
+        )
 
     var minutes = Int(tm.tm_min)
     if not -1 < minutes < 61:
-        raise Error("The minutes parsed out from the timestamp is too large or negative. Received: " + String(minutes))
+        raise Error(
+            "The minutes parsed out from the timestamp is too large or negative."
+            " Received: "
+            + String(minutes)
+        )
 
     var seconds = Int(tm.tm_sec)
     if not -1 < seconds < 61:
         raise Error(
-            "The day of the month parsed out from the timestamp is too large or negative. Received: " + String(seconds)
+            "The day of the month parsed out from the timestamp is too large or"
+            " negative. Received: "
+            + String(seconds)
         )
 
     var microseconds = time_val.tv_usec
