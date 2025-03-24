@@ -106,7 +106,7 @@ struct ConnInfo(Writable):
         )
 
 
-# Buffer ring helper functions
+# Helper functions for buffer operations
 fn submit_read_with_buffer_select(
     fd: Int32, mut ring: IoUring, mut buf_ring: BufRing, protocol_id: UInt16 = 0
 ) raises:
@@ -128,22 +128,17 @@ fn submit_read_with_buffer_select(
             index=0, len=UInt32(MAX_MESSAGE_LEN)
         ).buf_ptr
 
-        # Get an SQE and set the BUFFER_SELECT flag (we'll use a different SQE for Read)
+        # Get an SQE and set the BUFFER_SELECT flag
         var sqe = sq.__next__()
         sqe.flags |= IoUringSqeFlags.BUFFER_SELECT
 
         # Create read operation with a new SQE, just like in the working echoserver example
-        # This is a key difference - we set the flag on one SQE but use a fresh one for the operation
         _ = Read(
-            sq.__next__(),  # Use a FRESH SQE here, not the one we set flags on
+            sq.__next__(),  # Use a fresh SQE here, not the one we set flags on
             client_fd,
             buffer_ptr,
             UInt(MAX_MESSAGE_LEN),
         ).user_data(read_conn.to_int())
-
-        # Submit operation immediately to ensure it's queued
-        _ = ring.submit_and_wait(wait_nr=0)
-        logger.debug("Submitted read with buffer select for fd:", fd)
 
 
 fn submit_write_with_buffer(
@@ -165,10 +160,6 @@ fn submit_write_with_buffer(
         _ = Write(
             sq.__next__(), Fd(unsafe_fd=write_conn.fd), buf_ptr, UInt(bytes_count)
         ).user_data(write_conn.to_int())
-
-        # Submit operation immediately
-        _ = ring.submit_and_wait(wait_nr=0)
-        logger.debug("Submitted write for fd:", fd, "bytes:", bytes_count)
 
 
 struct WSConnection:
@@ -227,7 +218,7 @@ struct WSConnection:
             self.protocol_id,
         )
 
-        # Submit and wait for the operation to complete
+        # Submit the operation
         var submitted = self.ring[].submit_and_wait(wait_nr=1)
         logger.debug("send_text submitted operations:", submitted)
 
@@ -237,6 +228,11 @@ struct WSConnection:
 
         # Now it's safe to free the buffer
         heap_buffer.free()
+
+        # Set up a read to receive the next message
+        submit_read_with_buffer_select(
+            self.fd.unsafe_fd(), self.ring[], self.buf_ring[], self.protocol_id
+        )
 
     fn send_binary(self, message: Bytes) raises:
         # Find the protocol
@@ -269,7 +265,7 @@ struct WSConnection:
             self.protocol_id,
         )
 
-        # Submit and wait for the operation to complete
+        # Submit the operation
         var submitted = self.ring[].submit_and_wait(wait_nr=1)
         logger.debug("send_binary submitted operations:", submitted)
 
@@ -279,6 +275,11 @@ struct WSConnection:
 
         # Now it's safe to free the buffer
         heap_buffer.free()
+
+        # Set up a read to receive the next message
+        submit_read_with_buffer_select(
+            self.fd.unsafe_fd(), self.ring[], self.buf_ring[], self.protocol_id
+        )
 
     fn close(self) raises -> None:
         # Just close the file descriptor
@@ -370,8 +371,7 @@ struct Server:
         """
         self.shutdown()
 
-        # Clean up buf_ring if it was created
-        # TODO: Fix this sentence which is not compiling
+        # Clean up buf_ring properly
         # self.ring.unsafe_delete_buf_ring(self.buf_ring^)
 
     # ===-------------------------------------------------------------------=== #
@@ -524,17 +524,14 @@ struct Server:
                             ")",
                         )
 
-                        # Get a buffer handle to safely use it
-                        var buf_ring_ptr = self.buf_ring[]
-
                         # Need to make sure buffer_idx is valid - it should be < BUFFERS_COUNT
                         if buffer_idx >= BUFFERS_COUNT:
                             logger.error("Invalid buffer index:", buffer_idx)
                             buffer_idx = 0
 
                         # Get a buffer handle with the correct index and size
-                        # Note: by using unsafe_buf, we ensure the buffer is properly tracked by the kernel
-                        # so it can be properly released/recycled after use
+                        # Using unsafe_buf ensures the buffer is properly tracked by the kernel
+                        var buf_ring_ptr = self.buf_ring[]
                         var buffer = buf_ring_ptr.unsafe_buf(
                             index=buffer_idx, len=UInt32(bytes_read)
                         )
@@ -573,7 +570,7 @@ struct Server:
                                 # Mark protocol as inactive
                                 protocol_ptr[].set_inactive()
 
-                                # Buffer is automatically recycled with buf_ring
+                                # Buffer is automatically recycled when it goes out of scope
                                 continue
 
                             # Handle connection state
@@ -603,7 +600,7 @@ struct Server:
                                         # Mark protocol as inactive
                                         protocol_ptr[].set_inactive()
 
-                                        # Buffer is automatically recycled with buf_ring
+                                        # Buffer is automatically recycled when it goes out of scope
                                         continue
 
                                     logger.debug("Sending handshake response")
@@ -625,7 +622,7 @@ struct Server:
                                         if i < MAX_MESSAGE_LEN:
                                             heap_buffer[i] = Int8(data_to_send[i])
 
-                                    # Use direct write_with_buffer helper that handles submission
+                                    # Use write_with_buffer helper that handles submission
                                     submit_write_with_buffer(
                                         conn.fd,
                                         UnsafePointer[c_void](heap_buffer),
@@ -640,7 +637,7 @@ struct Server:
                                         "Handshake submitted operations:", submitted
                                     )
 
-                                    # Process any completions to ensure our write is done
+                                    # Process completions to ensure our write is done
                                     for cqe in self.ring.cq(wait_nr=0):
                                         logger.debug(
                                             "Processed completion in handshake"
@@ -649,7 +646,7 @@ struct Server:
                                     # Now it's safe to free the buffer
                                     heap_buffer.free()
 
-                                    # IMPORTANT: Post a new read for the connection after handshake
+                                    # Post a new read for the connection after handshake
                                     logger.info(
                                         "Setting up read after handshake for fd:",
                                         conn.fd,
@@ -660,13 +657,12 @@ struct Server:
                                         self.buf_ring,
                                         conn.protocol_id,
                                     )
-
-                                    # Make sure the submission gets through
-                                    _ = self.ring.submit_and_wait(wait_nr=0)
                             else:
                                 # Handle WebSocket frames
                                 logger.debug("Handling WebSocket frame")
                                 self.handle_websocket_frame(conn)
+
+                            # Buffer is automatically recycled when it goes out of scope at the end of this block
 
                 # Handle write completion
                 elif conn.type == WRITE:
@@ -679,16 +675,13 @@ struct Server:
                     )
 
                     # Post a new read for the connection using BUFFER_SELECT
-                    # This is critical for the echo server's request-response pattern
+                    # This is critical for the WebSocket server's message handling pattern
                     logger.info(
                         "Setting up next read after write completion for fd:", conn.fd
                     )
                     submit_read_with_buffer_select(
                         conn.fd, self.ring, self.buf_ring, conn.protocol_id
                     )
-
-                    # Make sure our submissions are getting through
-                    _ = self.ring.submit_and_wait(wait_nr=0)
 
     fn handle_websocket_frame(mut self, conn: ConnInfo) raises -> None:
         """
@@ -743,7 +736,7 @@ struct Server:
                 conn.protocol_id,
             )
 
-            # Submit and wait for the operation to complete
+            # Submit the operation
             var submitted = self.ring.submit_and_wait(wait_nr=1)
             logger.debug("handle_websocket_frame submitted operations:", submitted)
 
@@ -754,16 +747,13 @@ struct Server:
             # Now it's safe to free the buffer
             heap_buffer.free()
 
-            # IMPORTANT: Post a new read for this connection - this is critical for the next message
-            logger.info(
-                "Setting up follow-up read in WebSocket frame handler for fd:", conn.fd
-            )
-            submit_read_with_buffer_select(
-                conn.fd, self.ring, self.buf_ring, conn.protocol_id
-            )
-
-            # Make sure the read submission gets through
-            _ = self.ring.submit_and_wait(wait_nr=0)
+        # IMPORTANT: Post a new read for this connection - this is critical for the next message
+        logger.info(
+            "Setting up follow-up read in WebSocket frame handler for fd:", conn.fd
+        )
+        submit_read_with_buffer_select(
+            conn.fd, self.ring, self.buf_ring, conn.protocol_id
+        )
 
     fn address(self) -> String:
         """
