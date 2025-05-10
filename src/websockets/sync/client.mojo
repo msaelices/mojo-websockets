@@ -3,14 +3,14 @@ from websockets.frames import Frame
 from websockets.logger import logger
 from websockets.protocol.base import (
     receive_data,
-    send_binary, 
-    send_continuation, 
-    send_text, 
+    send_binary,
+    send_continuation,
+    send_text,
 )
 from websockets.protocol.client import ClientProtocol
 from websockets.net import TCPAddr, TCPConnection
 from websockets.socket import Socket
-from websockets.utils.bytes import str_to_bytes
+from websockets.utils.bytes import str_to_bytes, bytes_to_str
 from websockets.utils.uri import URI
 
 
@@ -18,6 +18,7 @@ struct Client:
     """
     A client object that can be used to connect to a server.
     """
+
     var uri: URI
     var conn: TCPConnection
     var protocol: ClientProtocol
@@ -30,7 +31,9 @@ struct Client:
             socket = Socket[TCPAddr]()
         except e:
             logger.error(e)
-            raise Error("Client: Failed to create WS client due to socket creation failure.")
+            raise Error(
+                "Client: Failed to create WS client due to socket creation failure."
+            )
         self.conn = TCPConnection(socket^)
 
     fn __moveinit__(mut self, owned other: Self):
@@ -139,12 +142,20 @@ struct Client:
         # TODO: Handle parse exceptions
         return received
 
+    fn recv_text(mut self) raises -> String:
+        """
+        Receive a message from the server.
+
+        Returns:
+            String - The message received.
+        """
+        return bytes_to_str(self.recv())
+
     fn close(mut self) raises -> None:
         """
         Close the connection.
         """
         self.conn.teardown()
-
 
 
 fn connect(uri: String) raises -> Client:
@@ -167,4 +178,3 @@ fn connect(uri: String) raises -> Client:
     .
     """
     return Client(uri)
-

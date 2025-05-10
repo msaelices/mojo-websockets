@@ -2,14 +2,18 @@
 # Thanks to @rd4com for the original code
 
 from base64 import b64encode
-from collections import Dict, Optional
+from collections import Dict, InlineArray, List, Optional
 from memory import UnsafePointer
-from python import Python, PythonObject
 from time import sleep
 
-from websockets.libc import c_int
+from websockets.libc import c_int, close as libc_close
 
-from websockets.aliases import Bytes, DEFAULT_BUFFER_SIZE, DEFAULT_MAX_REQUEST_BODY_SIZE, MAGIC_CONSTANT
+from websockets.aliases import (
+    Bytes,
+    DEFAULT_BUFFER_SIZE,
+    DEFAULT_MAX_REQUEST_BODY_SIZE,
+    MAGIC_CONSTANT,
+)
 from websockets.frames import Frame
 from websockets.http import Header, Headers, HTTPRequest, HTTPResponse, encode
 from websockets.logger import logger
@@ -20,70 +24,250 @@ from websockets.protocol.server import ServerProtocol
 from websockets.protocol.client import ClientProtocol
 from websockets.utils.bytes import str_to_bytes
 
-alias BYTE_0_TEXT: UInt8 = 1
-alias BYTE_0_NO_FRAGMENT: UInt8 = 128
+from mojix.fd import Fd
+from mojix.io_uring import SQE64
+from mojix.net.socket import socket, bind, listen
+from mojix.net.types import AddrFamily, SocketType, SocketAddrV4
+from io_uring import IoUring
+from io_uring.op import Accept, Read, Write
 
-alias BYTE_1_FRAME_IS_MASKED: UInt8 = 128
+alias ACCEPT = 0
+alias READ = 1
+alias WRITE = 2
+alias CLOSE = 3  # For handling connection closing
 
-alias BYTE_1_SIZE_ONE_BYTE: UInt8 = 125
-alias BYTE_1_SIZE_TWO_BYTES: UInt8 = 126
-alias BYTE_1_SIZE_EIGHT_BYTES: UInt8 = 127
-
+# Configuration for io_uring
+alias MAX_CONNECTIONS = 16
+alias BACKLOG = 512
+# alias MAX_MESSAGE_LEN = 16384  # Increased for WebSocket frames
+alias MAX_MESSAGE_LEN = 2048  # Reduced because of compiler slow compilation (InlineArray meta-programming)
+alias BUFFERS_COUNT = 16  # Must be power of 2
+alias BUF_RING_SIZE = BUFFERS_COUNT
+# Number of entries in the submission queue
+alias SQ_ENTRIES = 128
 
 alias ConnHandler = fn (conn: WSConnection, data: Bytes) raises -> None
+
+
+@value
+struct ConnInfo(Writable):
+    var fd: Int32
+    var type: UInt16
+    var bid: UInt32  # Buffer ID
+    var protocol_id: UInt16  # ID to track which protocol instance this is associated with
+
+    fn __init__(
+        out self, fd: Int32, type: UInt16, bid: UInt32 = 0, protocol_id: UInt16 = 0
+    ):
+        self.fd = fd
+        self.type = type
+        self.bid = bid
+        self.protocol_id = protocol_id
+
+    fn to_int(self) -> UInt64:
+        """Pack ConnInfo into a 64-bit integer for user_data."""
+        return (
+            (UInt64(self.fd) << 32)
+            | (UInt64(self.type) << 24)
+            | (UInt64(self.protocol_id) << 16)
+            | UInt64(self.bid)
+        )
+
+    @staticmethod
+    fn from_int(value: UInt64) -> Self:
+        """Unpack ConnInfo from a 64-bit integer."""
+        return Self(
+            fd=Int32((value >> 32) & 0xFFFFFFFF),
+            type=UInt16((value >> 24) & 0xFF),
+            protocol_id=UInt16((value >> 16) & 0xFF),
+            bid=UInt32(value & 0xFFFF),
+        )
+
+    fn write_to[W: Writer](self, mut writer: W) -> None:
+        type_str = (
+            "ACCEPT" if self.type
+            == ACCEPT else "READ" if self.type
+            == READ else "WRITE" if self.type
+            == WRITE else "CLOSE"
+        )
+        writer.write(
+            "ConnInfo(fd: ",
+            self.fd,
+            ", type:",
+            type_str,
+            ", bid:",
+            self.bid,
+            ", protocol_id:",
+            self.protocol_id,
+            ")",
+        )
+
+
+struct BufferMemory:
+    """Manages the buffer memory for the server."""
+
+    var _data: InlineArray[Int8, MAX_MESSAGE_LEN * BUFFERS_COUNT]
+    var _buffer_avail: InlineArray[Bool, BUFFERS_COUNT]  # Track buffer availability
+
+    fn __init__(out self):
+        """Initialize the buffer memory."""
+        logger.debug("Initializing BufferMemory with direct buffers")
+        self._data = InlineArray[Int8, MAX_MESSAGE_LEN * BUFFERS_COUNT](fill=0)
+        self._buffer_avail = InlineArray[Bool, BUFFERS_COUNT](
+            fill=True
+        )  # All buffers start as available
+
+    fn get_buffer_pointer(self, idx: Int) -> UnsafePointer[Int8]:
+        """Get a pointer to a specific buffer."""
+        return self._data.unsafe_ptr() + (idx * MAX_MESSAGE_LEN)
+
+    fn get_available_buffer(mut self) -> (Int, UnsafePointer[Int8]):
+        """Get an available buffer."""
+        # Find an available buffer
+        for i in range(BUFFERS_COUNT):
+            if self._buffer_avail[i]:
+                self._buffer_avail[i] = False  # Mark as in use
+                return (i, self.get_buffer_pointer(i))
+
+        # If all buffers are in use, just return the first one
+        logger.error("All buffers in use, recycling buffer 0")
+        return (0, self.get_buffer_pointer(0))
+
+    fn mark_buffer_available(mut self, idx: Int):
+        """Mark a buffer as available."""
+        self._buffer_avail[idx] = True
 
 
 struct WSConnection:
     """
     A connection object that represents a WebSocket connection.
     """
-    var conn_ptr: UnsafePointer[TCPConnection]
-    var protocol_ptr: UnsafePointer[ServerProtocol]
 
-    fn __init__(out self, ref conn: TCPConnection, ref protocol: ServerProtocol):
-        self.conn_ptr = UnsafePointer.address_of(conn)
-        self.protocol_ptr = UnsafePointer.address_of(protocol)
+    var fd: Fd
+    var protocol_id: UInt16
+    var buffer_memory: UnsafePointer[BufferMemory]
+    var ring: UnsafePointer[IoUring]
+    var server: UnsafePointer[Server]
 
-    fn read(self, mut buf: Bytes) raises -> None:
-        _ = self.conn_ptr[].read(buf)
-        receive_data(self.protocol_ptr[], buf)
-
-    fn write(self, buf: Bytes) raises -> Int:
-        return self.conn_ptr[].write(buf)
+    fn __init__(
+        out self,
+        fd: Int,
+        protocol_id: UInt16,
+        owned buffer_memory: UnsafePointer[BufferMemory],
+        owned ring: UnsafePointer[IoUring],
+        owned server: UnsafePointer[Server],
+    ):
+        self.fd = Fd(unsafe_fd=fd)
+        self.protocol_id = protocol_id
+        self.buffer_memory = buffer_memory
+        self.ring = ring
+        self.server = server
 
     fn send_text(self, message: String) raises:
-        send_text(self.protocol_ptr[], str_to_bytes(message))
-        _ = self.write(self.protocol_ptr[].data_to_send())
+        # Find the protocol
+        var protocol_ptr = UnsafePointer[ServerProtocol].address_of(
+            self.server[].protocols[self.protocol_id]
+        )
+
+        # Prepare the message
+        send_text(protocol_ptr[], str_to_bytes(message))
+        var data_to_send = protocol_ptr[].data_to_send()
+
+        # Use io_uring to write the data
+        var sq = self.ring[].sq()
+        if sq:
+            # We need to copy the data because we can't guarantee when io_uring will use it
+            var buffer_idx = Int(self.buffer_memory[].get_available_buffer()[0])
+            var buffer_ptr = self.buffer_memory[].get_buffer_pointer(buffer_idx)
+
+            # Copy data to the buffer
+            for i in range(len(data_to_send)):
+                buffer_ptr[i] = Int8(data_to_send[i])
+
+            var write_conn = ConnInfo(
+                fd=self.fd.unsafe_fd(),
+                type=WRITE,
+                bid=UInt32(buffer_idx),
+                protocol_id=self.protocol_id,
+            )
+            _ = Write[type=SQE64, origin = __origin_of(sq)](
+                sq.__next__(), self.fd, buffer_ptr, UInt(len(data_to_send))
+            ).user_data(write_conn.to_int())
+
+            # Submit operations
+            _ = self.ring[].submit_and_wait(wait_nr=1)
 
     fn send_binary(self, message: Bytes) raises:
-        send_binary(self.protocol_ptr[], message)
-        _ = self.write(self.protocol_ptr[].data_to_send())
+        # Find the protocol
+        var protocol_ptr = UnsafePointer[ServerProtocol].address_of(
+            self.server[].protocols[self.protocol_id]
+        )
+
+        # Prepare the message
+        send_binary(protocol_ptr[], message)
+        var data_to_send = protocol_ptr[].data_to_send()
+
+        # Use io_uring to write the data
+        var sq = self.ring[].sq()
+        if sq:
+            # We need to copy the data because we can't guarantee when io_uring will use it
+            var buffer_idx = Int(self.buffer_memory[].get_available_buffer()[0])
+            var buffer_ptr = self.buffer_memory[].get_buffer_pointer(buffer_idx)
+
+            # Copy data to the buffer
+            for i in range(len(data_to_send)):
+                buffer_ptr[i] = Int8(data_to_send[i])
+
+            var write_conn = ConnInfo(
+                fd=self.fd.unsafe_fd(),
+                type=WRITE,
+                bid=UInt32(buffer_idx),
+                protocol_id=self.protocol_id,
+            )
+            _ = Write[type=SQE64, origin = __origin_of(sq)](
+                sq.__next__(), self.fd, buffer_ptr, UInt(len(data_to_send))
+            ).user_data(write_conn.to_int())
+
+            # Submit operations
+            _ = self.ring[].submit_and_wait(wait_nr=1)
 
     fn close(self) raises -> None:
-        self.conn_ptr[].close()
+        # Just close the file descriptor
+        var native_fd = self.fd.unsafe_fd()
+        libc_close(native_fd)
 
 
 struct Server:
     """
-    A Mojo-based web server that accept incoming requests and delivers HTTP services.
+    A Mojo-based WebSocket server that accepts incoming connections using io_uring for concurrency.
     """
-    # TODO: add an error_handler to the constructor
 
     var host: String
     var port: Int
     var handler: ConnHandler
     var max_request_body_size: Int
 
-    var ln: TCPListener
+    # io_uring related fields
+    var ring: IoUring
+    var buffer_memory: BufferMemory
+    var protocols: List[ServerProtocol]
+    var active_connections: Int
+    var running: Bool
 
-    fn __init__(out self, host: String, port: Int, handler: ConnHandler, max_request_body_size: Int = DEFAULT_MAX_REQUEST_BODY_SIZE) raises:
+    fn __init__(
+        out self,
+        host: String,
+        port: Int,
+        handler: ConnHandler,
+        max_request_body_size: Int = DEFAULT_MAX_REQUEST_BODY_SIZE,
+    ) raises:
         """
         Initialize a new server.
 
         Args:
             host: String - The address to listen on.
             port: Int - The port to listen on.
-            handler : ConnHandler - An object that handles incoming HTTP requests.
+            handler: ConnHandler - An object that handles incoming WebSocket messages.
             max_request_body_size: Int - The maximum size of the request body.
 
         Raises:
@@ -93,23 +277,22 @@ struct Server:
         self.port = port
         self.handler = handler
         self.max_request_body_size = max_request_body_size
-        self.ln = TCPListener()
 
-    fn __moveinit__(mut self, owned other: Self):
-        self.host = other.host
-        self.port = other.port
-        self.handler = other.handler
-        self.max_request_body_size = other.max_request_body_size
-        self.ln = other.ln^
+        # Initialize io_uring instance
+        self.ring = IoUring[](sq_entries=SQ_ENTRIES)
 
-    fn __copyinit__(mut self, other: Self):
-        self.host = other.host
-        self.port = other.port
-        self.handler = other.handler
-        self.max_request_body_size = other.max_request_body_size
-        self.ln = other.ln
+        # Initialize buffer memory
+        self.buffer_memory = BufferMemory()
 
-    fn __enter__(self) -> Self:
+        # Initialize protocol list
+        self.protocols = List[ServerProtocol]()
+        for _ in range(MAX_CONNECTIONS):
+            self.protocols.append(ServerProtocol())
+
+        self.active_connections = 0
+        self.running = False
+
+    fn __enter__(self) raises -> Self:
         """
         Context manager entry point, called by the serve() function.
 
@@ -117,7 +300,7 @@ struct Server:
             with serve(handler, host, port) as server:
                 server.serve_forever()
         """
-        return self
+        return Self(self.host, self.port, self.handler, self.max_request_body_size)
 
     fn __exit__(
         mut self,
@@ -133,130 +316,376 @@ struct Server:
 
     fn serve_forever(mut self) raises:
         """
-        Listen for incoming connections and serve HTTP requests.
+        Listen for incoming connections and serve WebSocket requests concurrently using io_uring.
         """
-        var net = ListenConfig()
-        var listener = net.listen(self.host, self.port)
-        self.serve(listener^)
+        self.running = True
 
-    fn serve(mut self, owned ln: TCPListener) raises:
-        """Serve HTTP requests.
+        # Setup listener socket
+        var listener_fd = socket(AddrFamily.INET, SocketType.STREAM)
+        var ip_parts = self.host.split(".")
 
-        Args:
-            ln: TCP server that listens for incoming connections.
+        # Parse the IP address
+        var a: UInt8 = 0
+        var b: UInt8 = 0
+        var c: UInt8 = 0
+        var d: UInt8 = 0
 
-        Raises:
-            If there is an error while serving requests.
-        """
-        while True:
-            var conn = ln.accept()
-            self.serve_connection(conn)
-
-    fn serve_connection(mut self, mut conn: TCPConnection) raises -> None:
-        """Serve a single connection.
-
-        Args:
-            conn: A connection object that represents a client connection.
-
-        Raises:
-            If there is an error while serving the connection.
-        """
-        protocol = ServerProtocol()
-        remote_addr = conn.socket.remote_address()
-        logger.debug(
-            "Connection accepted! IP:", remote_addr.ip, "Port:", remote_addr.port
-        )
-        wsconn = WSConnection(conn, protocol)
-        while True:
-            var b = Bytes(capacity=DEFAULT_BUFFER_SIZE)
+        # Handle different host values
+        if self.host == "localhost" or self.host == "127.0.0.1":
+            a = 127
+            b = 0
+            c = 0
+            d = 1
+        elif len(ip_parts) == 4:
             try:
-                _ = wsconn.read(b)
-            except e:
-                conn.teardown()
-                logger.error(e)
-                return
-            logger.debug("Bytes received:", len(b))
+                a = UInt8(Int(ip_parts[0]))
+                b = UInt8(Int(ip_parts[1]))
+                c = UInt8(Int(ip_parts[2]))
+                d = UInt8(Int(ip_parts[3]))
+            except:
+                a = 0
+                b = 0
+                c = 0
+                d = 0
 
-            if protocol.get_parser_exc():
-                logger.error(String(protocol.get_parser_exc().value()))
-                conn.teardown()
-                return
+        bind(listener_fd, SocketAddrV4(a, b, c, d, port=UInt16(self.port)))
+        listen(listener_fd, backlog=BACKLOG)
+        logger.info("WebSocket server listening on", self.host, "port", self.port)
 
-            # If the server is set to not support keep-alive connections, or the client requests a connection close, we mark the connection to be closed.
-            if protocol.get_state() == CONNECTING:
-                var request: HTTPRequest = protocol.events_received()[0][HTTPRequest]
+        # Add initial accept
+        var sq = self.ring.sq()
+        if sq:
+            var conn = ConnInfo(fd=Int32(listener_fd.unsafe_fd()), type=ACCEPT)
+            _ = Accept(sq.__next__(), listener_fd).user_data(conn.to_int())
 
-                logger.debug("Starting handshake")
+        # Main event loop
+        while self.running:
+            # Submit and wait for at least 1 completion
+            var submitted = self.ring.submit_and_wait(wait_nr=1)
 
-                response = protocol.accept(request)
-                if protocol.get_handshake_exc():
-                    logger.error(String(protocol.get_handshake_exc().value()))
-                    conn.teardown()
-                    return
+            logger.debug("Submitting io_uring operations:", submitted)
 
-                logger.debug("Sending handshake response")
-                protocol.send_response(response)
-                data_to_send = protocol.data_to_send()
-        
-                bytes_written = conn.write(data_to_send)
-                logger.debug("Bytes written:", bytes_written)
-            else:
-                self.handle_read(protocol, wsconn, b)
+            if submitted < 0:
+                logger.error("Error submitting io_uring operations")
+                break
 
-            logger.debug(
-                remote_addr.ip,
-                String(remote_addr.port),
-            )
+            # Process completions
+            for cqe in self.ring.cq(wait_nr=0):
+                var res = cqe.res
+                var user_data = cqe.user_data
 
-    fn address(mut self) -> String:
+                if res < 0:
+                    logger.error("Error in completion:", res)
+                    continue
+
+                var conn = ConnInfo.from_int(user_data)
+                logger.debug("Completion result:", res, "conn:", conn)
+
+                # Handle accept completion
+                if conn.type == ACCEPT:
+                    # New connection
+                    var client_fd = Fd(unsafe_fd=res)
+
+                    # Find an available protocol slot
+                    var protocol_id: UInt16 = 0
+                    for i in range(MAX_CONNECTIONS):
+                        if (
+                            i < len(self.protocols)
+                            and not self.protocols[i].is_active()
+                        ):
+                            protocol_id = UInt16(i)
+                            break
+
+                    self.active_connections += 1
+                    logger.info(
+                        "New connection (active:",
+                        self.active_connections,
+                        ", protocol_id:",
+                        protocol_id,
+                        ")",
+                    )
+
+                    # Reset the protocol for this connection
+                    if protocol_id < len(self.protocols):
+                        self.protocols[protocol_id] = ServerProtocol()
+                        self.protocols[protocol_id].set_active()
+                    else:
+                        self.protocols.append(ServerProtocol())
+                        self.protocols[protocol_id].set_active()
+
+                    # Add read for the new connection
+                    sq = self.ring.sq()
+                    if sq:
+                        # Get available buffer
+                        var result = self.buffer_memory.get_available_buffer()
+                        var buf_idx = result[0]
+                        var buf_ptr = result[1]
+                        read_conn = ConnInfo(
+                            fd=client_fd.unsafe_fd(),
+                            type=READ,
+                            bid=UInt32(buf_idx),
+                            protocol_id=protocol_id,
+                        )
+                        _ = Read[type=SQE64, origin = __origin_of(sq)](
+                            sq.__next__(), client_fd, buf_ptr, UInt(MAX_MESSAGE_LEN)
+                        ).user_data(read_conn.to_int())
+
+                    # Re-add accept
+                    sq = self.ring.sq()
+                    if sq:
+                        accept_conn = ConnInfo(fd=listener_fd.unsafe_fd(), type=ACCEPT)
+                        _ = Accept(sq.__next__(), listener_fd).user_data(
+                            accept_conn.to_int()
+                        )
+
+                # Handle read completion
+                elif conn.type == READ:
+                    if res <= 0:
+                        # Connection closed or error
+                        self.active_connections -= 1
+                        logger.info(
+                            "Connection closed (active:", self.active_connections, ")"
+                        )
+
+                        # Mark the protocol as inactive
+                        if conn.protocol_id < len(self.protocols):
+                            self.protocols[conn.protocol_id].set_inactive()
+
+                        # Free the buffer
+                        self.buffer_memory.mark_buffer_available(Int(conn.bid))
+                    else:
+                        # Get buffer info
+                        var buffer_idx = Int(conn.bid)
+                        var buffer_ptr = self.buffer_memory.get_buffer_pointer(
+                            buffer_idx
+                        )
+                        var bytes_read = Int(res)
+
+                        # Create a Bytes object from the buffer
+                        var data = Bytes(capacity=bytes_read)
+                        for i in range(bytes_read):
+                            data.append(UInt8(buffer_ptr[i]))
+
+                        # Process the data with the protocol
+                        if conn.protocol_id < len(self.protocols):
+                            var protocol_ptr = UnsafePointer[ServerProtocol].address_of(
+                                self.protocols[conn.protocol_id]
+                            )
+
+                            # Send data to protocol
+                            receive_data(protocol_ptr[], data)
+
+                            # Check for parser exceptions
+                            if protocol_ptr[].get_parser_exc():
+                                logger.error(
+                                    String(protocol_ptr[].get_parser_exc().value())
+                                )
+
+                                # Close the connection
+                                libc_close(conn.fd)
+                                self.active_connections -= 1
+
+                                logger.info(
+                                    "Connection closed (active:",
+                                    self.active_connections,
+                                    ")",
+                                )
+
+                                # Mark protocol as inactive
+                                protocol_ptr[].set_inactive()
+
+                                # Free the buffer
+                                self.buffer_memory.mark_buffer_available(buffer_idx)
+                                continue
+
+                            # Handle connection state
+                            if protocol_ptr[].get_state() == CONNECTING:
+                                # WebSocket handshake
+                                logger.debug("Handling WebSocket handshake")
+                                var events_list = protocol_ptr[].events_received()
+                                if len(events_list) > 0:
+                                    var request: HTTPRequest = events_list[0][
+                                        HTTPRequest
+                                    ]
+                                    var response = protocol_ptr[].accept(request)
+
+                                    if protocol_ptr[].get_handshake_exc():
+                                        logger.error(
+                                            String(
+                                                protocol_ptr[]
+                                                .get_handshake_exc()
+                                                .value()
+                                            )
+                                        )
+
+                                        # Close the connection
+                                        libc_close(conn.fd)
+                                        self.active_connections -= 1
+
+                                        # Mark protocol as inactive
+                                        protocol_ptr[].set_inactive()
+
+                                        # Free the buffer
+                                        self.buffer_memory.mark_buffer_available(
+                                            buffer_idx
+                                        )
+                                        continue
+
+                                    logger.debug("Sending handshake response")
+                                    protocol_ptr[].send_response(response)
+                                    var data_to_send = protocol_ptr[].data_to_send()
+
+                                    # Use io_uring to write the handshake response
+                                    sq = self.ring.sq()
+                                    if sq:
+                                        # Copy data to a fresh buffer
+                                        var new_buffer_idx = Int(
+                                            self.buffer_memory.get_available_buffer()[0]
+                                        )
+                                        var new_buffer_ptr = self.buffer_memory.get_buffer_pointer(
+                                            new_buffer_idx
+                                        )
+
+                                        # Copy the data
+                                        for i in range(len(data_to_send)):
+                                            new_buffer_ptr[i] = Int8(data_to_send[i])
+
+                                        # Send handshake response
+                                        write_conn = ConnInfo(
+                                            fd=conn.fd,
+                                            type=WRITE,
+                                            bid=UInt32(new_buffer_idx),
+                                            protocol_id=conn.protocol_id,
+                                        )
+                                        _ = Write[type=SQE64, origin = __origin_of(sq)](
+                                            sq.__next__(),
+                                            Fd(unsafe_fd=conn.fd),
+                                            new_buffer_ptr,
+                                            UInt(len(data_to_send)),
+                                        ).user_data(write_conn.to_int())
+                            else:
+                                # Handle WebSocket frames
+                                logger.debug("Handling WebSocket frame")
+                                self.handle_websocket_frame(conn, buffer_idx)
+
+                # Handle write completion
+                elif conn.type == WRITE:
+                    logger.debug(
+                        "Write completion (buffer_idx:",
+                        conn.bid,
+                        ", protocol_id",
+                        conn.protocol_id,
+                        ")",
+                    )
+
+                    # Free the buffer
+                    self.buffer_memory.mark_buffer_available(Int(conn.bid))
+
+                    # Post a new read for the connection
+                    sq = self.ring.sq()
+                    if sq:
+                        # Get available buffer
+                        var result = self.buffer_memory.get_available_buffer()
+                        var buf_idx = result[0]
+                        var buf_ptr = result[1]
+                        logger.debug(
+                            "Posting new read for connection (buffer_idx:", buf_idx, ")"
+                        )
+                        read_conn = ConnInfo(
+                            fd=conn.fd,
+                            type=READ,
+                            bid=UInt32(buf_idx),
+                            protocol_id=conn.protocol_id,
+                        )
+                        _ = Read[type=SQE64, origin = __origin_of(sq)](
+                            sq.__next__(),
+                            Fd(unsafe_fd=conn.fd),
+                            buf_ptr,
+                            UInt(MAX_MESSAGE_LEN),
+                        ).user_data(read_conn.to_int())
+
+    fn handle_websocket_frame(mut self, conn: ConnInfo, buffer_idx: Int) raises -> None:
+        """
+        Handle incoming WebSocket frames.
+
+        Args:
+            conn: ConnInfo - Connection information.
+            buffer_idx: Int - Buffer index.
+        """
+        if conn.protocol_id >= len(self.protocols):
+            return
+
+        var protocol_ptr = UnsafePointer[ServerProtocol].address_of(
+            self.protocols[conn.protocol_id]
+        )
+        var events_received = protocol_ptr[].events_received()
+
+        # Create a WSConnection for the handler - moved outside the loop
+        var wsconn = WSConnection(
+            Int(conn.fd),
+            conn.protocol_id,
+            UnsafePointer.address_of(self.buffer_memory),
+            UnsafePointer.address_of(self.ring),
+            UnsafePointer.address_of(self),
+        )
+
+        for event_ref in events_received:
+            var event = event_ref[]
+            if event.isa[Frame]() and event[Frame].is_data():
+                var data_received = event[Frame].data
+
+                # Call the handler
+                self.handler(wsconn, data_received)
+
+        var data_to_send = protocol_ptr[].data_to_send()
+        if len(data_to_send) > 0:
+            # Use io_uring to write response
+            var sq = self.ring.sq()
+            if sq:
+                # We need to copy the data
+                var new_buffer_idx = Int(self.buffer_memory.get_available_buffer()[0])
+                var new_buffer_ptr = self.buffer_memory.get_buffer_pointer(
+                    new_buffer_idx
+                )
+
+                # Copy the data
+                for i in range(len(data_to_send)):
+                    new_buffer_ptr[i] = Int8(data_to_send[i])
+
+                var write_conn = ConnInfo(
+                    fd=conn.fd,
+                    type=WRITE,
+                    bid=UInt32(new_buffer_idx),
+                    protocol_id=conn.protocol_id,
+                )
+                _ = Write[type=SQE64, origin = __origin_of(sq)](
+                    sq.__next__(),
+                    Fd(unsafe_fd=conn.fd),
+                    new_buffer_ptr,
+                    UInt(len(data_to_send)),
+                ).user_data(write_conn.to_int())
+
+    fn address(self) -> String:
         """
         Get the address of the server.
         """
         return String(self.host, ":", self.port)
 
-    fn handle_read(self, mut protocol: ServerProtocol, mut wsconn: WSConnection, data: Bytes) raises -> None:
-        """
-        Handle incoming data.
-
-        Args:
-            protocol: ServerProtocol - The protocol object that handles the connection.
-            wsconn: WSConnection - The connection object.
-            data: Bytes - The data received from the client.
-        """
-        bytes_recv = len(data)
-        if bytes_recv == 0:
-            logger.debug("Received zero bytes. Closing connection.")
-            receive_eof(protocol)
-            return
-
-        events_received = protocol.events_received()
-        for event_ref in events_received:
-            event = event_ref[]
-            if event.isa[Frame]() and event[Frame].is_data():
-                data_received = event[Frame].data
-                self.handler(wsconn, data_received)
-
-        data_to_send = protocol.data_to_send()
-        if len(data_to_send) > 0:
-            bytes_written = wsconn.write(data_to_send)
-            logger.debug("Bytes written: ", bytes_written)
-    
     fn shutdown(mut self) raises -> None:
         """
         Shutdown the server.
         """
-        self.ln.close()
-
+        self.running = False
 
 
 fn serve(handler: ConnHandler, host: String, port: Int) raises -> Server:
     """
-    Serve HTTP requests.
+    Serve WebSocket requests concurrently using io_uring.
 
     Args:
-        handler : ConnHandler - An object that handles incoming HTTP requests.
-        host : String - The address to listen on.
-        port : Int - The port to listen on.
+        handler: ConnHandler - An object that handles incoming WebSocket messages.
+        host: String - The address to listen on.
+        port: Int - The port to listen on.
 
     Returns:
         Server - A server object that can be used to serve requests.
@@ -270,4 +699,3 @@ fn serve(handler: ConnHandler, host: String, port: Int) raises -> Server:
     .
     """
     return Server(host, port, handler)
-
