@@ -65,8 +65,7 @@ fn unpack(format: String, buffer: Bytes) raises -> List[Int]:
             offset = 1
             order = format[0]
     var fmt_span = format.as_bytes()[offset:]
-    for c_ref in fmt_span:
-        c = c_ref[]
+    for c in fmt_span:
         if c == ord("b"):
             values.append(Int(reader.read[DType.int8](order)))
         elif c == ord("B"):
