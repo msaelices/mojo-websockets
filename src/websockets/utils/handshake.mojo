@@ -1,6 +1,7 @@
 from base64 import b64encode
 
 from websockets.aliases import Bytes, MAGIC_CONSTANT
+from websockets.utils.bytes import bytes_to_str
 from websockets.utils.sha1 import sha1_digest_string
 
 
@@ -15,12 +16,6 @@ def ws_accept_key(key: String) -> String:
         The accept key.
     """
     var accept_key = key + MAGIC_CONSTANT
+    var digest = bytes_to_str(sha1_digest_string(accept_key))
 
-    var digest = sha1_digest_string(accept_key)
-
-    # Convert digest to Bytes for b64encode
-    var s = Bytes(capacity=len(digest))
-    for i in range(len(digest)):
-        s.append(digest[i])
-
-    return b64encode(s)
+    return b64encode(digest)
