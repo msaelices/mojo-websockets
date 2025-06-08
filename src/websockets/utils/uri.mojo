@@ -138,11 +138,8 @@ struct URI:
             return None
 
         user_info = self.host[:i]
-        try:
-            result = user_info.split(":", maxsplit=2)
-            return (result[0], result[1])
-        except:
-            return (user_info, String(""))
+        result = user_info.split(":", maxsplit=2)
+        return (result[0], result[1])
 
     fn __eq__(self, other: URI) -> Bool:
         return self.full_uri == other.full_uri

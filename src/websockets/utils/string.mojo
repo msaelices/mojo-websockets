@@ -105,7 +105,7 @@ struct ByteWriter(Writer):
         return ret^
 
 
-struct ByteReader[origin: Origin]:
+struct ByteReader[origin: Origin](Sized):
     var _inner: Span[Byte, origin]
     var read_pos: Int
 
