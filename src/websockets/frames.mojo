@@ -486,7 +486,7 @@ struct Frame(Stringable, EqualityComparable):
 
 
 @value
-struct Close:
+struct Close(StringableRaising):
     """
     Code and reason for WebSocket close frames.
 

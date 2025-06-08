@@ -135,8 +135,7 @@ struct Client:
 
         events_received = self.protocol.events_received()
         received = Bytes(capacity=DEFAULT_BUFFER_SIZE)
-        for event_ref in events_received:
-            event = event_ref[]
+        for event in events_received:
             if event.isa[Frame]():
                 received += event[Frame].data
         # TODO: Handle parse exceptions

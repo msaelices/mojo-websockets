@@ -159,12 +159,12 @@ struct Headers(Writable, Stringable):
     fn __init__(out self, owned *headers: Header):
         self._inner = Dict[String, String]()
         for header in headers:
-            self[header[].key.lower()] = header[].value
+            self[header.key.lower()] = header.value
 
     fn __eq__(self, other: Headers) -> Bool:
         for item in self._inner.items():
-            key = item[].key
-            value = item[].value
+            key = item.key
+            value = item.value
             if key not in other._inner or other._inner.get(key) != value:
                 return False
         return True
@@ -233,7 +233,7 @@ struct Headers(Writable, Stringable):
 
     fn write_to[T: Writer, //](self, mut writer: T):
         for header in self._inner.items():
-            write_header(writer, header[].key, header[].value)
+            write_header(writer, header.key, header.value)
 
     fn remove(mut self, key: String) raises -> None:
         _ = self._inner.pop(key.lower())

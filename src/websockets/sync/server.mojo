@@ -239,8 +239,7 @@ struct Server:
             return
 
         events_received = protocol.events_received()
-        for event_ref in events_received:
-            event = event_ref[]
+        for event in events_received:
             if event.isa[Frame]() and event[Frame].is_data():
                 data_received = event[Frame].data
                 self.handler(wsconn, data_received)
