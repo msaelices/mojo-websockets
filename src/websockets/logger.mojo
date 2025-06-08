@@ -46,8 +46,8 @@ mojo ... -D LOG_LEVEL=DEBUG
 
 @value
 struct Logger[level: Int]:
-    alias STDOUT = 1
-    alias STDERR = 2
+    alias STDOUT = FileDescriptor(1)
+    alias STDERR = FileDescriptor(2)
 
     fn _log_message[event_level: Int](self, message: String):
         @parameter
