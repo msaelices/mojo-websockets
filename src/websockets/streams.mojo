@@ -91,7 +91,7 @@ struct StreamReader(Streamable):
         self.offset = 0
         self.eof = False
 
-    fn __moveinit__(mut self, owned other: StreamReader):
+    fn __moveinit__(out self, owned other: StreamReader):
         self.buffer = other.buffer^
         self.offset = other.offset
         self.eof = other.eof
@@ -165,19 +165,25 @@ struct StreamReader(Streamable):
         p = n - self.offset
         if p > m:
             raise Error(
-                "RuntimeError: read {} bytes, expected no more than {} bytes".format(
-                    p, m
-                )
+                "RuntimeError: read "
+                + String(p)
+                + " bytes, expected no more than "
+                + String(m)
+                + " bytes"
             )
         if not found and self.eof:
             raise Error(
-                "EOFError: stream ends after {} bytes, before end of line".format(p)
+                "EOFError: stream ends after "
+                + String(p)
+                + " bytes, before end of line"
             )
         if n > m + self.offset:
             raise Error(
-                "RuntimeError: read {} bytes, expected no more than {} bytes".format(
-                    n, m
-                )
+                "RuntimeError: read "
+                + String(n)
+                + " bytes, expected no more than "
+                + String(m)
+                + " bytes"
             )
 
         if not found:
@@ -202,9 +208,11 @@ struct StreamReader(Streamable):
         if remaining < n:
             if self.eof:
                 raise Error(
-                    "EOFError: stream ends after {} bytes, expected {} bytes".format(
-                        remaining, n
-                    )
+                    "EOFError: stream ends after "
+                    + String(remaining)
+                    + " bytes, expected "
+                    + String(n)
+                    + " bytes"
                 )
             return None
         result = self.buffer[self.offset : self.offset + n]
@@ -225,8 +233,11 @@ struct StreamReader(Streamable):
             p = len(self.buffer) - self.offset
             if p > m:
                 raise Error(
-                    "RuntimeError: read {} bytes, expected no more than {} bytes"
-                    .format(p, m)
+                    "RuntimeError: read "
+                    + String(p)
+                    + " bytes, expected no more than "
+                    + String(m)
+                    + " bytes"
                 )
             return None
         result = self.buffer[self.offset :]

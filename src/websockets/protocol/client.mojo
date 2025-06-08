@@ -2,7 +2,12 @@ from base64 import b64encode
 from collections import Optional
 from memory import UnsafePointer
 
-from websockets.aliases import Bytes, DEFAULT_MAX_REQUEST_BODY_SIZE, DEFAULT_BUFFER_SIZE, MAGIC_CONSTANT
+from websockets.aliases import (
+    Bytes,
+    DEFAULT_MAX_REQUEST_BODY_SIZE,
+    DEFAULT_BUFFER_SIZE,
+    MAGIC_CONSTANT,
+)
 from websockets.http import (
     build_host_header,
     build_authorization_basic,
@@ -22,16 +27,16 @@ from websockets.protocol.base import (
     send_eof,
 )
 from websockets.streams import StreamReader
-from websockets.utils.bytes import b64decode, gen_token, str_to_bytes,gen_mask
+from websockets.utils.bytes import b64decode, gen_token, str_to_bytes, gen_mask
 from websockets.utils.handshake import ws_accept_key
 from websockets.utils.uri import URI
-
 
 
 struct ClientProtocol(Protocol):
     """
     Sans-I/O implementation of a WebSocket client connection.
     """
+
     alias side = CLIENT
 
     var key: String
@@ -52,7 +57,12 @@ struct ClientProtocol(Protocol):
     var eof_sent: Bool
     var discard_sent: Bool
 
-    fn __init__(out self, owned uri: URI, owned key: Optional[String] = None, owned origin: Optional[String] = None):
+    fn __init__(
+        out self,
+        owned uri: URI,
+        owned key: Optional[String] = None,
+        owned origin: Optional[String] = None,
+    ):
         if not key:
             self.key = b64encode(gen_token(16))
         else:
@@ -102,7 +112,7 @@ struct ClientProtocol(Protocol):
 
     fn get_reader_ptr(self) -> UnsafePointer[StreamReader]:
         """Get the reader of the protocol."""
-        return UnsafePointer.address_of(self.reader)
+        return UnsafePointer(to=self.reader)
 
     fn get_state(self) -> Int:
         """
@@ -240,7 +250,6 @@ struct ClientProtocol(Protocol):
         """Set the parser exception."""
         self.parser_exc = exc
 
-
     fn get_handshake_exc(self) -> Optional[Error]:
         """Get the handshake exception."""
         return self.handshake_exc
@@ -283,7 +292,9 @@ struct ClientProtocol(Protocol):
         opt_user_info = self.wsuri.get_user_info()
         if opt_user_info:
             user_info = opt_user_info.value()
-            headers["Authorization"] = build_authorization_basic(user_info[0], user_info[1])
+            headers["Authorization"] = build_authorization_basic(
+                user_info[0], user_info[1]
+            )
 
         # if self.available_extensions is not None:
         #     extensions_header = build_extension(
@@ -311,10 +322,13 @@ struct ClientProtocol(Protocol):
 
     fn process_response(mut self, response: HTTPResponse) raises -> None:
         """Process the handshare response from the server."""
-        constrained[Self.side == CLIENT, "Protocol.process_response() is only available for client connections."]()
+        constrained[
+            Self.side == CLIENT,
+            "Protocol.process_response() is only available for client connections.",
+        ]()
 
         if response.status_code != 101:
-            raise Error("InvalidStatus: {}".format(response.status_code))
+            raise Error("InvalidStatus: " + String(response.status_code))
 
         headers = response.headers
 

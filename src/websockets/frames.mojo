@@ -193,7 +193,7 @@ fn apply_mask(data: Bytes, mask: Bytes) raises -> Bytes:
     """
     if len(mask) != 4:
         raise Error(
-            "ValueError: mask must contain 4 bytes and not {}".format(len(mask))
+            "ValueError: mask must contain 4 bytes and not " + String(len(mask))
         )
 
     # TODO: Use SIMD instructions to apply the mask.
@@ -284,9 +284,8 @@ struct Frame(Stringable, EqualityComparable):
         var coding: String = ""
         var data: String
 
-        length = "{} byte{}".format(
-            Int(len(self.data)),
-            "" if len(self.data) == 1 else "s",
+        length = (
+            String(Int(len(self.data))) + " byte" + ("" if len(self.data) == 1 else "s")
         )
         non_final = "" if self.fin else "continued"
 
@@ -316,9 +315,9 @@ struct Frame(Stringable, EqualityComparable):
         else:
             data = "''"
 
-        metadata = ", ".join(List(coding, length, non_final))
+        metadata = coding + ", " + length + ", " + non_final
 
-        repr_data = "'{}'".format(data) if coding == "text" else data
+        repr_data = "'" + data + "'" if coding == "text" else data
         writer.write(get_op_code_name(self.opcode), " ", repr_data, " [", metadata, "]")
 
     @always_inline
@@ -339,7 +338,7 @@ struct Frame(Stringable, EqualityComparable):
         """
         var s: String = ""
         for byte in self.data:
-            s += "{} ".format(hex(ord(String(byte))))
+            s += hex(ord(String(byte))) + " "
         return String(s.strip())
 
     fn check(self) raises -> None:
@@ -450,19 +449,19 @@ struct Frame(Stringable, EqualityComparable):
         head1 = unpacked_data[0]
         head2 = unpacked_data[1]
 
-        # While not Pythonic, this is marginally faster than calling bool().
-        fin = True if head1 & 0b10000000 else False
-        rsv1 = True if head1 & 0b01000000 else False
-        rsv2 = True if head1 & 0b00100000 else False
-        rsv3 = True if head1 & 0b00010000 else False
+        # Convert bit flags to boolean values
+        fin = head1 & 0b10000000 != 0
+        rsv1 = head1 & 0b01000000 != 0
+        rsv2 = head1 & 0b00100000 != 0
+        rsv3 = head1 & 0b00010000 != 0
 
         opcode = Int(head1 & 0b00001111)
 
         if opcode not in DATA_OPCODES and opcode not in CTRL_OPCODES:
-            raise Error("ProtocolError: invalid opcode: {}".format(opcode))
+            raise Error("ProtocolError: invalid opcode: " + String(opcode))
 
         # Check if the mask bit is set correctly.
-        if Bool(head2 & 0b10000000) != mask:
+        if (head2 & 0b10000000 != 0) != mask:
             raise Error("ProtocolError: incorrect masking")
 
         length = head2 & 0b01111111
@@ -511,10 +510,10 @@ struct Close:
             explanation = "private use"
         else:
             explanation = get_close_code_explanation(self.code)
-        result = "{} ({})".format(get_close_code_name(self.code), explanation)
+        result = get_close_code_name(self.code) + " (" + explanation + ")"
 
         if self.reason:
-            result = "{} {}".format(result, self.reason)
+            result = result + " " + self.reason
 
         return result
 
@@ -580,4 +579,4 @@ struct Close:
         """
         code = Int(self.code)
         if not (code in EXTERNAL_CLOSE_CODES or 3000 <= code < 5000):
-            raise Error("ProtocolError: invalid status code: {}".format(self.code))
+            raise Error("ProtocolError: invalid status code: " + String(self.code))

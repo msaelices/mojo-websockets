@@ -96,7 +96,7 @@ struct Sha1Hash:
     var _unprocessed: Bytes
     var _message_byte_length: UInt64
 
-    fn __init__(mut self):
+    fn __init__(out self):
         """Initialize a new SHA1 hash object."""
         # Initial digest variables
         self._h0 = 0x67452301

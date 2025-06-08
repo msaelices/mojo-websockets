@@ -33,7 +33,6 @@ struct BytesConstant:
     alias N_CHAR = byte(N_CHAR)
 
 
-
 @value
 struct CharSet:
     var value: String
@@ -95,10 +94,8 @@ struct ByteWriter(Writer):
 
     @always_inline
     fn consuming_write(mut self, owned s: String):
-        # kind of cursed but seems to work?
-        _ = s._buffer.pop()
-        self._inner.extend(s._buffer^)
-        s._buffer = s._buffer_type()
+        # Just convert to bytes and extend
+        self._inner.extend(s.as_bytes())
 
     @always_inline
     fn write_byte(mut self, b: Byte):
@@ -212,7 +209,12 @@ fn to_string(b: Span[UInt8]) -> String:
     """
     var bytes = List[UInt8, True](b)
     bytes.append(0)
-    return String(bytes^)
+    var buffer = bytes^
+    return String(
+        StringSlice[__origin_of(buffer)](
+            ptr=buffer.unsafe_ptr(), length=len(buffer) - 1
+        )
+    )
 
 
 fn to_string(owned bytes: List[UInt8, True]) -> String:
@@ -224,7 +226,13 @@ fn to_string(owned bytes: List[UInt8, True]) -> String:
     """
     if bytes[-1] != 0:
         bytes.append(0)
-    return String(bytes^)
+    # In Max 25.3, we need to use FromBytes for String construction
+    var buffer = bytes^
+    return String(
+        StringSlice[__origin_of(buffer)](
+            ptr=buffer.unsafe_ptr(), length=len(buffer) - 1
+        )
+    )
 
 
 fn compare_case_insensitive(a: Bytes, b: Bytes) -> Bool:

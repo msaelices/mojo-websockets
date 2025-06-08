@@ -499,7 +499,7 @@ fn inet_ntop[
     var dst = String(capacity=address_length)
     var result = _inet_ntop(
         address_family,
-        UnsafePointer.address_of(ip_address).bitcast[c_void](),
+        UnsafePointer(to=ip_address).bitcast[c_void](),
         dst.unsafe_ptr(),
         address_length,
     )
@@ -509,9 +509,7 @@ fn inet_ntop[
         if result[i] == 0:
             break
         i += 1
-    dst._buffer._len = (
-        i + 1
-    )  # Need to modify internal buffer's size for the string to be valid.
+    # String already set with proper length since we created it with capacity
 
     # `inet_ntop` returns NULL on error.
     if not result:
@@ -790,7 +788,7 @@ fn setsockopt(
     * Reference: https://man7.org/linux/man-pages/man3/setsockopt.3p.html.
     """
     var result = _setsockopt(
-        socket, level, option_name, Pointer.address_of(option_value), sizeof[Int]()
+        socket, level, option_name, Pointer(to=option_value), sizeof[Int]()
     )
     if result == -1:
         var errno = get_errno()
@@ -895,7 +893,7 @@ fn getsockopt(
     var option_value = stack_allocation[1, c_void]()
     var option_len: socklen_t = sizeof[Int]()
     var result = _getsockopt(
-        socket, level, option_name, option_value, Pointer.address_of(option_len)
+        socket, level, option_name, option_value, Pointer(to=option_len)
     )
     if result == -1:
         var errno = get_errno()
@@ -1079,7 +1077,7 @@ fn getpeername(file_descriptor: c_int) raises -> sockaddr_in:
     var result = _getpeername(
         file_descriptor,
         remote_address,
-        Pointer.address_of(socklen_t(sizeof[sockaddr]())),
+        Pointer(to=socklen_t(sizeof[sockaddr]())),
     )
     if result == -1:
         var errno = get_errno()
@@ -1177,7 +1175,7 @@ fn bind(socket: c_int, mut address: sockaddr_in) raises:
     #### Notes:
     * Reference: https://man7.org/linux/man-pages/man3/bind.3p.html.
     """
-    var result = _bind(socket, Pointer.address_of(address), sizeof[sockaddr_in]())
+    var result = _bind(socket, Pointer(to=address), sizeof[sockaddr_in]())
     if result == -1:
         var errno = get_errno()
         if errno == EACCES:
@@ -1356,8 +1354,8 @@ fn accept(socket: c_int) raises -> c_int:
     var remote_address = sockaddr()
     var result = _accept(
         socket,
-        Pointer.address_of(remote_address),
-        Pointer.address_of(socklen_t(sizeof[socklen_t]())),
+        Pointer(to=remote_address),
+        Pointer(to=socklen_t(sizeof[socklen_t]())),
     )
     if result == -1:
         var errno = get_errno()
@@ -1478,7 +1476,7 @@ fn connect(socket: c_int, address: sockaddr_in) raises:
     #### Notes:
     * Reference: https://man7.org/linux/man-pages/man3/connect.3p.html.
     """
-    var result = _connect(socket, Pointer.address_of(address), sizeof[sockaddr_in]())
+    var result = _connect(socket, Pointer(to=address), sizeof[sockaddr_in]())
     if result == -1:
         var errno = get_errno()
         if errno == EACCES:
@@ -1742,7 +1740,7 @@ fn recvfrom(
         length,
         flags,
         address,
-        Pointer[socklen_t].address_of(sizeof[sockaddr]()),
+        Pointer[socklen_t](to=sizeof[sockaddr]()),
     )
     if result == -1:
         var errno = get_errno()

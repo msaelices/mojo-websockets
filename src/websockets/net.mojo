@@ -75,7 +75,7 @@ trait Net:
     #    ...
 
 
-trait Connection(CollectionElement):
+trait Connection:
     fn __init__(out self, laddr: String, raddr: String) raises:
         ...
 
@@ -98,7 +98,7 @@ trait Connection(CollectionElement):
         ...
 
 
-trait Addr(Stringable, Representable, Writable, EqualityComparableCollectionElement):
+trait Addr(Stringable, Writable):
     alias _type: StringLiteral
 
     fn __init__(out self):

@@ -73,9 +73,7 @@ from websockets.logger import logger
 alias SocketClosedError = "Socket: Socket is already closed"
 
 
-struct Socket[AddrType: Addr, address_family: Int = AF_INET](
-    Representable, Stringable, Writable
-):
+struct Socket[AddrType: Addr, address_family: Int = AF_INET](Stringable, Writable):
     """Represents a network file descriptor. Wraps around a file descriptor and provides network functions.
 
     Args:

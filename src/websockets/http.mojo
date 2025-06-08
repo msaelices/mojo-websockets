@@ -1,7 +1,7 @@
 from base64 import b64encode
 from collections import Dict, Optional
 from memory import Span
-from utils import StringSlice
+from collections.string import StringSlice
 
 from websockets.aliases import Bytes, Duration, DEFAULT_BUFFER_SIZE
 from websockets.libc import AF_INET6
@@ -121,15 +121,15 @@ fn build_host_header(host: String, port: Int, secure: Bool) raises -> String:
             address.isa[addrinfo_macos]()
             and address[addrinfo_macos].ai_family == AF_INET6
         ):
-            host_header = "[{}]".format(host)
+            host_header = "[" + host + "]"
         elif (
             address.isa[addrinfo_unix]()
             and address[addrinfo_unix].ai_family == AF_INET6
         ):
-            host_header = "[{}]".format(host)
+            host_header = "[" + host + "]"
 
     if port != (443 if secure else 80):
-        host_header = "{}:{}".format(host_header, port)
+        host_header = host_header + ":" + String(port)
 
     return host_header
 
@@ -139,9 +139,9 @@ fn build_authorization_basic(username: String, password: String) raises -> Strin
     Build an `Authorization` header for HTTP Basic Auth.
     """
     # https://datatracker.ietf.org/doc/html/rfc7617#section-2
-    user_pass = "{}:{}".format(username, password)
+    user_pass = username + ":" + password
     basic_credentials = b64encode(user_pass)
-    return "Basic {}".format(basic_credentials)
+    return "Basic " + basic_credentials
 
 
 @value
@@ -279,7 +279,8 @@ struct HTTPRequest(Writable, Stringable):
             and self.uri == other.uri
             and self.protocol == other.protocol
             and self.headers == other.headers
-            and String(self.body_raw) == String(other.body_raw)
+            and StringSlice(unsafe_from_utf8=Span(self.body_raw))
+            == StringSlice(unsafe_from_utf8=Span(other.body_raw))
         )
 
     fn __ne__(self, other: Self) raises -> Bool:

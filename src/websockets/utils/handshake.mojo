@@ -21,6 +21,6 @@ def ws_accept_key(key: String) -> String:
     # Convert digest to Bytes for b64encode
     var s = Bytes(capacity=len(digest))
     for i in range(len(digest)):
-        s.append(Int(digest[i]))
+        s.append(digest[i])
 
     return b64encode(s)

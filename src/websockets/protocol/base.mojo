@@ -3,11 +3,11 @@ from collections import Optional
 from websockets.aliases import Bytes, DEFAULT_MAX_REQUEST_BODY_SIZE
 from websockets.http import HTTPRequest, HTTPResponse
 from websockets.frames import (
-       Close,
-       Frame,
-       CloseCode,
-       OpCode,
-       OK_CLOSE_CODES,
+    Close,
+    Frame,
+    CloseCode,
+    OpCode,
+    OK_CLOSE_CODES,
 )
 from websockets.streams import StreamReader
 from websockets.utils.bytes import gen_mask
@@ -32,7 +32,6 @@ fn receive_data[
         return None
 
     _ = parse[gen_mask_func=gen_mask_func](protocol, data)
-
 
 
 fn parse[
@@ -96,7 +95,7 @@ fn parse_handshake[T: Protocol](mut protocol: T) raises -> Optional[HTTPRequest]
     if T.side == SERVER:
         try:
             request, bytes_read = HTTPRequest.from_bytes(
-                'http://localhost',   # TODO: Use actual host
+                "http://localhost",  # TODO: Use actual host
                 DEFAULT_MAX_REQUEST_BODY_SIZE,
                 reader_ptr[].buffer,
             )
@@ -166,7 +165,8 @@ fn parse_buffer[
     try:
         is_masked = T.side == SERVER
         optional_frame = Frame.parse(
-            reader_ptr, mask=is_masked,
+            reader_ptr,
+            mask=is_masked,
         )
         if optional_frame:
             receive_frame[gen_mask_func=gen_mask_func](protocol, optional_frame.value())
@@ -256,7 +256,9 @@ fn receive_frame[
             # Close.serialize() because that fails when the close frame
             # is empty and Close.parse() synthesizes a 1005 close code.
             # The rest is identical to send_close().
-            send_frame[gen_mask_func=gen_mask_func](protocol, Frame(OpCode.OP_CLOSE, frame.data))
+            send_frame[gen_mask_func=gen_mask_func](
+                protocol, Frame(OpCode.OP_CLOSE, frame.data)
+            )
             protocol.set_close_sent(protocol.get_close_rcvd())
             protocol.set_close_rcvd_then_sent(True)
             protocol.set_state(CLOSING)
@@ -282,7 +284,7 @@ fn receive_frame[
         _ = parse_buffer(protocol)
     else:
         # This can't happen because Frame.parse() validates opcodes.
-        raise Error("AssertionError: unexpected opcode: {}".format(frame.opcode))
+        raise Error("AssertionError: unexpected opcode: " + String(frame.opcode))
 
 
 fn send_text[
@@ -313,7 +315,7 @@ fn send_text[
     if protocol.expect_continuation_frame():
         raise Error("ProtocolError: expected a continuation frame")
     if state != OPEN:
-        raise Error("InvalidState: connection is {}".format(state))
+        raise Error("InvalidState: connection is " + String(state))
 
     protocol.set_expect_continuation_frame(not fin)
     send_frame[gen_mask_func=gen_mask_func](protocol, Frame(OpCode.OP_TEXT, data, fin))
@@ -474,7 +476,9 @@ fn send_close[
     # While RFC 6455 doesn't rule out sending more than one close Frame,
     # websockets is conservative in what it sends and doesn't allow that.
     if protocol.get_state() != OPEN:
-        raise Error("InvalidState: connection is not open but {}".format(protocol.get_state()))
+        raise Error(
+            "InvalidState: connection is not open but " + String(protocol.get_state())
+        )
     if not code:
         if reason != "":
             raise Error("ProtocolError: cannot send a reason without a code")
@@ -520,15 +524,16 @@ fn send_binary[
     if protocol.expect_continuation_frame():
         raise Error("ProtocolError: expected a continuation frame")
     if protocol.get_state() != OPEN:
-        raise Error("InvalidState: connection is {}".format(protocol.get_state()))
+        raise Error("InvalidState: connection is " + String(protocol.get_state()))
     protocol.set_expect_continuation_frame(not fin)
-    send_frame[gen_mask_func=gen_mask_func](protocol, Frame(OpCode.OP_BINARY, data, fin))
+    send_frame[gen_mask_func=gen_mask_func](
+        protocol, Frame(OpCode.OP_BINARY, data, fin)
+    )
 
 
 fn fail[
-    T: Protocol,
-    gen_mask_func: fn () -> Bytes = gen_mask
-](mut protocol: T, code: Int, reason: String = '') raises -> None:
+    T: Protocol, gen_mask_func: fn () -> Bytes = gen_mask
+](mut protocol: T, code: Int, reason: String = "") raises -> None:
     """
     `Fail the WebSocket connection`_.
 
@@ -556,7 +561,9 @@ fn fail[
         if code != CloseCode.CLOSE_CODE_ABNORMAL_CLOSURE:
             close = Close(code, reason)
             data = close.serialize()
-            send_frame[gen_mask_func=gen_mask_func](protocol, Frame(OpCode.OP_CLOSE, data))
+            send_frame[gen_mask_func=gen_mask_func](
+                protocol, Frame(OpCode.OP_CLOSE, data)
+            )
             protocol.set_close_sent(close)
             # If recv_messages() raised an exception upon receiving a close
             # frame but before echoing it, then close_rcvd is not None even
@@ -596,7 +603,9 @@ fn receive_eof[T: Protocol](mut protocol: T) raises:
     if protocol.get_state() == OPEN:
         protocol.set_parser_exc(Error("EOFError: unexpected end of stream"))
     elif protocol.get_state() == CONNECTING:
-        protocol.set_handshake_exc(Error("EOFError: connection closed before handshake completed"))
+        protocol.set_handshake_exc(
+            Error("EOFError: connection closed before handshake completed")
+        )
         return
 
     if protocol.get_eof_sent() and protocol.get_state() == CLOSED:
@@ -635,7 +644,7 @@ fn send_ping[
     # RFC 6455 allows control frames after starting the closing handshake.
     state = protocol.get_state()
     if state != OPEN and state != CLOSING:
-        raise Error("InvalidState: connection is {}".format(state))
+        raise Error("InvalidState: connection is " + String(state))
     send_frame[gen_mask_func=gen_mask_func](protocol, Frame(OpCode.OP_PING, data))
 
 
@@ -698,6 +707,18 @@ fn get_close_exc[T: Protocol](protocol: T) raises -> Error:
         and Int(close_rcvd.value().code) in OK_CLOSE_CODES
         and Int(close_sent.value().code) in OK_CLOSE_CODES
     ):
-        return Error("ConnectionClosedOK: {}, {}".format(close_rcvd.value().code, close_sent.value().code))
+        return Error(
+            "ConnectionClosedOK: "
+            + String(close_rcvd.value().code)
+            + ", "
+            + String(close_sent.value().code)
+        )
     else:
-        return Error("ConnectionClosedError: {}, {}, {}".format(Bool(close_rcvd), Bool(close_sent), Bool(close_rcvd_then_sent)))
+        return Error(
+            "ConnectionClosedError: "
+            + String(Bool(close_rcvd))
+            + ", "
+            + String(Bool(close_sent))
+            + ", "
+            + String(Bool(close_rcvd_then_sent))
+        )
