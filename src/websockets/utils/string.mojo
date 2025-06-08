@@ -82,11 +82,8 @@ struct ByteWriter(Writer):
             args: The data to write.
         """
 
-        @parameter
-        fn write_arg[T: Writable](arg: T):
-            arg.write_to(self)
-
-        args.each[write_arg]()
+        for i in range(args.__len__()):
+            args[i].write_to(self)
 
     @always_inline
     fn consuming_write(mut self, owned b: Bytes):
