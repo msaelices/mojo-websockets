@@ -98,7 +98,7 @@ trait Connection:
         ...
 
 
-trait Addr(Stringable, Writable):
+trait Addr(Stringable, Copyable, Representable, Writable):
     fn __init__(out self):
         ...
 
