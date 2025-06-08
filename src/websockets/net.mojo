@@ -236,7 +236,7 @@ struct TCPConnection:
 
 fn resolve_internet_addr(network: String, address: String) raises -> TCPAddr:
     var host: String = ""
-    var port: String = ""
+    var port: String
     var portnum: Int = 0
     if (
         network == NetworkType.TCP.value
@@ -285,8 +285,8 @@ struct HostPort:
 
 
 fn split_host_port(hostport: String) raises -> HostPort:
-    var host: String = ""
-    var port: String = ""
+    var host: String
+    var port: String
     var colon_index = hostport.rfind(":")
     var j: Int = 0
     var k: Int = 0
@@ -338,8 +338,8 @@ fn parse_address(address: String) raises -> (String, UInt16):
     if colon_index == -1:
         raise MissingPortError
 
-    var host: String = ""
-    var port: String = ""
+    var host: String
+    var port: String
     var j: Int = 0
     var k: Int = 0
 
@@ -456,7 +456,7 @@ struct addrinfo_macos(AddrInfo):
         Returns:
             The IP address.
         """
-        var host_ptr = host.unsafe_cstr_ptr().origin_cast[mut=False](),
+        var host_ptr = (host.unsafe_cstr_ptr().origin_cast[mut=False](),)
         var servinfo = Pointer(to=Self())
         var servname = UnsafePointer[Int8]()
 
@@ -541,7 +541,7 @@ struct addrinfo_unix(AddrInfo):
         Returns:
             The IP address.
         """
-        var host_ptr = host.unsafe_cstr_ptr().origin_cast[mut=False](),
+        var host_ptr = (host.unsafe_cstr_ptr().origin_cast[mut=False](),)
         var servinfo = Pointer(to=Self())
         var servname = UnsafePointer[Int8]()
 

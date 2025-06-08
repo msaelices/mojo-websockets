@@ -149,8 +149,8 @@ struct StreamReader(Streamable):
             EOFError: If the stream ends without a LF.
             RuntimeError: If the stream ends in more than ``m`` bytes.
         """
-        var n: Int = 0  # number of bytes to read
-        var p: Int = 0  # number of bytes without a newline
+        var n: Int  # number of bytes to read
+        var p: Int  # number of bytes without a newline
         var found: Bool = False
 
         start = self.offset

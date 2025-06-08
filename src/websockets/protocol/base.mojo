@@ -171,7 +171,6 @@ fn parse_buffer[
         if optional_frame:
             receive_frame[gen_mask_func=gen_mask_func](protocol, optional_frame.value())
             protocol.add_event(optional_frame.value())
-        err = None
         return optional_frame
     except error:
         err = error

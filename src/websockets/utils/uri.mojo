@@ -31,14 +31,10 @@ struct URI:
     @staticmethod
     fn parse(uri: String) -> URI:
         var proto_str = String(HTTP11)
-        var is_https = False
-
         var proto_end = uri.find("://")
         var remainder_uri: String
         if proto_end >= 0:
             proto_str = uri[:proto_end]
-            if proto_str == HTTPS:
-                is_https = True
             remainder_uri = uri[proto_end + 3 :]
         else:
             remainder_uri = uri

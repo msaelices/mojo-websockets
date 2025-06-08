@@ -330,8 +330,6 @@ struct ClientProtocol(Protocol):
         if response.status_code != 101:
             raise Error("InvalidStatus: " + String(response.status_code))
 
-        headers = response.headers
-
         # TODO: Support for several "Connection" headers
         # See process_response in the Python implementation
         if "Connection" not in response.headers:

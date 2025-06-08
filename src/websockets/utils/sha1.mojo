@@ -49,9 +49,9 @@ fn _process_chunk(
     var d = h3
     var e = h4
 
-    var f: UInt32 = 0
-    var k: UInt32 = 0
-    var temp: UInt32 = 0
+    var f: UInt32
+    var k: UInt32
+    var temp: UInt32
 
     for i in range(80):
         if i < 20:
