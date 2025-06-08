@@ -26,18 +26,15 @@ struct Client:
     fn __init__(out self, uri: String) raises:
         self.uri = URI.parse(uri)
         self.protocol = ClientProtocol(self.uri)
-        # Need to fix Socket generic parameter issue in Max 25.3
-        # In Max 25.3, we have to switch to a non-generic approach
+        var socket: Socket[TCPAddr]
         try:
-            # Placeholder for connection logic
-            pass
+            socket = Socket[TCPAddr]()
         except e:
             logger.error(e)
             raise Error(
                 "Client: Failed to create WS client due to socket creation failure."
             )
-        # Connection handling changed in Max 25.3
-        # self.conn = TCPConnection(socket^)
+        self.conn = TCPConnection(socket^)
 
     fn __moveinit__(out self, owned other: Self):
         self.protocol = other.protocol^
@@ -60,18 +57,16 @@ struct Client:
                 client.send_text("Hello world!")
                 response = client.recv()
         """
-        # Connection handling changed in Max 25.3
-        # Need to implement a new version
-        logger.debug("Connection not implemented in Max 25.3 yet")
-        # conn_req = self.protocol.connect()
-        # logger.debug("Sending connection request:\n" + String(conn_req))
-        # self.protocol.send_request(conn_req)
-        # data_to_send = self.protocol.data_to_send()
-        # _ = self.conn.write(data_to_send)
-        # response_bytes = Bytes(capacity=DEFAULT_BUFFER_SIZE)
-        # bytes_received = self.conn.read(response_bytes)
-        # logger.debug("Bytes received: ", bytes_received)
-        # receive_data(self.protocol, response_bytes)
+        self.conn.connect(self.uri.get_hostname(), self.uri.get_port())
+        conn_req = self.protocol.connect()
+        logger.debug("Sending connection request:\n", conn_req)
+        self.protocol.send_request(conn_req)
+        data_to_send = self.protocol.data_to_send()
+        _ = self.conn.write(data_to_send)
+        response_bytes = Bytes(capacity=DEFAULT_BUFFER_SIZE)
+        bytes_received = self.conn.read(response_bytes)
+        logger.debug("Bytes received: ", bytes_received)
+        receive_data(self.protocol, response_bytes)
         if self.protocol.get_handshake_exc():
             logger.error(String(self.protocol.get_handshake_exc().value()))
             logger.error("Failed to establish connection. Closing connection.")
