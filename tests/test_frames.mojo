@@ -24,12 +24,12 @@ fn test_str() raises:
         "TEXT 'Spam' [text, 4 bytes, continued]",
     )
     assert_equal(
-        String(Frame(OpCode.OP_BINARY, bytes("Eggs"))),
-        "BINARY 0x30 0x30 0x30 0x30 [binary, 4 bytes, ]",
+        String(Frame(OpCode.OP_BINARY, Bytes(31, 32, 33, 34))),
+        "BINARY 0x1f 0x20 0x21 0x22 [binary, 4 bytes, ]",
     )
     assert_equal(
         String(Frame(OpCode.OP_BINARY, bytes("Eggs"), fin=False)),
-        "BINARY 0x30 0x30 0x30 0x30 [binary, 4 bytes, continued]",
+        "BINARY 0x45 0x67 0x67 0x73 [binary, 4 bytes, continued]",
     )
     assert_equal(
         String(Frame(OpCode.OP_CLOSE, bytes(""))),
