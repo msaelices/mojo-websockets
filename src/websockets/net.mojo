@@ -445,7 +445,7 @@ struct addrinfo_macos(AddrInfo):
         self.ai_addr = UnsafePointer[sockaddr]()
         self.ai_next = UnsafePointer[c_void]()
 
-    fn get_from_host(self, host: String) raises -> Self:
+    fn get_from_host(self, owned host: String) raises -> Self:
         """
         Returns an IP address based on the host.
         This is a MacOS-specific implementation.
@@ -456,7 +456,7 @@ struct addrinfo_macos(AddrInfo):
         Returns:
             The IP address.
         """
-        var host_ptr = host.unsafe_cstr_ptr()
+        var host_ptr = host.unsafe_cstr_ptr().origin_cast[mut=False](),
         var servinfo = Pointer(to=Self())
         var servname = UnsafePointer[Int8]()
 
@@ -468,7 +468,7 @@ struct addrinfo_macos(AddrInfo):
         var error = external_call[
             "getaddrinfo",
             Int32,
-        ](host_ptr, servname, Pointer(to=hints), Pointer.address_of(servinfo))
+        ](host_ptr, servname, Pointer(to=hints), Pointer(to=servinfo))
 
         if error != 0:
             print("getaddrinfo failed with error code: " + error.__str__())
@@ -530,7 +530,7 @@ struct addrinfo_unix(AddrInfo):
         self.ai_canonname = UnsafePointer[c_char]()
         self.ai_next = UnsafePointer[c_void]()
 
-    fn get_from_host(self, host: String) raises -> Self:
+    fn get_from_host(self, owned host: String) raises -> Self:
         """
         Returns an IP address based on the host.
         This is a MacOS-specific implementation.
@@ -541,7 +541,7 @@ struct addrinfo_unix(AddrInfo):
         Returns:
             The IP address.
         """
-        var host_ptr = host.unsafe_cstr_ptr()
+        var host_ptr = host.unsafe_cstr_ptr().origin_cast[mut=False](),
         var servinfo = Pointer(to=Self())
         var servname = UnsafePointer[Int8]()
 
