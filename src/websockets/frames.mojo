@@ -564,7 +564,7 @@ struct Close:
         else:
             code = self.code
 
-        bytes = UnsafePointer.address_of(code).bitcast[Byte]()
+        bytes = UnsafePointer(to=code).bitcast[Byte]()
         code_bytes = Bytes(bytes[0], bytes[1])
         code_bytes.extend(self.reason.as_bytes())
         return code_bytes

@@ -226,8 +226,6 @@ struct Socket[AddrType: Addr, address_family: Int = AF_INET](Stringable, Writabl
 
         writer.write(
             "Socket[",
-            AddrType._type,
-            ", ",
             af(),
             "]",
             "(",
@@ -379,7 +377,7 @@ struct Socket[AddrType: Addr, address_family: Int = AF_INET](Stringable, Writabl
             getsockname(
                 self.fd,
                 local_address,
-                Pointer.address_of(socklen_t(sizeof[sockaddr]())),
+                Pointer(to=socklen_t(sizeof[sockaddr]())),
             )
         except e:
             logger.error(e)
@@ -557,7 +555,7 @@ struct Socket[AddrType: Addr, address_family: Int = AF_INET](Stringable, Writabl
             src.unsafe_ptr(),
             len(src),
             0,
-            UnsafePointer.address_of(addr).bitcast[sockaddr](),
+            UnsafePointer(to=addr).bitcast[sockaddr](),
         )
 
         return bytes_sent

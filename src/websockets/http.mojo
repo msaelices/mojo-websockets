@@ -590,7 +590,7 @@ struct HTTPResponse(Writable, Stringable):
                     ):
                         break
 
-                    buff.resize(0)
+                    buff.shrink(0)
                 response.read_chunks(b)
                 return response
             except e:

@@ -99,8 +99,6 @@ trait Connection:
 
 
 trait Addr(Stringable, Writable):
-    alias _type: StringLiteral
-
     fn __init__(out self):
         ...
 
@@ -130,7 +128,6 @@ struct NetworkType:
 
 @value
 struct TCPAddr(Addr):
-    alias _type = "TCPAddr"
     var ip: String
     var port: UInt16
     var zone: String  # IPv6 addressing zone
@@ -144,6 +141,11 @@ struct TCPAddr(Addr):
         self.ip = ip
         self.port = port
         self.zone = ""
+
+    fn __copyinit__(out self, other: Self):
+        self.ip = other.ip
+        self.port = other.port
+        self.zone = other.zone
 
     fn network(self) -> String:
         return NetworkType.TCP.value
@@ -455,7 +457,7 @@ struct addrinfo_macos(AddrInfo):
             The IP address.
         """
         var host_ptr = host.unsafe_cstr_ptr()
-        var servinfo = Pointer.address_of(Self())
+        var servinfo = Pointer(to=Self())
         var servname = UnsafePointer[Int8]()
 
         var hints = Self()
@@ -466,7 +468,7 @@ struct addrinfo_macos(AddrInfo):
         var error = external_call[
             "getaddrinfo",
             Int32,
-        ](host_ptr, servname, Pointer.address_of(hints), Pointer.address_of(servinfo))
+        ](host_ptr, servname, Pointer(to=hints), Pointer.address_of(servinfo))
 
         if error != 0:
             print("getaddrinfo failed with error code: " + error.__str__())
@@ -540,7 +542,7 @@ struct addrinfo_unix(AddrInfo):
             The IP address.
         """
         var host_ptr = host.unsafe_cstr_ptr()
-        var servinfo = Pointer.address_of(Self())
+        var servinfo = Pointer(to=Self())
         var servname = UnsafePointer[Int8]()
 
         var hints = Self()
@@ -551,7 +553,7 @@ struct addrinfo_unix(AddrInfo):
         var error = external_call[
             "getaddrinfo",
             Int32,
-        ](host_ptr, servname, Pointer.address_of(hints), Pointer.address_of(servinfo))
+        ](host_ptr, servname, Pointer(to=hints), Pointer(to=servinfo))
 
         if error != 0:
             print("getaddrinfo failed with error code: " + error.__str__())
@@ -732,7 +734,7 @@ fn get_address_info(host: String) raises -> Variant[addrinfo_macos, addrinfo_uni
 #     var addr: sockaddr_in = sockaddr_in(
 #         AF_INET, htons(port), ip, StaticTuple[c_char, 8](0, 0, 0, 0, 0, 0, 0, 0)
 #     )
-#     var addr_ptr = Pointer[sockaddr_in].address_of(addr)
+#     var addr_ptr = Pointer[sockaddr_in](to=addr)
 #     var sock = socket(AF_INET, SOCK_STREAM, 0)
 #
 #     if (
