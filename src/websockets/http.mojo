@@ -145,7 +145,7 @@ fn build_authorization_basic(username: String, password: String) raises -> Strin
 
 
 @value
-struct Headers(Writable, Stringable):
+struct Headers(Writable, Stringable, EqualityComparable):
     """Represents the header key/values in an http request/response.
 
     Header keys are normalized to lowercase

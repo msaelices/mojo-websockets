@@ -20,6 +20,7 @@ from testutils import ACCEPT, KEY, assert_bytes_equal
 fn date_func() -> String:
     return "Thu, 02 Jan 2025 22:16:23 GMT"
 
+
 fn make_request() raises -> HTTPRequest:
     """Generate a handshake request that can be altered for testing."""
     return HTTPRequest(
@@ -40,14 +41,16 @@ fn test_receive_request() raises:
     receive_data(
         server,
         str_to_bytes(
-            "GET /test HTTP/1.1\r\n"
-            "Host: example.com\r\n"
-            "Upgrade: websocket\r\n"
-            "Connection: Upgrade\r\n"
-            "Sec-WebSocket-Key: {}\r\n"
-            "Sec-WebSocket-Version: 13\r\n"
-            "\r\n".format(KEY)
-        )
+            String(
+                "GET /test HTTP/1.1\r\n"
+                "Host: example.com\r\n"
+                "Upgrade: websocket\r\n"
+                "Connection: Upgrade\r\n"
+                "Sec-WebSocket-Key: {}\r\n"
+                "Sec-WebSocket-Version: 13\r\n"
+                "\r\n"
+            ).format(KEY)
+        ),
     )
 
     data_to_send = server.data_to_send()
@@ -65,12 +68,14 @@ fn test_accept_and_send_successful_response() raises:
 
     data_to_send = server.data_to_send()
     expected = str_to_bytes(
-        "HTTP/1.1 101 Switching Protocols\r\n"
-        "date: Thu, 02 Jan 2025 22:16:23 GMT\r\n"
-        "upgrade: websocket\r\n"
-        "connection: Upgrade\r\n"
-        "sec-websocket-accept: {}\r\n"
-        "\r\n".format(ACCEPT)
+        String(
+            "HTTP/1.1 101 Switching Protocols\r\n"
+            "date: Thu, 02 Jan 2025 22:16:23 GMT\r\n"
+            "upgrade: websocket\r\n"
+            "connection: Upgrade\r\n"
+            "sec-websocket-accept: {}\r\n"
+            "\r\n"
+        ).format(ACCEPT)
     )
     assert_bytes_equal(
         data_to_send,
@@ -99,7 +104,7 @@ fn test_send_response_after_failed_accept() raises:
             "content-type: text/plain; charset=utf-8\r\n"
             "\r\n"
             'Missing "Sec-WebSocket-Key" header.'
-        )
+        ),
     )
     assert_true(close_expected(server))
     assert_equal(server.get_state(), CONNECTING)
@@ -108,7 +113,9 @@ fn test_send_response_after_failed_accept() raises:
 fn test_send_response_after_reject() raises:
     """Server rejects a handshake request and sends a failed response."""
     var server = ServerProtocol()
-    var response = server.reject[date_func=date_func](404, "Not Found", "Sorry folks.\n")
+    var response = server.reject[date_func=date_func](
+        404, "Not Found", "Sorry folks.\n"
+    )
     server.send_response(response)
 
     var data_to_send = server.data_to_send()
@@ -122,7 +129,7 @@ fn test_send_response_after_reject() raises:
             "content-type: text/plain; charset=utf-8\r\n"
             "\r\n"
             "Sorry folks.\n"
-        )
+        ),
     )
     assert_true(close_expected(server))
     assert_equal(server.get_state(), CONNECTING)
@@ -149,14 +156,16 @@ fn test_send_response_without_accept_or_reject() raises:
     assert_bytes_equal(
         data_to_send,
         str_to_bytes(
-            "HTTP/1.1 410 Gone\r\n"
-            "connection: close\r\n"
-            "content-length: 6\r\n"
-            "content-type: text/plain\r\n"
-            "date: {}\r\n"
-            "\r\n"
-            "AWOL.\n".format(date_func())
-        )
+            String(
+                "HTTP/1.1 410 Gone\r\n"
+                "connection: close\r\n"
+                "content-length: 6\r\n"
+                "content-type: text/plain\r\n"
+                "date: {}\r\n"
+                "\r\n"
+                "AWOL.\n"
+            ).format(date_func())
+        ),
     )
     assert_true(close_expected(server))
     assert_equal(server.get_state(), CONNECTING)
@@ -168,14 +177,16 @@ fn test_receive_request_and_check_events() raises:
     receive_data(
         server,
         str_to_bytes(
-            "GET /test HTTP/1.1\r\n"
-            "Host: example.com\r\n"
-            "Upgrade: websocket\r\n"
-            "Connection: Upgrade\r\n"
-            "Sec-WebSocket-Key: {}\r\n"
-            "Sec-WebSocket-Version: 13\r\n"
-            "\r\n".format(KEY)
-        )
+            String(
+                "GET /test HTTP/1.1\r\n"
+                "Host: example.com\r\n"
+                "Upgrade: websocket\r\n"
+                "Connection: Upgrade\r\n"
+                "Sec-WebSocket-Key: {}\r\n"
+                "Sec-WebSocket-Version: 13\r\n"
+                "\r\n"
+            ).format(KEY)
+        ),
     )
 
     var events = server.events_received()
@@ -190,8 +201,8 @@ fn test_receive_request_and_check_events() raises:
             Header("Upgrade", "websocket"),
             Header("Connection", "Upgrade"),
             Header("Sec-WebSocket-Key", KEY),
-            Header("Sec-WebSocket-Version", "13")
-        )
+            Header("Sec-WebSocket-Version", "13"),
+        ),
     )
     assert_false(server.get_handshake_exc())
 
@@ -206,7 +217,7 @@ fn test_receive_no_request() raises:
     # EOFError: connection closed while reading HTTP request line
     assert_equal(
         String(server.get_handshake_exc().value()),
-        "EOFError: connection closed before handshake completed"
+        "EOFError: connection closed before handshake completed",
     )
     var events = server.events_received()
     assert_equal(len(events), 0)
@@ -224,7 +235,7 @@ fn test_receive_truncated_request() raises:
     # EOFError: connection closed while reading HTTP headers
     assert_equal(
         String(server.get_handshake_exc().value()),
-        "EOFError: connection closed before handshake completed"
+        "EOFError: connection closed before handshake completed",
     )
     var data_to_send = server.data_to_send()
     assert_bytes_equal(data_to_send, Bytes())
@@ -246,11 +257,15 @@ fn test_receive_junk_request() raises:
     # ValueError: invalid HTTP request line: HELO relay.invalid
     assert_equal(
         String(server.get_handshake_exc().value()),
-        "HTTPRequest.from_bytes: Failed to parse request headers: Failed to read second word from request line"
+        (
+            "HTTPRequest.from_bytes: Failed to parse request headers: Failed to read"
+            " second word from request line"
+        ),
     )
     assert_equal(len(events), 2)
     assert_true(events[0].isa[HTTPRequest]())
     assert_true(events[1].isa[HTTPRequest]())
+
 
 # ===----------------------------------------------------------------------===
 # Test generating opening handshake responses.
@@ -272,7 +287,7 @@ fn test_accept_response() raises:
             Header("Upgrade", "websocket"),
             Header("Connection", "Upgrade"),
             Header("Sec-WebSocket-Accept", ACCEPT),
-        )
+        ),
     )
     assert_bytes_equal(response.body_raw, Bytes())
 
@@ -280,7 +295,9 @@ fn test_accept_response() raises:
 fn test_reject_response() raises:
     """Check that `reject()` creates a failed opening handshake response."""
     var server = ServerProtocol()
-    var response = server.reject[date_func=date_func](404, "Not Found", "Sorry folks.\n")
+    var response = server.reject[date_func=date_func](
+        404, "Not Found", "Sorry folks.\n"
+    )
 
     assert_equal(response.status_code, 404)
     assert_equal(response.status_text, "Not Found")
@@ -291,7 +308,7 @@ fn test_reject_response() raises:
             Header("Connection", "close"),
             Header("Content-Length", "13"),
             Header("Content-Type", "text/plain; charset=utf-8"),
-        )
+        ),
     )
     assert_bytes_equal(response.body_raw, str_to_bytes("Sorry folks.\n"))
 
@@ -299,7 +316,9 @@ fn test_reject_response() raises:
 fn test_reject_response_supports_int_status() raises:
     """Check that reject() accepts an integer status code."""
     var server = ServerProtocol()
-    var response = server.reject[date_func=date_func](404, "Not Found", "Sorry folks.\n")
+    var response = server.reject[date_func=date_func](
+        404, "Not Found", "Sorry folks.\n"
+    )
 
     assert_equal(response.status_code, 404)
     assert_equal(response.status_text, "Not Found")
@@ -322,6 +341,7 @@ fn test_reject_response_supports_int_status() raises:
 # ===----------------------------------------------------------------------===
 # Test processing of handshake responses to configure the connection.
 # ===----------------------------------------------------------------------===
+
 
 fn test_basic() raises:
     """Handshake succeeds."""
@@ -348,7 +368,7 @@ fn test_missing_connection() raises:
     assert_true(server.get_handshake_exc())
     assert_equal(
         String(server.get_handshake_exc().value()),
-        'Request headers do not contain an "connection" header'
+        'Request headers do not contain an "connection" header',
     )
 
 
@@ -368,7 +388,7 @@ fn test_invalid_connection() raises:
     # Request headers do not contain an "connection" header
     assert_equal(
         String(server.get_handshake_exc().value()),
-        'Request "connection" header is not "upgrade"'
+        'Request "connection" header is not "upgrade"',
     )
 
 
@@ -386,7 +406,7 @@ fn test_missing_upgrade() raises:
     assert_true(server.get_handshake_exc())
     assert_equal(
         String(server.get_handshake_exc().value()),
-        'Request headers do not contain an "upgrade" header'
+        'Request headers do not contain an "upgrade" header',
     )
 
 
@@ -405,7 +425,7 @@ fn test_invalid_upgrade() raises:
     assert_true(server.get_handshake_exc())
     assert_equal(
         String(server.get_handshake_exc().value()),
-        'Request "upgrade" header is not "websocket"'
+        'Request "upgrade" header is not "websocket"',
     )
 
 
@@ -421,7 +441,7 @@ fn test_missing_key() raises:
     assert_true(server.get_handshake_exc())
     assert_equal(
         String(server.get_handshake_exc().value()),
-        'Missing "Sec-WebSocket-Key" header.'
+        'Missing "Sec-WebSocket-Key" header.',
     )
 
 
@@ -475,7 +495,7 @@ fn test_truncated_key() raises:
     assert_true(server.get_handshake_exc())
     assert_equal(
         String(server.get_handshake_exc().value()),
-        "ValueError: Input length must be divisible by 4"
+        "ValueError: Input length must be divisible by 4",
     )
 
 
@@ -491,7 +511,7 @@ fn test_missing_version() raises:
     assert_true(server.get_handshake_exc())
     assert_equal(
         String(server.get_handshake_exc().value()),
-        'Missing "Sec-WebSocket-Version" header.'
+        'Missing "Sec-WebSocket-Version" header.',
     )
 
 
@@ -508,7 +528,7 @@ fn test_invalid_version() raises:
     assert_true(server.get_handshake_exc())
     assert_equal(
         String(server.get_handshake_exc().value()),
-        'Request "Sec-WebSocket-Version" header is not "13"'
+        'Request "Sec-WebSocket-Version" header is not "13"',
     )
 
 
@@ -538,10 +558,7 @@ fn test_no_origin() raises:
     # specific errors yet in Mojo
     assert_equal(response.status_code, 400)
     assert_true(server.get_handshake_exc())
-    assert_equal(
-        String(server.get_handshake_exc().value()),
-        'Missing "Origin" header.'
-    )
+    assert_equal(String(server.get_handshake_exc().value()), 'Missing "Origin" header.')
 
 
 fn test_unexpected_origin() raises:
@@ -558,13 +575,15 @@ fn test_unexpected_origin() raises:
     assert_true(server.get_handshake_exc())
     assert_equal(
         String(server.get_handshake_exc().value()),
-        'Invalid "Origin" header: https://other.example.com'
+        'Invalid "Origin" header: https://other.example.com',
     )
 
 
 fn test_supported_origin() raises:
     """Handshake succeeds when checking origins and the origin is supported."""
-    var server = ServerProtocol(origins=List[String]("https://example.com", "https://other.example.com"))
+    var server = ServerProtocol(
+        origins=List[String]("https://example.com", "https://other.example.com")
+    )
     var request = make_request()
     request.headers["Origin"] = "https://other.example.com"
     var response = server.accept[date_func=date_func](request)
@@ -580,7 +599,9 @@ fn test_supported_origin() raises:
 
 fn test_unsupported_origin() raises:
     """Handshake succeeds when checking origins and the origin is unsupported."""
-    var server = ServerProtocol(origins=List[String]("https://example.com", "https://other.example.com"))
+    var server = ServerProtocol(
+        origins=List[String]("https://example.com", "https://other.example.com")
+    )
     var request = make_request()
     request.headers["Origin"] = "https://original.example.com"
     var response = server.accept[date_func=date_func](request)
@@ -592,7 +613,7 @@ fn test_unsupported_origin() raises:
     assert_true(server.get_handshake_exc())
     assert_equal(
         String(server.get_handshake_exc().value()),
-        'Invalid "Origin" header: https://original.example.com'
+        'Invalid "Origin" header: https://original.example.com',
     )
 
 
@@ -615,9 +636,13 @@ fn test_bypass_handshake() raises:
     """ServerProtocol bypasses the opening handshake if state is OPEN."""
     var server = ServerProtocol()
     server.set_state(OPEN)
+
     fn gen_mask() -> Bytes:
         return Bytes(0, 0, 0, 0)
-    receive_data[gen_mask_func=gen_mask](server, Bytes(129, 134, 0, 0, 0, 0, 72, 101, 108, 108, 111, 33))  # "\x81\x86\x00\x00\x00\x00Hello!"
+
+    receive_data[gen_mask_func=gen_mask](
+        server, Bytes(129, 134, 0, 0, 0, 0, 72, 101, 108, 108, 111, 33)
+    )  # "\x81\x86\x00\x00\x00\x00Hello!"
     events = server.events_received()
     assert_equal(len(events), 1)
     var frame = events[0][Frame]
@@ -874,4 +899,3 @@ fn test_bypass_handshake() raises:
 #         self.assertHandshakeSuccess(server)
 #         self.assertNotIn("Sec-WebSocket-Protocol", response.headers)
 #         self.assertIsNone(server.subprotocol)
-
