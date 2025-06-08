@@ -338,7 +338,7 @@ struct Frame(Stringable, EqualityComparable):
         """
         var s: String = ""
         for byte in self.data:
-            s += hex(ord(String(byte))) + " "
+            s += hex(byte) + " "
         return String(s.strip())
 
     fn check(self) raises -> None:
