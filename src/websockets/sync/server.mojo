@@ -273,7 +273,7 @@ fn serve[handler: ConnHandler](host: String, port: Int) raises -> Server[handler
         If there is an error while serving requests.
 
     Usage:
-        with serve(handler, host, port) as server:
+        with serve[handler](host, port) as server:
             server.serve_forever()
     .
     """
