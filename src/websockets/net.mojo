@@ -449,7 +449,7 @@ struct addrinfo_macos(AddrInfo):
         self.ai_addr = UnsafePointer[sockaddr]()
         self.ai_next = UnsafePointer[c_void]()
 
-    fn get_from_host(self, owned host: String) raises -> Self:
+    fn get_from_host(self, owned host: String) raises -> UnsafePointer[Self]:
         """
         Returns an IP address based on the host.
         This is a MacOS-specific implementation.
@@ -461,7 +461,7 @@ struct addrinfo_macos(AddrInfo):
             The IP address.
         """
         var host_ptr = host.unsafe_cstr_ptr().origin_cast[mut=False]()
-        var servinfo = Pointer(to=self)
+        var servinfo = UnsafePointer(to=self)
         var servname = UnsafePointer[Int8]()
 
         var hints = Self()
@@ -472,22 +472,20 @@ struct addrinfo_macos(AddrInfo):
         var error = external_call[
             "getaddrinfo",
             Int32,
-        ](host_ptr, servname, Pointer(to=hints), Pointer(to=servinfo))
+        ](host_ptr, servname, UnsafePointer(to=hints), UnsafePointer(to=servinfo))
 
         if error != 0:
             print("getaddrinfo failed with error code: " + error.__str__())
             raise Error("Failed to get IP address. getaddrinfo failed.")
 
-        var addrinfo = servinfo[]
-
-        var ai_addr = addrinfo.ai_addr
+        var ai_addr = servinfo[].ai_addr
         if not ai_addr:
             print("ai_addr is null")
             raise Error(
                 "Failed to get IP address. getaddrinfo was called successfully,"
                 " but ai_addr is null."
             )
-        return addrinfo
+        return servinfo
 
     fn get_ip_address(self, host: String) raises -> in_addr:
         """
@@ -500,9 +498,9 @@ struct addrinfo_macos(AddrInfo):
         Returns:
             The IP address.
         """
-        var addrinfo = self.get_from_host(host)
+        var addrinfo_ptr = self.get_from_host(host)
 
-        var ai_addr = addrinfo.ai_addr
+        var ai_addr = addrinfo_ptr[].ai_addr
         var addr_in = ai_addr.bitcast[sockaddr_in]()[]
 
         return addr_in.sin_addr
@@ -541,48 +539,9 @@ struct addrinfo_unix(AddrInfo):
         self.ai_addr = UnsafePointer[sockaddr]()
         self.ai_next = OpaquePointer()
 
-    fn get_from_host(self, owned host: String) raises -> Self:
+    fn get_from_host(self, owned host: String) raises -> UnsafePointer[Self]:
         """
         Returns an IP address based on the host.
-        This is a MacOS-specific implementation.
-
-        Args:
-            host: String - The host to get the IP from.
-
-        Returns:
-            The IP address.
-        """
-        var host_ptr = host.unsafe_cstr_ptr()
-        var servinfo = Pointer(to=self)
-        var servname = UnsafePointer[Int8]()
-
-        var hints = Self()
-        hints.ai_family = AF_INET
-        hints.ai_socktype = SOCK_STREAM
-        hints.ai_flags = AI_PASSIVE
-
-        var error = external_call[
-            "getaddrinfo",
-            Int32,
-        ](host_ptr, servname, Pointer(to=hints), Pointer(to=servinfo))
-
-        if error != 0:
-            logger.error("getaddrinfo failed with error code: ", error)
-            raise Error("Failed to get IP address. getaddrinfo failed.")
-
-        var addrinfo = servinfo[]
-
-        var ai_addr = addrinfo.ai_addr
-        if not ai_addr:
-            logger.error("ai_addr is null")
-            raise Error(
-                "Failed to get IP address. getaddrinfo was called successfully,"
-                " but ai_addr is null."
-            )
-        return addrinfo
-
-    fn get_ip_address(self, host: String) raises -> in_addr:
-        """Returns an IP address based on the host.
         This is a MacOS-specific implementation.
 
         Args:
@@ -607,8 +566,22 @@ struct addrinfo_unix(AddrInfo):
                 "Failed to get IP address because the response's `ai_addr` was null."
             )
 
-        var ip = result[].ai_addr.bitcast[sockaddr_in]()[].sin_addr
-        freeaddrinfo(result)
+        return result
+
+    fn get_ip_address(self, host: String) raises -> in_addr:
+        """Returns an IP address based on the host.
+        This is a MacOS-specific implementation.
+
+        Args:
+            host: String - The host to get the IP from.
+
+        Returns:
+            The IP address.
+        """
+        result_ptr = self.get_from_host(host)
+
+        var ip = result_ptr[].ai_addr.bitcast[sockaddr_in]()[].sin_addr
+        freeaddrinfo(result_ptr)
         return ip
 
 
@@ -729,8 +702,8 @@ fn get_address_info(host: String) raises -> Variant[addrinfo_macos, addrinfo_uni
         The IP address.
     """
     if os_is_macos():
-        return addrinfo_macos().get_from_host(host)
-    return addrinfo_unix().get_from_host(host)
+        return addrinfo_macos().get_from_host(host)[]
+    return addrinfo_unix().get_from_host(host)[]
 
 
 fn _getaddrinfo[
