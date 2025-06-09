@@ -338,7 +338,7 @@ struct Socket[AddrType: Addr, address_family: Int = AF_INET](Stringable, Writabl
         """
         var binary_ip: c_uint
         try:
-            binary_ip = inet_pton[address_family](address.unsafe_ptr())
+            binary_ip = inet_pton[address_family](address)
         except e:
             logger.error(e)
             raise Error(
@@ -458,6 +458,12 @@ struct Socket[AddrType: Addr, address_family: Int = AF_INET](Stringable, Writabl
         Raises:
             Error: If connecting to the remote socket fails.
         """
+        logger.info(
+            "Socket.connect: Attempting to connect to remote socket at "
+            + address
+            + ":"
+            + String(port)
+        )
 
         @parameter
         if os_is_macos():
