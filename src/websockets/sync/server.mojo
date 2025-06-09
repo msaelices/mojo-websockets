@@ -34,7 +34,7 @@ alias BYTE_1_SIZE_TWO_BYTES: UInt8 = 126
 alias BYTE_1_SIZE_EIGHT_BYTES: UInt8 = 127
 
 
-alias ConnHandler = fn (conn: WSConnection, data: Bytes) raises -> None
+alias ConnHandler = fn (conn: WSConnection, data: Span[Byte]) raises -> None
 
 
 struct WSConnection:
@@ -68,16 +68,20 @@ struct WSConnection:
         self.conn_ptr[].close()
 
 
-struct Server:
+struct Server[
+    handler: ConnHandler,
+]:
     """
     A Mojo-based web server that accept incoming requests and delivers HTTP services.
+
+    Parameters:
+        handler: ConnHandler - A function that handles incoming HTTP requests.
     """
 
     # TODO: add an error_handler to the constructor
 
     var host: String
     var port: Int
-    var handler: ConnHandler
     var max_request_body_size: Int
 
     var ln: TCPListener
@@ -86,7 +90,6 @@ struct Server:
         out self,
         host: String,
         port: Int,
-        handler: ConnHandler,
         max_request_body_size: Int = DEFAULT_MAX_REQUEST_BODY_SIZE,
     ) raises:
         """
@@ -95,7 +98,6 @@ struct Server:
         Args:
             host: String - The address to listen on.
             port: Int - The port to listen on.
-            handler : ConnHandler - An object that handles incoming HTTP requests.
             max_request_body_size: Int - The maximum size of the request body.
 
         Raises:
@@ -103,21 +105,18 @@ struct Server:
         """
         self.host = host
         self.port = port
-        self.handler = handler
         self.max_request_body_size = max_request_body_size
         self.ln = TCPListener()
 
     fn __moveinit__(out self, owned other: Self):
         self.host = other.host
         self.port = other.port
-        self.handler = other.handler
         self.max_request_body_size = other.max_request_body_size
         self.ln = other.ln^
 
     fn __copyinit__(out self, other: Self):
         self.host = other.host
         self.port = other.port
-        self.handler = other.handler
         self.max_request_body_size = other.max_request_body_size
         self.ln = other.ln
 
@@ -242,7 +241,7 @@ struct Server:
         for event in events_received:
             if event.isa[Frame]() and event[Frame].is_data():
                 data_received = event[Frame].data
-                self.handler(wsconn, data_received)
+                handler(wsconn, data_received)
 
         data_to_send = protocol.data_to_send()
         if len(data_to_send) > 0:
@@ -256,14 +255,16 @@ struct Server:
         self.ln.close()
 
 
-fn serve(handler: ConnHandler, host: String, port: Int) raises -> Server:
+fn serve[handler: ConnHandler](host: String, port: Int) raises -> Server[handler]:
     """
     Serve HTTP requests.
 
     Args:
-        handler : ConnHandler - An object that handles incoming HTTP requests.
         host : String - The address to listen on.
         port : Int - The port to listen on.
+
+    Parameters:
+        handler: ConnHandler - A function that handles incoming HTTP requests.
 
     Returns:
         Server - A server object that can be used to serve requests.
@@ -276,4 +277,4 @@ fn serve(handler: ConnHandler, host: String, port: Int) raises -> Server:
             server.serve_forever()
     .
     """
-    return Server(host, port, handler)
+    return Server[handler](host, port)
