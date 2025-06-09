@@ -20,12 +20,12 @@ For a complete listing, see the [features](docs/features.md) document.
 
 ## Installation
 
-1. **Install [magic](https://docs.modular.com/magic#install-magic)**
+1. **Install [pixi](https://pixi.sh/latest/)**
 
 2. **Add the WebSockets Package** (at the top level of your project):
 
     ```bash
-    magic add websockets
+    pixi add websockets
     ```
 ## Example of usage
 
