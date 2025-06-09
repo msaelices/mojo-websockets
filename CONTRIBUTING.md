@@ -1,16 +1,16 @@
 # Contributing Guide
 
-## Activate the magic shell
+## Activate the pixi shell
 
-For development, you can activate the magic shell by running:
+For development, you can activate the pixi shell by running:
 
 ```bash
-magic shell
+pixi shell
 ```
 
 ## How to build this package
 
-Once you have the magic shell activated, you can build the package by running:
+Once you have the pixi shell activated, you can build the package by running:
 
 ```bash
 ./scripts/build.sh

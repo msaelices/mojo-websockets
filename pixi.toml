@@ -1,10 +1,10 @@
 [project]
 authors = ["Manuel Saelices <msaelices@gmail.com>"]
-channels = ["conda-forge", "https://conda.modular.com/max"]
+channels = ["conda-forge", "https://conda.modular.com/max-nightly"]
 description = "Library for building WebSocket servers and clients in Mojo"
 name = "mojo-websockets"
 platforms = ["linux-64", "osx-arm64"]
-version = "0.2.0"
+version = "0.4.0"
 
 [dependencies]
-max = ">=25.2.0"
+max = ">=25.4.0.dev2025053005"

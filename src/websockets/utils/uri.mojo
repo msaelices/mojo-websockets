@@ -1,5 +1,6 @@
 from collections import Optional
-from utils import StringSlice, Variant
+from collections.string import StringSlice
+from utils import Variant
 
 from websockets.aliases import Bytes
 from websockets.utils.string import (
@@ -30,14 +31,10 @@ struct URI:
     @staticmethod
     fn parse(uri: String) -> URI:
         var proto_str = String(HTTP11)
-        var is_https = False
-
         var proto_end = uri.find("://")
         var remainder_uri: String
         if proto_end >= 0:
             proto_str = uri[:proto_end]
-            if proto_str == HTTPS:
-                is_https = True
             remainder_uri = uri[proto_end + 3 :]
         else:
             remainder_uri = uri
@@ -107,10 +104,7 @@ struct URI:
     fn get_path(self) -> String:
         # TODO: Remove try-catch when .format() does not raise
         if self.query_string:
-            try:
-                return "{}?{}".format(self.path, self.query_string)
-            except e:
-                pass
+            return self.path + "?" + self.query_string
         return self.path
 
     fn get_hostname(self) -> String:
@@ -122,7 +116,7 @@ struct URI:
         if j < 0:
             j = len(self.host)
 
-        return self.host[i: j]
+        return self.host[i:j]
 
     fn get_port(self) raises -> Int:
         """
@@ -144,12 +138,8 @@ struct URI:
             return None
 
         user_info = self.host[:i]
-        try:
-            result = user_info.split(":", maxsplit=2)
-            return (result[0], result[1])
-        except:
-            return (user_info, String(""))
+        result = user_info.split(":", maxsplit=2)
+        return (result[0], result[1])
 
     fn __eq__(self, other: URI) -> Bool:
         return self.full_uri == other.full_uri
-

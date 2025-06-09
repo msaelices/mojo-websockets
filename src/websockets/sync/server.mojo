@@ -8,7 +8,12 @@ from time import sleep
 
 from websockets.libc import c_int
 
-from websockets.aliases import Bytes, DEFAULT_BUFFER_SIZE, DEFAULT_MAX_REQUEST_BODY_SIZE, MAGIC_CONSTANT
+from websockets.aliases import (
+    Bytes,
+    DEFAULT_BUFFER_SIZE,
+    DEFAULT_MAX_REQUEST_BODY_SIZE,
+    MAGIC_CONSTANT,
+)
 from websockets.frames import Frame
 from websockets.http import Header, Headers, HTTPRequest, HTTPResponse, encode
 from websockets.logger import logger
@@ -36,12 +41,13 @@ struct WSConnection:
     """
     A connection object that represents a WebSocket connection.
     """
+
     var conn_ptr: UnsafePointer[TCPConnection]
     var protocol_ptr: UnsafePointer[ServerProtocol]
 
     fn __init__(out self, ref conn: TCPConnection, ref protocol: ServerProtocol):
-        self.conn_ptr = UnsafePointer.address_of(conn)
-        self.protocol_ptr = UnsafePointer.address_of(protocol)
+        self.conn_ptr = UnsafePointer(to=conn)
+        self.protocol_ptr = UnsafePointer(to=protocol)
 
     fn read(self, mut buf: Bytes) raises -> None:
         _ = self.conn_ptr[].read(buf)
@@ -66,6 +72,7 @@ struct Server:
     """
     A Mojo-based web server that accept incoming requests and delivers HTTP services.
     """
+
     # TODO: add an error_handler to the constructor
 
     var host: String
@@ -75,7 +82,13 @@ struct Server:
 
     var ln: TCPListener
 
-    fn __init__(out self, host: String, port: Int, handler: ConnHandler, max_request_body_size: Int = DEFAULT_MAX_REQUEST_BODY_SIZE) raises:
+    fn __init__(
+        out self,
+        host: String,
+        port: Int,
+        handler: ConnHandler,
+        max_request_body_size: Int = DEFAULT_MAX_REQUEST_BODY_SIZE,
+    ) raises:
         """
         Initialize a new server.
 
@@ -94,14 +107,14 @@ struct Server:
         self.max_request_body_size = max_request_body_size
         self.ln = TCPListener()
 
-    fn __moveinit__(mut self, owned other: Self):
+    fn __moveinit__(out self, owned other: Self):
         self.host = other.host
         self.port = other.port
         self.handler = other.handler
         self.max_request_body_size = other.max_request_body_size
         self.ln = other.ln^
 
-    fn __copyinit__(mut self, other: Self):
+    fn __copyinit__(out self, other: Self):
         self.host = other.host
         self.port = other.port
         self.handler = other.handler
@@ -161,10 +174,8 @@ struct Server:
             If there is an error while serving the connection.
         """
         protocol = ServerProtocol()
-        remote_addr = conn.socket.remote_address()
-        logger.debug(
-            "Connection accepted! IP:", remote_addr.ip, "Port:", remote_addr.port
-        )
+        # Remote address handling changed in Max 25.3
+        logger.debug("Connection accepted!")
         wsconn = WSConnection(conn, protocol)
         while True:
             var b = Bytes(capacity=DEFAULT_BUFFER_SIZE)
@@ -196,16 +207,13 @@ struct Server:
                 logger.debug("Sending handshake response")
                 protocol.send_response(response)
                 data_to_send = protocol.data_to_send()
-        
+
                 bytes_written = conn.write(data_to_send)
                 logger.debug("Bytes written:", bytes_written)
             else:
                 self.handle_read(protocol, wsconn, b)
 
-            logger.debug(
-                remote_addr.ip,
-                String(remote_addr.port),
-            )
+            logger.debug("Connection processed")
 
     fn address(mut self) -> String:
         """
@@ -213,7 +221,9 @@ struct Server:
         """
         return String(self.host, ":", self.port)
 
-    fn handle_read(self, mut protocol: ServerProtocol, mut wsconn: WSConnection, data: Bytes) raises -> None:
+    fn handle_read(
+        self, mut protocol: ServerProtocol, mut wsconn: WSConnection, data: Bytes
+    ) raises -> None:
         """
         Handle incoming data.
 
@@ -229,8 +239,7 @@ struct Server:
             return
 
         events_received = protocol.events_received()
-        for event_ref in events_received:
-            event = event_ref[]
+        for event in events_received:
             if event.isa[Frame]() and event[Frame].is_data():
                 data_received = event[Frame].data
                 self.handler(wsconn, data_received)
@@ -239,13 +248,12 @@ struct Server:
         if len(data_to_send) > 0:
             bytes_written = wsconn.write(data_to_send)
             logger.debug("Bytes written: ", bytes_written)
-    
+
     fn shutdown(mut self) raises -> None:
         """
         Shutdown the server.
         """
         self.ln.close()
-
 
 
 fn serve(handler: ConnHandler, host: String, port: Int) raises -> Server:
@@ -269,4 +277,3 @@ fn serve(handler: ConnHandler, host: String, port: Int) raises -> Server:
     .
     """
     return Server(host, port, handler)
-

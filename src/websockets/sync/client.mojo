@@ -36,12 +36,12 @@ struct Client:
             )
         self.conn = TCPConnection(socket^)
 
-    fn __moveinit__(mut self, owned other: Self):
+    fn __moveinit__(out self, owned other: Self):
         self.protocol = other.protocol^
         self.uri = other.uri^
         self.conn = other.conn^
 
-    fn __copyinit__(mut self, other: Self):
+    fn __copyinit__(out self, other: Self):
         self.protocol = other.protocol
         self.uri = other.uri
         self.conn = other.conn
@@ -59,7 +59,7 @@ struct Client:
         """
         self.conn.connect(self.uri.get_hostname(), self.uri.get_port())
         conn_req = self.protocol.connect()
-        logger.debug("Sending connection request:\n{}".format(String(conn_req)))
+        logger.debug("Sending connection request:\n", conn_req)
         self.protocol.send_request(conn_req)
         data_to_send = self.protocol.data_to_send()
         _ = self.conn.write(data_to_send)
@@ -135,8 +135,7 @@ struct Client:
 
         events_received = self.protocol.events_received()
         received = Bytes(capacity=DEFAULT_BUFFER_SIZE)
-        for event_ref in events_received:
-            event = event_ref[]
+        for event in events_received:
             if event.isa[Frame]():
                 received += event[Frame].data
         # TODO: Handle parse exceptions

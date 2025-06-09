@@ -2,7 +2,12 @@ from base64 import b64encode
 from collections import Optional
 from memory import UnsafePointer
 
-from websockets.aliases import Bytes, DEFAULT_MAX_REQUEST_BODY_SIZE, DEFAULT_BUFFER_SIZE, MAGIC_CONSTANT
+from websockets.aliases import (
+    Bytes,
+    DEFAULT_MAX_REQUEST_BODY_SIZE,
+    DEFAULT_BUFFER_SIZE,
+    MAGIC_CONSTANT,
+)
 from websockets.http import (
     get_date_timestamp,
     encode,
@@ -30,6 +35,7 @@ struct ServerProtocol(Protocol):
     """
     Sans-I/O implementation of a WebSocket server connection.
     """
+
     alias side = SERVER
 
     var origins: Optional[List[String]]
@@ -91,7 +97,7 @@ struct ServerProtocol(Protocol):
 
     fn get_reader_ptr(self) -> UnsafePointer[StreamReader]:
         """Get the reader of the protocol."""
-        return UnsafePointer.address_of(self.reader)
+        return UnsafePointer(to=self.reader)
 
     fn get_state(self) -> Int:
         """
@@ -144,7 +150,10 @@ struct ServerProtocol(Protocol):
 
     fn process_response(mut self, response: HTTPResponse) raises -> None:
         """Process the handshare response from the server."""
-        constrained[Self.side == CLIENT, "Protocol.process_response() is only available for client connections."]()
+        constrained[
+            Self.side == CLIENT,
+            "Protocol.process_response() is only available for client connections.",
+        ]()
 
     # Public method for getting outgoing data after receiving data or sending events.
 
@@ -234,7 +243,6 @@ struct ServerProtocol(Protocol):
         """Set the parser exception."""
         self.parser_exc = exc
 
-
     fn get_handshake_exc(self) -> Optional[Error]:
         """Get the handshake exception."""
         return self.handshake_exc
@@ -247,7 +255,9 @@ struct ServerProtocol(Protocol):
     # Methods
     # ===-------------------------------------------------------------------=== #
 
-    fn accept[date_func: fn () -> String = get_date_timestamp](mut self, request: HTTPRequest) raises -> HTTPResponse:
+    fn accept[
+        date_func: fn () -> String = get_date_timestamp
+    ](mut self, request: HTTPRequest) raises -> HTTPResponse:
         """
         Accept a WebSocket connection.
 
@@ -282,7 +292,7 @@ struct ServerProtocol(Protocol):
 
             if self.origins is not None and "Origin" in request.headers:
                 if request.headers["Origin"] not in self.origins.value():
-                    raise Error('Invalid "Origin" header: {}'.format(request.headers["Origin"]))
+                    raise Error('Invalid "Origin" header: ' + request.headers["Origin"])
 
             # Validate the base64 encoded Sec-WebSocket-Key
             _ = b64decode[validate=True](request.headers["Sec-WebSocket-Key"])
@@ -333,7 +343,7 @@ struct ServerProtocol(Protocol):
             _ = parse_buffer(self)
 
     fn reject[
-        date_func : fn () -> String = get_date_timestamp,
+        date_func: fn () -> String = get_date_timestamp,
     ](mut self, status_code: Int, status_text: String, body: String) -> HTTPResponse:
         """
         Fail the WebSocket connection.
@@ -350,6 +360,6 @@ struct ServerProtocol(Protocol):
             Header("Date", date_func()),
             Header("Connection", "close"),
             Header("Content-Length", String(len(body))),
-            Header("Content-type", "text/plain; charset=utf-8")
+            Header("Content-type", "text/plain; charset=utf-8"),
         )
         return HTTPResponse(status_code, status_text, headers, str_to_bytes(body))

@@ -75,7 +75,7 @@ trait Net:
     #    ...
 
 
-trait Connection(CollectionElement):
+trait Connection:
     fn __init__(out self, laddr: String, raddr: String) raises:
         ...
 
@@ -98,9 +98,7 @@ trait Connection(CollectionElement):
         ...
 
 
-trait Addr(Stringable, Representable, Writable, EqualityComparableCollectionElement):
-    alias _type: StringLiteral
-
+trait Addr(Stringable, Copyable, Representable, Writable):
     fn __init__(out self):
         ...
 
@@ -130,7 +128,6 @@ struct NetworkType:
 
 @value
 struct TCPAddr(Addr):
-    alias _type = "TCPAddr"
     var ip: String
     var port: UInt16
     var zone: String  # IPv6 addressing zone
@@ -144,6 +141,11 @@ struct TCPAddr(Addr):
         self.ip = ip
         self.port = port
         self.zone = ""
+
+    fn __copyinit__(out self, other: Self):
+        self.ip = other.ip
+        self.port = other.port
+        self.zone = other.zone
 
     fn network(self) -> String:
         return NetworkType.TCP.value
@@ -234,7 +236,7 @@ struct TCPConnection:
 
 fn resolve_internet_addr(network: String, address: String) raises -> TCPAddr:
     var host: String = ""
-    var port: String = ""
+    var port: String
     var portnum: Int = 0
     if (
         network == NetworkType.TCP.value
@@ -283,8 +285,8 @@ struct HostPort:
 
 
 fn split_host_port(hostport: String) raises -> HostPort:
-    var host: String = ""
-    var port: String = ""
+    var host: String
+    var port: String
     var colon_index = hostport.rfind(":")
     var j: Int = 0
     var k: Int = 0
@@ -336,8 +338,8 @@ fn parse_address(address: String) raises -> (String, UInt16):
     if colon_index == -1:
         raise MissingPortError
 
-    var host: String = ""
-    var port: String = ""
+    var host: String
+    var port: String
     var j: Int = 0
     var k: Int = 0
 
@@ -443,7 +445,7 @@ struct addrinfo_macos(AddrInfo):
         self.ai_addr = UnsafePointer[sockaddr]()
         self.ai_next = UnsafePointer[c_void]()
 
-    fn get_from_host(self, host: String) raises -> Self:
+    fn get_from_host(self, owned host: String) raises -> Self:
         """
         Returns an IP address based on the host.
         This is a MacOS-specific implementation.
@@ -454,8 +456,8 @@ struct addrinfo_macos(AddrInfo):
         Returns:
             The IP address.
         """
-        var host_ptr = host.unsafe_cstr_ptr()
-        var servinfo = Pointer.address_of(Self())
+        var host_ptr = (host.unsafe_cstr_ptr().origin_cast[mut=False](),)
+        var servinfo = Pointer(to=Self())
         var servname = UnsafePointer[Int8]()
 
         var hints = Self()
@@ -466,7 +468,7 @@ struct addrinfo_macos(AddrInfo):
         var error = external_call[
             "getaddrinfo",
             Int32,
-        ](host_ptr, servname, Pointer.address_of(hints), Pointer.address_of(servinfo))
+        ](host_ptr, servname, Pointer(to=hints), Pointer(to=servinfo))
 
         if error != 0:
             print("getaddrinfo failed with error code: " + error.__str__())
@@ -528,7 +530,7 @@ struct addrinfo_unix(AddrInfo):
         self.ai_canonname = UnsafePointer[c_char]()
         self.ai_next = UnsafePointer[c_void]()
 
-    fn get_from_host(self, host: String) raises -> Self:
+    fn get_from_host(self, owned host: String) raises -> Self:
         """
         Returns an IP address based on the host.
         This is a MacOS-specific implementation.
@@ -539,8 +541,8 @@ struct addrinfo_unix(AddrInfo):
         Returns:
             The IP address.
         """
-        var host_ptr = host.unsafe_cstr_ptr()
-        var servinfo = Pointer.address_of(Self())
+        var host_ptr = (host.unsafe_cstr_ptr().origin_cast[mut=False](),)
+        var servinfo = Pointer(to=Self())
         var servname = UnsafePointer[Int8]()
 
         var hints = Self()
@@ -551,7 +553,7 @@ struct addrinfo_unix(AddrInfo):
         var error = external_call[
             "getaddrinfo",
             Int32,
-        ](host_ptr, servname, Pointer.address_of(hints), Pointer.address_of(servinfo))
+        ](host_ptr, servname, Pointer(to=hints), Pointer(to=servinfo))
 
         if error != 0:
             print("getaddrinfo failed with error code: " + error.__str__())
@@ -732,7 +734,7 @@ fn get_address_info(host: String) raises -> Variant[addrinfo_macos, addrinfo_uni
 #     var addr: sockaddr_in = sockaddr_in(
 #         AF_INET, htons(port), ip, StaticTuple[c_char, 8](0, 0, 0, 0, 0, 0, 0, 0)
 #     )
-#     var addr_ptr = Pointer[sockaddr_in].address_of(addr)
+#     var addr_ptr = Pointer[sockaddr_in](to=addr)
 #     var sock = socket(AF_INET, SOCK_STREAM, 0)
 #
 #     if (

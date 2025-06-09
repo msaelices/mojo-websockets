@@ -6,7 +6,7 @@ from websockets.aliases import Bytes
 from websockets.utils.bytes import str_to_bytes
 
 from websockets.frames import (
-    Close, 
+    Close,
     Frame,
     OpCode,
 )
@@ -16,16 +16,37 @@ from testutils import assert_bytes_equal
 
 
 fn test_str() raises:
-    assert_equal(String(Frame(OpCode.OP_TEXT, bytes("Spam"))), "TEXT 'Spam' [text, 4 bytes, ]")
-    assert_equal(String(Frame(OpCode.OP_TEXT, bytes("Spam"), fin=False)), "TEXT 'Spam' [text, 4 bytes, continued]")
-    assert_equal(String(Frame(OpCode.OP_BINARY, bytes("Eggs"))), "BINARY 0x30 0x30 0x30 0x30 [binary, 4 bytes, ]")
-    assert_equal(String(Frame(OpCode.OP_BINARY, bytes("Eggs"), fin=False)), "BINARY 0x30 0x30 0x30 0x30 [binary, 4 bytes, continued]")
-    assert_equal(String(Frame(OpCode.OP_CLOSE, bytes(""))), "CLOSE NO_STATUS_RCVD (no status received [internal]) [, 0 bytes, ]")
-    assert_equal(String(Frame(OpCode.OP_CLOSE, bytes("\x03\xe9OK"))), "CLOSE GOING_AWAY (going away) OK [, 4 bytes, ]")
+    assert_equal(
+        String(Frame(OpCode.OP_TEXT, bytes("Spam"))), "TEXT 'Spam' [text, 4 bytes, ]"
+    )
+    assert_equal(
+        String(Frame(OpCode.OP_TEXT, bytes("Spam"), fin=False)),
+        "TEXT 'Spam' [text, 4 bytes, continued]",
+    )
+    assert_equal(
+        String(Frame(OpCode.OP_BINARY, Bytes(31, 32, 33, 34))),
+        "BINARY 0x1f 0x20 0x21 0x22 [binary, 4 bytes, ]",
+    )
+    assert_equal(
+        String(Frame(OpCode.OP_BINARY, bytes("Eggs"), fin=False)),
+        "BINARY 0x45 0x67 0x67 0x73 [binary, 4 bytes, continued]",
+    )
+    assert_equal(
+        String(Frame(OpCode.OP_CLOSE, bytes(""))),
+        "CLOSE NO_STATUS_RCVD (no status received [internal]) [, 0 bytes, ]",
+    )
+    assert_equal(
+        String(Frame(OpCode.OP_CLOSE, bytes("\x03\xe9OK"))),
+        "CLOSE GOING_AWAY (going away) OK [, 4 bytes, ]",
+    )
     assert_equal(String(Frame(OpCode.OP_PING, bytes(""))), "PING '' [, 0 bytes, ]")
-    assert_equal(String(Frame(OpCode.OP_PING, bytes("ping"))), "PING 'ping' [text, 4 bytes, ]")
+    assert_equal(
+        String(Frame(OpCode.OP_PING, bytes("ping"))), "PING 'ping' [text, 4 bytes, ]"
+    )
     assert_equal(String(Frame(OpCode.OP_PONG, bytes(""))), "PONG '' [, 0 bytes, ]")
-    assert_equal(String(Frame(OpCode.OP_PONG, bytes("pong"))), "PONG 'pong' [text, 4 bytes, ]")
+    assert_equal(
+        String(Frame(OpCode.OP_PONG, bytes("pong"))), "PONG 'pong' [text, 4 bytes, ]"
+    )
 
 
 fn test_close_serialize() raises:
@@ -34,7 +55,6 @@ fn test_close_serialize() raises:
 
 
 fn parse(data: Bytes, mask: Bool) raises -> Optional[Frame]:
-
     """
     Parse a frame from a bytestring.
     """
@@ -42,12 +62,15 @@ fn parse(data: Bytes, mask: Bool) raises -> Optional[Frame]:
     reader.feed_data(data)
     reader.feed_eof()
     frame = Frame.parse(
-        UnsafePointer.address_of(reader), mask=mask,
+        UnsafePointer(to=reader),
+        mask=mask,
     )
     return frame
 
+
 # fn enforce_mask(mask: Bytes):
 #     return unittest.mock.patch("secrets.token_bytes", return_value=mask)
+
 
 fn assert_frame_data(frame: Frame, data: Bytes, mask: Bool) raises:
     """
