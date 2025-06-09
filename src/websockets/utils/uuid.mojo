@@ -60,7 +60,7 @@ struct MersenneTwister:
 
 
 @register_passable("trivial")
-struct UUID(Stringable):
+struct UUID(Stringable, EqualityComparable, Copyable, Movable):
     var bytes: StaticTuple[UInt8, 16]
 
     fn __init__(out self):
