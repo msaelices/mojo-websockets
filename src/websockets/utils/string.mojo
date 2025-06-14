@@ -215,24 +215,6 @@ fn to_string(b: Span[UInt8]) -> String:
     )
 
 
-fn to_string(owned bytes: List[UInt8, True]) -> String:
-    """Creates a String from the provided List of bytes.
-    If you do not transfer ownership of the List, the List will be copied.
-
-    Args:
-        bytes: The List of bytes to convert to a String.
-    """
-    if bytes[-1] != 0:
-        bytes.append(0)
-    # In Max 25.3, we need to use FromBytes for String construction
-    var buffer = bytes^
-    return String(
-        StringSlice[__origin_of(buffer)](
-            ptr=buffer.unsafe_ptr(), length=len(buffer) - 1
-        )
-    )
-
-
 fn compare_case_insensitive(a: Bytes, b: Bytes) -> Bool:
     if len(a) != len(b):
         return False
