@@ -73,9 +73,7 @@ from websockets.logger import logger
 alias SocketClosedError = "Socket: Socket is already closed"
 
 
-struct Socket[AddrType: Addr, address_family: Int = AF_INET](
-    Representable, Stringable, Writable
-):
+struct Socket[AddrType: Addr, address_family: Int = AF_INET](Stringable, Writable):
     """Represents a network file descriptor. Wraps around a file descriptor and provides network functions.
 
     Args:
@@ -228,8 +226,6 @@ struct Socket[AddrType: Addr, address_family: Int = AF_INET](
 
         writer.write(
             "Socket[",
-            AddrType._type,
-            ", ",
             af(),
             "]",
             "(",
@@ -342,7 +338,7 @@ struct Socket[AddrType: Addr, address_family: Int = AF_INET](
         """
         var binary_ip: c_uint
         try:
-            binary_ip = inet_pton[address_family](address.unsafe_ptr())
+            binary_ip = inet_pton[address_family](address)
         except e:
             logger.error(e)
             raise Error(
@@ -381,7 +377,7 @@ struct Socket[AddrType: Addr, address_family: Int = AF_INET](
             getsockname(
                 self.fd,
                 local_address,
-                Pointer.address_of(socklen_t(sizeof[sockaddr]())),
+                Pointer(to=socklen_t(sizeof[sockaddr]())),
             )
         except e:
             logger.error(e)
@@ -462,7 +458,12 @@ struct Socket[AddrType: Addr, address_family: Int = AF_INET](
         Raises:
             Error: If connecting to the remote socket fails.
         """
-        logger.debug("Socket.connect: Connecting to ", address, ":", String(port))
+        logger.info(
+            "Socket.connect: Attempting to connect to remote socket at "
+            + address
+            + ":"
+            + String(port)
+        )
 
         var ip: in_addr
         var binary_ip: c_uint
@@ -575,7 +576,7 @@ struct Socket[AddrType: Addr, address_family: Int = AF_INET](
             src.unsafe_ptr(),
             len(src),
             0,
-            UnsafePointer.address_of(addr).bitcast[sockaddr](),
+            UnsafePointer(to=addr).bitcast[sockaddr](),
         )
 
         return bytes_sent

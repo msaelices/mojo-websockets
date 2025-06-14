@@ -124,7 +124,7 @@ struct TimeZone(Stringable):
 
 
 @value
-struct SmallTime(Stringable, Writable, Representable):
+struct SmallTime(Representable, Stringable, Writable):
     """Datetime representation."""
 
     var year: Int
@@ -354,7 +354,7 @@ fn gmtime(owned tv_sec: Int) -> Tm:
         Broken down UTC time.
     """
     var tm = external_call["gmtime", UnsafePointer[Tm]](
-        Pointer.address_of(tv_sec)
+        Pointer(to=tv_sec)
     ).take_pointee()
     return tm
 
@@ -366,7 +366,7 @@ fn gettimeofday() -> TimeVal:
         Current time.
     """
     var tv = TimeVal()
-    _ = external_call["gettimeofday", NoneType](Pointer.address_of(tv), 0)
+    _ = external_call["gettimeofday", NoneType](Pointer(to=tv), 0)
     return tv
 
 

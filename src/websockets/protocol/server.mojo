@@ -118,7 +118,7 @@ struct ServerProtocol(Protocol):
 
     fn get_reader_ptr(self) -> UnsafePointer[StreamReader]:
         """Get the reader of the protocol."""
-        return UnsafePointer.address_of(self.reader)
+        return UnsafePointer(to=self.reader)
 
     fn get_state(self) -> Int:
         """
@@ -325,9 +325,7 @@ struct ServerProtocol(Protocol):
 
             if self.origins is not None and "Origin" in request.headers:
                 if request.headers["Origin"] not in self.origins.value():
-                    raise Error(
-                        'Invalid "Origin" header: {}'.format(request.headers["Origin"])
-                    )
+                    raise Error('Invalid "Origin" header: ' + request.headers["Origin"])
 
             # Validate the base64 encoded Sec-WebSocket-Key
             _ = b64decode[validate=True](request.headers["Sec-WebSocket-Key"])

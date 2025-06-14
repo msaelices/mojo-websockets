@@ -49,9 +49,9 @@ fn _process_chunk(
     var d = h3
     var e = h4
 
-    var f: UInt32 = 0
-    var k: UInt32 = 0
-    var temp: UInt32 = 0
+    var f: UInt32
+    var k: UInt32
+    var temp: UInt32
 
     for i in range(80):
         if i < 20:
@@ -96,7 +96,7 @@ struct Sha1Hash:
     var _unprocessed: Bytes
     var _message_byte_length: UInt64
 
-    fn __init__(mut self):
+    fn __init__(out self):
         """Initialize a new SHA1 hash object."""
         # Initial digest variables
         self._h0 = 0x67452301

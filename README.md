@@ -21,29 +21,28 @@ For a complete listing, see the [features](docs/features.md) document.
 
 ## Installation
 
-1. **Install [magic](https://docs.modular.com/magic#install-magic)**
+1. **Install [pixi](https://pixi.sh/latest/)**
 
 2. **Add the WebSockets Package** (at the top level of your project):
 
     ```bash
-    magic add websockets
+    pixi add websockets
     ```
 ## Example of usage
 
 ### Server side
 
 ```mojo
-from websockets.aliases import Bytes
 from websockets.sync.server import serve, WSConnection
 
-fn on_message(conn: WSConnection, data: Bytes) raises -> None:
-    str_received = String(StringSlice.from_utf8(data))
+fn on_message(conn: WSConnection, data: Span[Byte]) raises -> None:
+    str_received = String(data)
     print("<<< ", str_received)
     conn.send_text(str_received)
     print(">>> ", str_received)
 
 fn main() raises:
-    with serve(on_message, "127.0.0.1", 8000) as server:
+    with serve[on_message]("127.0.0.1", 8000) as server:
         server.serve_forever()
 ```
 

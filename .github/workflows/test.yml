@@ -12,7 +12,5 @@ jobs:
         uses: actions/checkout@v4
       - name: Run the test suite
         run: |
-          curl -ssL https://magic.modular.com | bash
-          source $HOME/.bash_profile
-          magic run mojo test -I src/ tests/
-
+          curl -fsSL https://pixi.sh/install.sh | bash
+          $HOME/.pixi/bin/pixi run mojo test -I src/ tests/

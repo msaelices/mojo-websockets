@@ -33,7 +33,6 @@ struct BytesConstant:
     alias N_CHAR = byte(N_CHAR)
 
 
-
 @value
 struct CharSet:
     var value: String
@@ -84,10 +83,8 @@ struct ByteWriter(Writer):
         """
 
         @parameter
-        fn write_arg[T: Writable](arg: T):
-            arg.write_to(self)
-
-        args.each[write_arg]()
+        for i in range(args.__len__()):
+            args[i].write_to(self)
 
     @always_inline
     fn consuming_write(mut self, owned b: Bytes):
@@ -95,10 +92,8 @@ struct ByteWriter(Writer):
 
     @always_inline
     fn consuming_write(mut self, owned s: String):
-        # kind of cursed but seems to work?
-        _ = s._buffer.pop()
-        self._inner.extend(s._buffer^)
-        s._buffer = s._buffer_type()
+        # Just convert to bytes and extend
+        self._inner.extend(s.as_bytes())
 
     @always_inline
     fn write_byte(mut self, b: Byte):
@@ -110,7 +105,7 @@ struct ByteWriter(Writer):
         return ret^
 
 
-struct ByteReader[origin: Origin]:
+struct ByteReader[origin: Origin](Sized):
     var _inner: Span[Byte, origin]
     var read_pos: Int
 
@@ -212,19 +207,12 @@ fn to_string(b: Span[UInt8]) -> String:
     """
     var bytes = List[UInt8, True](b)
     bytes.append(0)
-    return String(bytes^)
-
-
-fn to_string(owned bytes: List[UInt8, True]) -> String:
-    """Creates a String from the provided List of bytes.
-    If you do not transfer ownership of the List, the List will be copied.
-
-    Args:
-        bytes: The List of bytes to convert to a String.
-    """
-    if bytes[-1] != 0:
-        bytes.append(0)
-    return String(bytes^)
+    var buffer = bytes^
+    return String(
+        StringSlice[__origin_of(buffer)](
+            ptr=buffer.unsafe_ptr(), length=len(buffer) - 1
+        )
+    )
 
 
 fn compare_case_insensitive(a: Bytes, b: Bytes) -> Bool:

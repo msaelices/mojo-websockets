@@ -3,12 +3,11 @@
 import sys
 from utils import StringSlice
 
-from websockets.aliases import Bytes
 from websockets.sync.server import serve, WSConnection
 
 
-fn on_message(conn: WSConnection, data: Bytes) raises -> None:
-    str_received = String(StringSlice.from_utf8(data))
+fn on_message(conn: WSConnection, data: Span[Byte]) raises -> None:
+    str_received = String(bytes=data)
     print("<<< ", str_received)
     conn.send_text(str_received)
     print(">>> ", str_received)

@@ -1,3 +1,4 @@
+from collections import List
 from testing import assert_equal, assert_false, assert_true, assert_raises
 
 from websockets.aliases import Bytes
@@ -38,13 +39,15 @@ fn test_send_request() raises -> None:
     assert_bytes_equal(
         data_to_send,
         str_to_bytes(
-            "GET /test HTTP/1.1\r\n"
-            "host: example.com\r\n"
-            "upgrade: websocket\r\n"
-            "connection: Upgrade\r\n"
-            "sec-websocket-key: {}\r\n"
-            "sec-websocket-version: 13\r\n"
-            "\r\n".format(KEY)
+            String(
+                "GET /test HTTP/1.1\r\n"
+                "host: example.com\r\n"
+                "upgrade: websocket\r\n"
+                "connection: Upgrade\r\n"
+                "sec-websocket-key: {}\r\n"
+                "sec-websocket-version: 13\r\n"
+                "\r\n"
+            ).format(KEY)
         ),
     )
     assert_false(close_expected(client))
@@ -58,12 +61,14 @@ fn test_receive_successful_response() raises -> None:
     receive_data(
         client,
         str_to_bytes(
-            "HTTP/1.1 101 Switching Protocols\r\n"
-            "Upgrade: websocket\r\n"
-            "Connection: Upgrade\r\n"
-            "Sec-WebSocket-Accept: {}\r\n"
-            "Date: {}\r\n"
-            "\r\n".format(ACCEPT, date_func())
+            String(
+                "HTTP/1.1 101 Switching Protocols\r\n"
+                "Upgrade: websocket\r\n"
+                "Connection: Upgrade\r\n"
+                "Sec-WebSocket-Accept: {}\r\n"
+                "Date: {}\r\n"
+                "\r\n"
+            ).format(ACCEPT, date_func())
         ),
     )
 
@@ -79,13 +84,15 @@ fn test_receive_failed_response() raises -> None:
     receive_data(
         client,
         str_to_bytes(
-            "HTTP/1.1 404 Not Found\r\n"
-            "Date: {}\r\n"
-            "Content-Length: 13\r\n"
-            "Content-Type: text/plain; charset=utf-8\r\n"
-            "Connection: close\r\n"
-            "\r\n"
-            "Sorry folks.\n".format(date_func())
+            String(
+                "HTTP/1.1 404 Not Found\r\n"
+                "Date: {}\r\n"
+                "Content-Length: 13\r\n"
+                "Content-Type: text/plain; charset=utf-8\r\n"
+                "Connection: close\r\n"
+                "\r\n"
+                "Sorry folks.\n"
+            ).format(date_func())
         ),
     )
 
@@ -93,9 +100,11 @@ fn test_receive_failed_response() raises -> None:
     assert_true(close_expected(client))
     assert_equal(client.get_state(), CONNECTING)
 
+
 # ===----------------------------------------------------------------------===
 # Test generating opening handshake requests.
 # ===----------------------------------------------------------------------===
+
 
 fn test_connect() raises -> None:
     """Check that connect() creates an opening handshake request."""
@@ -110,13 +119,16 @@ fn test_connect() raises -> None:
             Header("Upgrade", "websocket"),
             Header("Connection", "Upgrade"),
             Header("Sec-WebSocket-Key", KEY),
-            Header("Sec-WebSocket-Version", "13")
-        )
+            Header("Sec-WebSocket-Version", "13"),
+        ),
     )
+
 
 fn test_path() raises -> None:
     """Check that connect() uses the path from the URI."""
-    client = ClientProtocol(uri=URI.parse("wss://example.com/endpoint?test=1"), key=String(KEY))
+    client = ClientProtocol(
+        uri=URI.parse("wss://example.com/endpoint?test=1"), key=String(KEY)
+    )
     request = client.connect()
 
     assert_equal(request.uri.get_path(), "/endpoint?test=1")
@@ -124,28 +136,56 @@ fn test_path() raises -> None:
 
 fn test_port() raises -> None:
     """Check that connect() uses the port from the URI or the default port."""
-    var test_cases = List(
-        ("ws://example.com/", "example.com"),
-        ("ws://example.com:80/", "example.com"),
-        ("ws://example.com:8080/", "example.com:8080"),
-        ("wss://example.com/", "example.com"),
-        ("wss://example.com:443/", "example.com"),
-        ("wss://example.com:8443/", "example.com:8443")
-    )
+    # Handle each test case individually instead of using a list
+    # Case 1
+    var uri = String("ws://example.com/")
+    var expected_host = String("example.com")
+    var client = ClientProtocol(uri=URI.parse(uri), key=String(KEY))
+    var request = client.connect()
+    assert_equal(request.headers["Host"], expected_host)
 
-    for i in range(len(test_cases)):
-        uri = test_cases[i][0]
-        expected_host = test_cases[i][1]
+    # Case 2
+    uri = String("ws://example.com:80/")
+    expected_host = String("example.com")
+    client = ClientProtocol(uri=URI.parse(uri), key=String(KEY))
+    request = client.connect()
+    assert_equal(request.headers["Host"], expected_host)
 
-        client = ClientProtocol(uri=URI.parse(uri), key=String(KEY))
-        request = client.connect()
+    # Case 3
+    uri = String("ws://example.com:8080/")
+    expected_host = String("example.com:8080")
+    client = ClientProtocol(uri=URI.parse(uri), key=String(KEY))
+    request = client.connect()
+    assert_equal(request.headers["Host"], expected_host)
 
-        assert_equal(request.headers["Host"], expected_host)
+    # Case 4
+    uri = String("wss://example.com/")
+    expected_host = String("example.com")
+    client = ClientProtocol(uri=URI.parse(uri), key=String(KEY))
+    request = client.connect()
+    assert_equal(request.headers["Host"], expected_host)
+
+    # Case 5
+    uri = String("wss://example.com:443/")
+    expected_host = String("example.com")
+    client = ClientProtocol(uri=URI.parse(uri), key=String(KEY))
+    request = client.connect()
+    assert_equal(request.headers["Host"], expected_host)
+
+    # Case 6
+    uri = String("wss://example.com:8443/")
+    expected_host = String("example.com:8443")
+    client = ClientProtocol(uri=URI.parse(uri), key=String(KEY))
+    request = client.connect()
+    assert_equal(request.headers["Host"], expected_host)
 
 
 fn test_user_info() raises -> None:
-    """Check that connect() performs HTTP Basic Authentication with user info from the URI."""
-    client = ClientProtocol(uri=URI.parse("wss://hello:iloveyou@example.com/"), key=String(KEY))
+    """Check that connect() performs HTTP Basic Authentication with user info from the URI.
+    """
+    client = ClientProtocol(
+        uri=URI.parse("wss://hello:iloveyou@example.com/"), key=String(KEY)
+    )
     request = client.connect()
 
     assert_equal(request.headers["Authorization"], "Basic aGVsbG86aWxvdmV5b3U=")
@@ -153,20 +193,24 @@ fn test_user_info() raises -> None:
 
 fn test_origin() raises -> None:
     """Check that connect(origin=...) generates an Origin header."""
-    client = ClientProtocol(uri=URI.parse(SOCKET_URI), key=String(KEY), origin=String("https://example.com"))
+    client = ClientProtocol(
+        uri=URI.parse(SOCKET_URI), key=String(KEY), origin=String("https://example.com")
+    )
     request = client.connect()
 
     assert_equal(request.headers["Origin"], "https://example.com")
 
 
 fn test_extensions() raises -> None:
-    """Check that connect(extensions=...) generates a Sec-WebSocket-Extensions header."""
+    """Check that connect(extensions=...) generates a Sec-WebSocket-Extensions header.
+    """
     # TODO: Implement once extensions are supported
     pass
 
 
 fn test_subprotocols() raises -> None:
-    """Check that connect(subprotocols=...) generates a Sec-WebSocket-Protocol header."""
+    """Check that connect(subprotocols=...) generates a Sec-WebSocket-Protocol header.
+    """
     # TODO: Implement once subprotocols are supported
     pass
 
@@ -174,6 +218,7 @@ fn test_subprotocols() raises -> None:
 # ===----------------------------------------------------------------------===
 # Test receiving opening handshake responses.
 # ===----------------------------------------------------------------------===
+
 
 fn test_receive_successful_response_with_events() raises -> None:
     """Client receives a successful handshake response and checks events."""
@@ -183,12 +228,14 @@ fn test_receive_successful_response_with_events() raises -> None:
     receive_data(
         client,
         str_to_bytes(
-            "HTTP/1.1 101 Switching Protocols\r\n"
-            "Upgrade: websocket\r\n"
-            "Connection: Upgrade\r\n"
-            "Sec-WebSocket-Accept: {}\r\n"
-            "Date: {}\r\n"
-            "\r\n".format(ACCEPT, date_func())
+            String(
+                "HTTP/1.1 101 Switching Protocols\r\n"
+                "Upgrade: websocket\r\n"
+                "Connection: Upgrade\r\n"
+                "Sec-WebSocket-Accept: {}\r\n"
+                "Date: {}\r\n"
+                "\r\n"
+            ).format(ACCEPT, date_func())
         ),
     )
 
@@ -204,8 +251,8 @@ fn test_receive_successful_response_with_events() raises -> None:
             Header("Upgrade", "websocket"),
             Header("Connection", "Upgrade"),
             Header("Sec-WebSocket-Accept", ACCEPT),
-            Header("Date", date_func())
-        )
+            Header("Date", date_func()),
+        ),
     )
     assert_bytes_equal(response.body_raw, str_to_bytes("\r\n"))
 
@@ -218,13 +265,15 @@ fn test_receive_failed_response_with_events() raises -> None:
     receive_data(
         client,
         str_to_bytes(
-            "HTTP/1.1 404 Not Found\r\n"
-            "Date: {}\r\n"
-            "Content-Length: 13\r\n"
-            "Content-Type: text/plain; charset=utf-8\r\n"
-            "Connection: close\r\n"
-            "\r\n"
-            "Sorry folks.\n".format(date_func())
+            String(
+                "HTTP/1.1 404 Not Found\r\n"
+                "Date: {}\r\n"
+                "Content-Length: 13\r\n"
+                "Content-Type: text/plain; charset=utf-8\r\n"
+                "Connection: close\r\n"
+                "\r\n"
+                "Sorry folks.\n"
+            ).format(date_func())
         ),
     )
 
@@ -240,8 +289,8 @@ fn test_receive_failed_response_with_events() raises -> None:
             Header("Date", date_func()),
             Header("Content-Length", "13"),
             Header("Content-Type", "text/plain; charset=utf-8"),
-            Header("Connection", "close")
-        )
+            Header("Connection", "close"),
+        ),
     )
     assert_bytes_equal(response.body_raw, str_to_bytes("\r\nSorry folks.\n"))
 
@@ -275,6 +324,7 @@ fn test_receive_no_response() raises -> None:
 #         "EOFError: connection closed while reading HTTP headers",
 #     )
 
+
 fn test_receive_random_response() raises -> None:
     """Client receives a junk handshake response."""
     client = ClientProtocol(uri=URI.parse(SOCKET_URI), key=String(KEY))
@@ -289,7 +339,10 @@ fn test_receive_random_response() raises -> None:
     # ValueError: invalid HTTP status line: 220 smtp.invalid
     assert_equal(
         String(client.get_handshake_exc().value()),
-        "Failed to parse response headers: Failed to read second word from request line",
+        (
+            "Failed to parse response headers: Failed to read second word from request"
+            " line"
+        ),
     )
 
 
@@ -335,6 +388,7 @@ fn test_receive_random_response() raises -> None:
 #         assert client.handshake_exc.__cause__ is None
 #         self.assertEqual(String(client.handshake_exc), msg)
 
+
 fn test_basic() raises -> None:
     """Handshake succeeds."""
     client = ClientProtocol(uri=URI.parse(SOCKET_URI), key=String(KEY))
@@ -343,12 +397,14 @@ fn test_basic() raises -> None:
     receive_data(
         client,
         str_to_bytes(
-            "HTTP/1.1 101 Switching Protocols\r\n"
-            "Upgrade: websocket\r\n"
-            "Connection: Upgrade\r\n"
-            "Sec-WebSocket-Accept: {}\r\n"
-            "Date: {}\r\n"
-            "\r\n".format(ACCEPT, date_func())
+            String(
+                "HTTP/1.1 101 Switching Protocols\r\n"
+                "Upgrade: websocket\r\n"
+                "Connection: Upgrade\r\n"
+                "Sec-WebSocket-Accept: {}\r\n"
+                "Date: {}\r\n"
+                "\r\n"
+            ).format(ACCEPT, date_func())
         ),
     )
 
@@ -364,11 +420,13 @@ fn test_missing_connection() raises -> None:
     receive_data(
         client,
         str_to_bytes(
-            "HTTP/1.1 101 Switching Protocols\r\n"
-            "Upgrade: websocket\r\n"
-            "Sec-WebSocket-Accept: {}\r\n"
-            "Date: {}\r\n"
-            "\r\n".format(ACCEPT, date_func())
+            String(
+                "HTTP/1.1 101 Switching Protocols\r\n"
+                "Upgrade: websocket\r\n"
+                "Sec-WebSocket-Accept: {}\r\n"
+                "Date: {}\r\n"
+                "\r\n"
+            ).format(ACCEPT, date_func())
         ),
     )
 
@@ -376,7 +434,7 @@ fn test_missing_connection() raises -> None:
     assert_true(client.get_handshake_exc())
     assert_equal(
         String(client.get_handshake_exc().value()),
-        'InvalidHeader: Missing "Connection" header'
+        'InvalidHeader: Missing "Connection" header',
     )
 
 
@@ -388,12 +446,14 @@ fn test_invalid_connection() raises -> None:
     receive_data(
         client,
         str_to_bytes(
-            "HTTP/1.1 101 Switching Protocols\r\n"
-            "Upgrade: websocket\r\n"
-            "Connection: close\r\n"
-            "Sec-WebSocket-Accept: {}\r\n"
-            "Date: {}\r\n"
-            "\r\n".format(ACCEPT, date_func())
+            String(
+                "HTTP/1.1 101 Switching Protocols\r\n"
+                "Upgrade: websocket\r\n"
+                "Connection: close\r\n"
+                "Sec-WebSocket-Accept: {}\r\n"
+                "Date: {}\r\n"
+                "\r\n"
+            ).format(ACCEPT, date_func())
         ),
     )
 
@@ -403,7 +463,7 @@ fn test_invalid_connection() raises -> None:
     # InvalidHeader: Invalid "Connection" header: close
     assert_equal(
         String(client.get_handshake_exc().value()),
-        'InvalidUpgrade: Response "Connection" header is not "Upgrade"'
+        'InvalidUpgrade: Response "Connection" header is not "Upgrade"',
     )
 
 
@@ -415,11 +475,13 @@ fn test_missing_upgrade() raises -> None:
     receive_data(
         client,
         str_to_bytes(
-            "HTTP/1.1 101 Switching Protocols\r\n"
-            "Connection: Upgrade\r\n"
-            "Sec-WebSocket-Accept: {}\r\n"
-            "Date: {}\r\n"
-            "\r\n".format(ACCEPT, date_func())
+            String(
+                "HTTP/1.1 101 Switching Protocols\r\n"
+                "Connection: Upgrade\r\n"
+                "Sec-WebSocket-Accept: {}\r\n"
+                "Date: {}\r\n"
+                "\r\n"
+            ).format(ACCEPT, date_func())
         ),
     )
 
@@ -427,7 +489,7 @@ fn test_missing_upgrade() raises -> None:
     assert_true(client.get_handshake_exc())
     assert_equal(
         String(client.get_handshake_exc().value()),
-        'InvalidHeader: Missing "Upgrade" header'
+        'InvalidHeader: Missing "Upgrade" header',
     )
 
 
@@ -439,12 +501,14 @@ fn test_invalid_upgrade() raises -> None:
     receive_data(
         client,
         str_to_bytes(
-            "HTTP/1.1 101 Switching Protocols\r\n"
-            "Upgrade: h2c\r\n"
-            "Connection: Upgrade\r\n"
-            "Sec-WebSocket-Accept: {}\r\n"
-            "Date: {}\r\n"
-            "\r\n".format(ACCEPT, date_func())
+            String(
+                "HTTP/1.1 101 Switching Protocols\r\n"
+                "Upgrade: h2c\r\n"
+                "Connection: Upgrade\r\n"
+                "Sec-WebSocket-Accept: {}\r\n"
+                "Date: {}\r\n"
+                "\r\n"
+            ).format(ACCEPT, date_func())
         ),
     )
 
@@ -452,7 +516,7 @@ fn test_invalid_upgrade() raises -> None:
     assert_true(client.get_handshake_exc())
     assert_equal(
         String(client.get_handshake_exc().value()),
-        'InvalidUpgrade: Response "Upgrade" header is not "websocket"'
+        'InvalidUpgrade: Response "Upgrade" header is not "websocket"',
     )
 
 
@@ -464,11 +528,13 @@ fn test_missing_accept() raises -> None:
     receive_data(
         client,
         str_to_bytes(
-            "HTTP/1.1 101 Switching Protocols\r\n"
-            "Upgrade: websocket\r\n"
-            "Connection: Upgrade\r\n"
-            "Date: {}\r\n"
-            "\r\n".format(date_func())
+            String(
+                "HTTP/1.1 101 Switching Protocols\r\n"
+                "Upgrade: websocket\r\n"
+                "Connection: Upgrade\r\n"
+                "Date: {}\r\n"
+                "\r\n"
+            ).format(date_func())
         ),
     )
 
@@ -476,7 +542,7 @@ fn test_missing_accept() raises -> None:
     assert_true(client.get_handshake_exc())
     assert_equal(
         String(client.get_handshake_exc().value()),
-        'InvalidHeader: Missing "Sec-WebSocket-Accept" header'
+        'InvalidHeader: Missing "Sec-WebSocket-Accept" header',
     )
 
 
@@ -506,6 +572,7 @@ fn test_missing_accept() raises -> None:
 #         'InvalidHeader: Multiple "Sec-WebSocket-Accept" headers'
 #     )
 
+
 fn test_invalid_accept() raises -> None:
     """Handshake fails when the Sec-WebSocket-Accept header is invalid."""
     client = ClientProtocol(uri=URI.parse(SOCKET_URI), key=String(KEY))
@@ -514,12 +581,14 @@ fn test_invalid_accept() raises -> None:
     receive_data(
         client,
         str_to_bytes(
-            "HTTP/1.1 101 Switching Protocols\r\n"
-            "Upgrade: websocket\r\n"
-            "Connection: Upgrade\r\n"
-            "Sec-WebSocket-Accept: invalid_accept_key\r\n"
-            "Date: {}\r\n"
-            "\r\n".format(date_func())
+            String(
+                "HTTP/1.1 101 Switching Protocols\r\n"
+                "Upgrade: websocket\r\n"
+                "Connection: Upgrade\r\n"
+                "Sec-WebSocket-Accept: invalid_accept_key\r\n"
+                "Date: {}\r\n"
+                "\r\n"
+            ).format(date_func())
         ),
     )
 
@@ -527,8 +596,9 @@ fn test_invalid_accept() raises -> None:
     assert_true(client.get_handshake_exc())
     assert_equal(
         String(client.get_handshake_exc().value()),
-        'InvalidHeader: "Sec-WebSocket-Accept" header is invalid'
+        'InvalidHeader: "Sec-WebSocket-Accept" header is invalid',
     )
+
 
 # fn test_close_reason_not_provided() raises:
 #     """Test handling when no close reason is provided."""
@@ -536,6 +606,7 @@ fn test_invalid_accept() raises -> None:
 #     receive_data(client, Bytes(136, 0))  # \x88\x00
 #     events = client.events_received()
 #     assert_equal(events[0][Frame], Frame(OpCode.OP_CLOSE, Bytes(), fin=True))
+
 
 fn test_bypass_handshake() raises -> None:
     """ClientProtocol bypasses the opening handshake if state is OPEN."""
@@ -546,7 +617,9 @@ fn test_bypass_handshake() raises -> None:
     events = client.events_received()
 
     assert_true(events[0].isa[Frame]())
-    assert_bytes_equal(events[0][Frame].data, Frame(OpCode.OP_TEXT, str_to_bytes("Hello!")).data)
+    assert_bytes_equal(
+        events[0][Frame].data, Frame(OpCode.OP_TEXT, str_to_bytes("Hello!")).data
+    )
 
 
 # TODO: Implement this tests when extensions are supported
@@ -757,7 +830,6 @@ fn test_bypass_handshake() raises -> None:
 #             "invalid Sec-WebSocket-Protocol header: "
 #             "multiple values: superchat, chat",
 #         )
-
 
 
 #     def test_custom_logger(self):

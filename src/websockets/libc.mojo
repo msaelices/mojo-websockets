@@ -1,7 +1,19 @@
 # Taken from lightbug_http
 
 from utils import StaticTuple
-from sys.ffi import external_call
+
+from sys.ffi import (
+    external_call,
+    c_char,
+    c_uchar,
+    c_int,
+    c_uint,
+    c_long,
+    c_short,
+    c_ushort,
+    c_float,
+    c_double,
+)
 from sys.info import sizeof, os_is_windows, os_is_macos, os_is_linux
 from memory import memcpy, UnsafePointer, stack_allocation
 
@@ -21,17 +33,8 @@ alias char_UnsafePointer = UnsafePointer[c_char]
 # Adapted from https://github.com/crisadamo/mojo-Libc . Huge thanks to Cristian!
 # C types
 alias c_void = UInt8
-alias c_char = UInt8
 alias c_schar = Int8
-alias c_uchar = UInt8
-alias c_short = Int16
-alias c_ushort = UInt16
-alias c_int = Int32
-alias c_uint = UInt32
-alias c_long = Int64
 alias c_ulong = UInt64
-alias c_float = Float32
-alias c_double = Float64
 
 # `Int` is known to be machine's width
 alias c_size_t = Int
@@ -427,7 +430,7 @@ fn ntohs(netshort: c_ushort) -> c_ushort:
 
 fn _inet_ntop(
     af: c_int,
-    src: UnsafePointer[c_void],
+    src: UnsafePointer[c_void, mut=False],
     dst: UnsafePointer[c_char],
     size: socklen_t,
 ) raises -> UnsafePointer[c_char]:
@@ -496,11 +499,11 @@ fn inet_ntop[
         address_length in [INET_ADDRSTRLEN, INET6_ADDRSTRLEN],
         "Address family must be either INET_ADDRSTRLEN or INET6_ADDRSTRLEN.",
     ]()
-    var dst = String(capacity=address_length)
+    var dst = UnsafePointer[c_char].alloc(address_length.value + 1)
     var result = _inet_ntop(
         address_family,
-        UnsafePointer.address_of(ip_address).bitcast[c_void](),
-        dst.unsafe_ptr(),
+        UnsafePointer(to=ip_address).bitcast[c_void](),
+        dst,
         address_length,
     )
 
@@ -509,9 +512,7 @@ fn inet_ntop[
         if result[i] == 0:
             break
         i += 1
-    dst._buffer._len = (
-        i + 1
-    )  # Need to modify internal buffer's size for the string to be valid.
+    # String already set with proper length since we created it with capacity
 
     # `inet_ntop` returns NULL on error.
     if not result:
@@ -533,8 +534,8 @@ fn inet_ntop[
                 + String(errno)
             )
 
-    # We want the string representation of the address, so it's ok to take ownership of the pointer here.
-    return dst
+    # Copy the dst pointer's contents into a new String.
+    return String(StringSlice(ptr=dst.bitcast[c_uchar](), length=i))
 
 
 fn _inet_pton(
@@ -570,7 +571,7 @@ fn _inet_pton(
     ](af, src, dst)
 
 
-fn inet_pton[address_family: Int32](src: UnsafePointer[c_char]) raises -> c_uint:
+fn inet_pton[address_family: Int](owned src: String) raises -> c_uint:
     """Libc POSIX `inet_pton` function. Converts a presentation format address (that is, printable form as held in a character string)
     to network format (usually a struct in_addr or some other internal binary representation, in network byte order).
 
@@ -592,12 +593,12 @@ fn inet_pton[address_family: Int32](src: UnsafePointer[c_char]) raises -> c_uint
     ```
 
     #### Notes:
-    * Reference: https://man7.org/linux/man-pages/man3/inet_ntop.3p.html.
+    * Reference: https://man7.org/linux/man-pages/man3/inet_ntop.3p.html .
     * This function is valid for `AF_INET` and `AF_INET6`.
     """
     constrained[
-        Int(address_family) in [AF_INET, AF_INET6],
-        "Address family must be either INET_ADDRSTRLEN or INET6_ADDRSTRLEN.",
+        address_family in [AF_INET, AF_INET6],
+        "Address family must be either AF_INET or AF_INET6.",
     ]()
     var ip_buffer: UnsafePointer[c_void]
 
@@ -607,15 +608,19 @@ fn inet_pton[address_family: Int32](src: UnsafePointer[c_char]) raises -> c_uint
     else:
         ip_buffer = stack_allocation[4, c_void]()
 
-    var result = _inet_pton(address_family, src, ip_buffer)
+    var result = _inet_pton(
+        address_family.value, src.unsafe_cstr_ptr().origin_cast[mut=False](), ip_buffer
+    )
     if result == 0:
         raise Error("inet_pton Error: The input is not a valid address.")
     elif result == -1:
         var errno = get_errno()
         raise Error(
-            "inet_pton Error: An error occurred while converting the address. Error"
-            " code: "
-            + String(errno)
+            (
+                "inet_pton Error: An error occurred while converting the address. Error"
+                " code: "
+            ),
+            errno,
         )
 
     return ip_buffer.bitcast[c_uint]().take_pointee()
@@ -790,7 +795,7 @@ fn setsockopt(
     * Reference: https://man7.org/linux/man-pages/man3/setsockopt.3p.html.
     """
     var result = _setsockopt(
-        socket, level, option_name, Pointer.address_of(option_value), sizeof[Int]()
+        socket, level, option_name, Pointer(to=option_value), sizeof[Int]()
     )
     if result == -1:
         var errno = get_errno()
@@ -895,7 +900,7 @@ fn getsockopt(
     var option_value = stack_allocation[1, c_void]()
     var option_len: socklen_t = sizeof[Int]()
     var result = _getsockopt(
-        socket, level, option_name, option_value, Pointer.address_of(option_len)
+        socket, level, option_name, option_value, Pointer(to=option_len)
     )
     if result == -1:
         var errno = get_errno()
@@ -1079,7 +1084,7 @@ fn getpeername(file_descriptor: c_int) raises -> sockaddr_in:
     var result = _getpeername(
         file_descriptor,
         remote_address,
-        Pointer.address_of(socklen_t(sizeof[sockaddr]())),
+        Pointer(to=socklen_t(sizeof[sockaddr]())),
     )
     if result == -1:
         var errno = get_errno()
@@ -1177,7 +1182,7 @@ fn bind(socket: c_int, mut address: sockaddr_in) raises:
     #### Notes:
     * Reference: https://man7.org/linux/man-pages/man3/bind.3p.html.
     """
-    var result = _bind(socket, Pointer.address_of(address), sizeof[sockaddr_in]())
+    var result = _bind(socket, Pointer(to=address), sizeof[sockaddr_in]())
     if result == -1:
         var errno = get_errno()
         if errno == EACCES:
@@ -1356,8 +1361,8 @@ fn accept(socket: c_int) raises -> c_int:
     var remote_address = sockaddr()
     var result = _accept(
         socket,
-        Pointer.address_of(remote_address),
-        Pointer.address_of(socklen_t(sizeof[socklen_t]())),
+        Pointer(to=remote_address),
+        Pointer(to=socklen_t(sizeof[socklen_t]())),
     )
     if result == -1:
         var errno = get_errno()
@@ -1478,7 +1483,7 @@ fn connect(socket: c_int, address: sockaddr_in) raises:
     #### Notes:
     * Reference: https://man7.org/linux/man-pages/man3/connect.3p.html.
     """
-    var result = _connect(socket, Pointer.address_of(address), sizeof[sockaddr_in]())
+    var result = _connect(socket, Pointer(to=address), sizeof[sockaddr_in]())
     if result == -1:
         var errno = get_errno()
         if errno == EACCES:
@@ -1742,7 +1747,7 @@ fn recvfrom(
         length,
         flags,
         address,
-        Pointer[socklen_t].address_of(sizeof[sockaddr]()),
+        Pointer[socklen_t](to=sizeof[sockaddr]()),
     )
     if result == -1:
         var errno = get_errno()
@@ -1930,7 +1935,7 @@ fn send(
 
 fn _sendto(
     socket: c_int,
-    message: UnsafePointer[c_void],
+    message: UnsafePointer[c_void, mut=False],
     length: c_size_t,
     flags: c_int,
     dest_addr: UnsafePointer[sockaddr],
@@ -1967,10 +1972,10 @@ fn _sendto(
         "sendto",
         c_ssize_t,
         c_int,
-        UnsafePointer[c_char],
+        UnsafePointer[c_void, mut=False],
         c_size_t,
         c_int,
-        UnsafePointer[sockaddr],
+        UnsafePointer[sockaddr, mut=False],
         socklen_t,
     ](socket, message, length, flags, dest_addr, dest_len)
 
