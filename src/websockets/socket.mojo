@@ -481,7 +481,7 @@ struct Socket[AddrType: Addr, address_family: Int = AF_INET](Stringable, Writabl
 
         except e:
             logger.debug("get_ip_address failed: Falling back to direct IP")
-            binary_ip = inet_pton[address_family](address.unsafe_ptr())
+            binary_ip = inet_pton[address_family](address)
 
         addr = sockaddr_in(
             address_family=address_family,
@@ -492,10 +492,10 @@ struct Socket[AddrType: Addr, address_family: Int = AF_INET](Stringable, Writabl
             connect(self.fd, addr)
         except e:
             logger.error(
-                "Socket.connect: Failed to establish a connection to the server: {}"
-                .format(e)
+                "Socket.connect: Failed to establish a connection to the server:",
+                e,
             )
-            raise Error("Failed to connect to server: {}".format(e))
+            raise Error(String("Failed to connect to server: {}").format(e))
 
         var remote = self.get_peer_name()
         self._remote_address = AddrType(remote[0], remote[1])

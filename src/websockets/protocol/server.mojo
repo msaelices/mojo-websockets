@@ -55,7 +55,7 @@ struct ServerProtocol(Protocol):
     var discard_sent: Bool
     var _active: Bool  # Track if the protocol is active/used
 
-    fn __moveinit__(mut self, owned existing: Self):
+    fn __moveinit__(out self, owned existing: Self):
         # Needed as we have a list of protocols in the server for concurrency
         self.origins = existing.origins
         self.reader = existing.reader^
